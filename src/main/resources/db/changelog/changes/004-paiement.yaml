@@ -1,0 +1,30 @@
+databaseChangeLog:
+  - changeSet:
+      id: 004-creer-table-paiement
+      author: batulo
+      changes:
+        - createTable:
+            tableName: paiement
+            columns:
+              - column: { name: id, type: BIGINT, autoIncrement: true, constraints: { primaryKey: true, nullable: false } }
+              - column:
+                  name: abonnement_id
+                  type: BIGINT
+                  constraints:
+                    nullable: false
+                    foreignKeyName: fk_paiement_abonnement
+                    references: abonnement(id)
+                    deleteCascade: true
+              - column: { name: stripe_session_id, type: VARCHAR(255), constraints: { nullable: false, unique: true, uniqueConstraintName: uk_paiement_stripe_session } }
+              - column: { name: stripe_payment_intent_id, type: VARCHAR(255) }
+              - column: { name: formule, type: VARCHAR(20), constraints: { nullable: false } }
+              - column: { name: montant, type: "NUMERIC(10,2)", constraints: { nullable: false } }
+              - column: { name: devise, type: VARCHAR(3), constraints: { nullable: false } }
+              - column: { name: statut, type: VARCHAR(20), constraints: { nullable: false } }
+              - column: { name: date_creation, type: TIMESTAMP WITH TIME ZONE, constraints: { nullable: false } }
+              - column: { name: date_paiement, type: TIMESTAMP WITH TIME ZONE }
+        - createIndex:
+            tableName: paiement
+            indexName: idx_paiement_abonnement
+            columns:
+              - column: { name: abonnement_id }

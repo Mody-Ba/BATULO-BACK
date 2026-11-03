@@ -1,0 +1,15 @@
+databaseChangeLog:
+  - include:
+      file: db/changelog/changes/001-entreprise.yaml
+  - include:
+      file: db/changelog/changes/002-utilisateur.yaml
+  - include:
+      file: db/changelog/changes/003-abonnement.yaml
+  - include:
+      file: db/changelog/changes/004-paiement.yaml
+  - include:
+      file: db/changelog/changes/005-jeton-reinitialisation.yaml
+  - include:
+      file: db/changelog/changes/006-jeton-rafraichissement.yaml
+  - include:
+      file: db/changelog/changes/007-notification.yaml
