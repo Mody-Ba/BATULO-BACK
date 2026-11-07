@@ -8,6 +8,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
@@ -36,6 +38,22 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(RegleGestionException.class)
     public ResponseEntity<ErrorResponse> handleRegleGestion(RegleGestionException ex) {
         return reponse(HttpStatus.BAD_REQUEST, ex.getCode(), ex.getMessage());
+    }
+
+    @ExceptionHandler(NonAuthentifieException.class)
+    public ResponseEntity<ErrorResponse> handleNonAuthentifie(NonAuthentifieException ex) {
+        return reponse(HttpStatus.UNAUTHORIZED, ex.getCode(), ex.getMessage());
+    }
+
+    /** Rôle refusé par @PreAuthorize : levée dans le controller, donc arrive ici et non dans AccesRefuseHandler. */
+    @ExceptionHandler(AccessDeniedException.class)
+    public ResponseEntity<ErrorResponse> handleAccesRefuse(AccessDeniedException ex) {
+        return reponse(HttpStatus.FORBIDDEN, "ACCES_REFUSE", "Votre rôle ne permet pas d'accéder à cette ressource.");
+    }
+
+    @ExceptionHandler(AuthenticationException.class)
+    public ResponseEntity<ErrorResponse> handleAuthentification(AuthenticationException ex) {
+        return reponse(HttpStatus.UNAUTHORIZED, "NON_AUTHENTIFIE", "Jeton d'authentification manquant ou invalide.");
     }
 
     @ExceptionHandler(ActionInterditeException.class)

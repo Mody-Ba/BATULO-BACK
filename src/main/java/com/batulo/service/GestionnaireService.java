@@ -9,8 +9,8 @@ import org.springframework.data.domain.Page;
  * Gestion des gestionnaires par l'admin d'une entreprise (AD-07 à AD-10). Toutes les opérations sont limitées
  * à l'entreprise de l'admin : un gestionnaire d'une autre entreprise donne ResourceNotFoundException (404).
  * <p>
- * Règles d'abonnement (ActionInterditeException, 403) : EN_ATTENTE_PAIEMENT ou DESACTIVE, tout est refusé ;
- * EXPIRE, lecture seule ; ACTIF ou EXPIRE_BIENTOT, tout est permis.
+ * Les règles d'abonnement (EN_ATTENTE_PAIEMENT ou DESACTIVE : tout est refusé ; EXPIRE : lecture seule) sont
+ * appliquées avant d'arriver ici, par AccesAbonnementInterceptor.
  */
 public interface GestionnaireService {
 

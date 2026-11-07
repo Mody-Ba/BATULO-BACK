@@ -1,0 +1,37 @@
+# Profil « test » des tests d'intégration : H2 en mémoire (mode PostgreSQL), aucun service extérieur.
+# Le schéma vient toujours de Liquibase ; ddl-auto=validate vérifie que les entités correspondent.
+spring:
+  datasource:
+    url: jdbc:h2:mem:batulo;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH;DB_CLOSE_DELAY=-1
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+  # H2 stocke TEXT en CLOB : la validation Hibernate est faite contre PostgreSQL au démarrage normal, pas ici.
+  # Le schéma reste créé par les mêmes changesets Liquibase.
+  jpa:
+    hibernate:
+      ddl-auto: none
+  # Jamais de vrai courriel : les tests remplacent EmailService par un mock.
+  mail:
+    host: localhost
+    port: 2525
+
+batulo:
+  jwt:
+    secret: secret-de-test-batulo-au-moins-32-octets-0123456789
+  stripe:
+    cle-secrete: ""
+    cle-publique: ""
+  cors:
+    origines: http://localhost:4200
+  abonnement:
+    # Pas de passage planifié pendant les tests (le 31 février n'existe pas).
+    cron-expiration: "0 0 0 31 2 *"
+
+# Le super admin de .env.properties n'est pas créé : chaque test crée ses propres comptes.
+SUPER_ADMIN_EMAIL: ""
+SUPER_ADMIN_PASSWORD: ""
+
+logging:
+  level:
+    com.batulo: WARN

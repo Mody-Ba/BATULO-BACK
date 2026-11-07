@@ -1,5 +1,6 @@
 package com.batulo.controller;
 
+import com.batulo.configs.security.UtilisateurConnecte;
 import com.batulo.mappers.AbonnementMapper;
 import com.batulo.service.DevPaiementService;
 import com.batulo.service.model.CarteTestResponse;
@@ -9,10 +10,11 @@ import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.context.annotation.Profile;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
@@ -34,15 +36,14 @@ public class DevPaiementController {
     }
 
     @PostMapping("/carte-test")
+    @PreAuthorize("hasRole('ADMIN')")
     @Operation(summary = "Payer un PaymentIntent avec la carte de test pm_card_visa (dev)",
             description = "Simule la saisie de carte du frontend : confirme le PaymentIntent côté Stripe. "
                     + "N'active PAS l'abonnement : appelez ensuite POST /api/abonnements/paiement/confirmer.")
     public CarteTestResponse payerAvecCarteTest(
-            // TEMPORAIRE - étape 7
-            @Parameter(description = "TEMPORAIRE - étape 7 : entreprise de l'admin connecté")
-            @RequestParam Long entrepriseId,
+            @Parameter(hidden = true) @AuthenticationPrincipal UtilisateurConnecte moi,
             @Valid @RequestBody ConfirmationPaiementRequest request) {
         return abonnementMapper.toCarteTestResponse(
-                devPaiementService.payerAvecCarteTest(entrepriseId, abonnementMapper.toModel(request)));
+                devPaiementService.payerAvecCarteTest(moi.entrepriseId(), abonnementMapper.toModel(request)));
     }
 }

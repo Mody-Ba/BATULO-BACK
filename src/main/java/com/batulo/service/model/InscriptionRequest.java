@@ -25,9 +25,8 @@ public record InscriptionRequest(
         String courriel,
 
         @NotBlank(message = "le mot de passe est obligatoire")
-        @Size(max = 72, message = "le mot de passe ne doit pas dépasser 72 caractères")
-        @Pattern(regexp = "^(?=.*[A-Za-z])(?=.*\\d).{8,}$",
-                message = "le mot de passe doit contenir au moins 8 caractères, dont une lettre et un chiffre")
+        @Size(max = ReglesMotDePasse.TAILLE_MAX, message = "le mot de passe ne doit pas dépasser 72 caractères")
+        @Pattern(regexp = ReglesMotDePasse.REGEX, message = ReglesMotDePasse.MESSAGE)
         @Schema(example = "MotDePasse123")
         String motDePasse,
 

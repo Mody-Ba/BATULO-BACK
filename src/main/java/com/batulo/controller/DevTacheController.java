@@ -6,6 +6,7 @@ import com.batulo.service.model.ResultatTacheResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.context.annotation.Profile;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -27,6 +28,7 @@ public class DevTacheController {
     }
 
     @PostMapping("/abonnements")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
     @Operation(summary = "Lancer la tâche des abonnements maintenant (dev)",
             description = "Même traitement que le passage de 8 h : rappels à 7 jours ou moins et expirations. "
                     + "Relançable sans risque : un avis n'est jamais envoyé deux fois pour la même période.")
