@@ -18,6 +18,7 @@ public record UtilisateurModel(
         String entrepriseNom,
         boolean actif,
         boolean motDePasseTemporaire,
+        Instant motDePasseTemporaireExpireLe,
         boolean peutCreerSondages,
         Instant dateCreation
 ) {

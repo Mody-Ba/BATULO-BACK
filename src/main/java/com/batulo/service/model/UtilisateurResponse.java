@@ -16,6 +16,8 @@ public record UtilisateurResponse(
         boolean actif,
         /** true : le mot de passe a été généré par le serveur et doit être changé. */
         boolean motDePasseTemporaire,
+        /** Fin de validité du mot de passe temporaire (24 h) ; null s'il n'y en a pas. */
+        Instant motDePasseTemporaireExpireLe,
         boolean peutCreerSondages,
         Instant dateCreation
 ) {
