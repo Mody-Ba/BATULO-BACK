@@ -1,0 +1,40 @@
+databaseChangeLog:
+  - changeSet:
+      id: 003-creer-table-abonnement
+      author: batulo
+      changes:
+        - createTable:
+            tableName: abonnement
+            columns:
+              - column: { name: id, type: BIGINT, autoIncrement: true, constraints: { primaryKey: true, nullable: false } }
+              - column:
+                  name: entreprise_id
+                  type: BIGINT
+                  constraints:
+                    nullable: false
+                    unique: true
+                    uniqueConstraintName: uk_abonnement_entreprise
+                    foreignKeyName: fk_abonnement_entreprise
+                    references: entreprise(id)
+                    deleteCascade: true
+              - column: { name: formule, type: VARCHAR(20) }
+              - column: { name: statut, type: VARCHAR(30), constraints: { nullable: false } }
+              - column: { name: date_debut, type: TIMESTAMP WITH TIME ZONE }
+              - column: { name: date_expiration, type: TIMESTAMP WITH TIME ZONE }
+              - column: { name: montant, type: "NUMERIC(10,2)" }
+              - column: { name: devise, type: VARCHAR(3) }
+              - column: { name: notif_7j_envoyee, type: BOOLEAN, defaultValueBoolean: false, constraints: { nullable: false } }
+              - column: { name: notif_expiration_envoyee, type: BOOLEAN, defaultValueBoolean: false, constraints: { nullable: false } }
+              - column: { name: date_creation, type: TIMESTAMP WITH TIME ZONE, constraints: { nullable: false } }
+              - column: { name: date_modification, type: TIMESTAMP WITH TIME ZONE, constraints: { nullable: false } }
+        - createIndex:
+            tableName: abonnement
+            indexName: idx_abonnement_statut
+            columns:
+              - column: { name: statut }
+        - sql:
+            sql: >-
+              ALTER TABLE abonnement ADD CONSTRAINT ck_abonnement_statut
+              CHECK (statut IN ('EN_ATTENTE_PAIEMENT','ACTIF','EXPIRE_BIENTOT','EXPIRE','DESACTIVE'));
+              ALTER TABLE abonnement ADD CONSTRAINT ck_abonnement_formule
+              CHECK (formule IS NULL OR formule IN ('MENSUELLE','ANNUELLE'))

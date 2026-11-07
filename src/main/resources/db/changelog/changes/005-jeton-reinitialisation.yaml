@@ -1,0 +1,21 @@
+databaseChangeLog:
+  - changeSet:
+      id: 005-creer-table-jeton-reinitialisation
+      author: batulo
+      changes:
+        - createTable:
+            tableName: jeton_reinitialisation
+            columns:
+              - column: { name: id, type: BIGINT, autoIncrement: true, constraints: { primaryKey: true, nullable: false } }
+              - column:
+                  name: utilisateur_id
+                  type: BIGINT
+                  constraints:
+                    nullable: false
+                    foreignKeyName: fk_jeton_reinit_utilisateur
+                    references: utilisateur(id)
+                    deleteCascade: true
+              - column: { name: jeton_hash, type: VARCHAR(64), constraints: { nullable: false, unique: true, uniqueConstraintName: uk_jeton_reinit_hash } }
+              - column: { name: expire_le, type: TIMESTAMP WITH TIME ZONE, constraints: { nullable: false } }
+              - column: { name: utilise_le, type: TIMESTAMP WITH TIME ZONE }
+              - column: { name: date_creation, type: TIMESTAMP WITH TIME ZONE, constraints: { nullable: false } }

@@ -1,0 +1,13 @@
+databaseChangeLog:
+  - changeSet:
+      id: 001-creer-table-entreprise
+      author: batulo
+      changes:
+        - createTable:
+            tableName: entreprise
+            columns:
+              - column: { name: id, type: BIGINT, autoIncrement: true, constraints: { primaryKey: true, nullable: false } }
+              - column: { name: nom, type: VARCHAR(150), constraints: { nullable: false } }
+              - column: { name: actif, type: BOOLEAN, defaultValueBoolean: true, constraints: { nullable: false } }
+              - column: { name: date_creation, type: TIMESTAMP WITH TIME ZONE, constraints: { nullable: false } }
+              - column: { name: date_modification, type: TIMESTAMP WITH TIME ZONE, constraints: { nullable: false } }

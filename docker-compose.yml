@@ -1,0 +1,27 @@
+services:
+  batulo-db:
+    image: postgres:16
+    container_name: batulo-db
+    environment:
+      POSTGRES_DB: batulo
+      POSTGRES_USER: batulo
+      POSTGRES_PASSWORD: batulo
+    ports:
+      - "5434:5432"
+    volumes:
+      - batulo-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U batulo -d batulo"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  batulo-mailpit:
+    image: axllent/mailpit:latest
+    container_name: batulo-mailpit
+    ports:
+      - "1025:1025"   # SMTP
+      - "8025:8025"   # Interface web : http://localhost:8025
+
+volumes:
+  batulo-db-data:
