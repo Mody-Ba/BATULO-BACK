@@ -35,6 +35,4 @@ build/
 ### Secrets locaux ###
 .env.properties
 
-### Ancien code de référence (supprimé après l'étape 7) ###
-docs/ancien-code/
 .DS_Store

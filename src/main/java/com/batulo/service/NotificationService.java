@@ -10,11 +10,7 @@ import org.springframework.data.domain.Page;
  */
 public interface NotificationService {
 
-    /**
-     * Notifications de l'utilisateur, les plus récentes d'abord.
-     *
-     * @throws com.batulo.exception.ResourceNotFoundException utilisateur inconnu
-     */
+    /** Notifications de l'utilisateur, les plus récentes d'abord. */
     Page<NotificationModel> lister(Long utilisateurId, int page, int taille);
 
     long nombreNonLues(Long utilisateurId);

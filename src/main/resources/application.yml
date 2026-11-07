@@ -58,9 +58,14 @@ batulo:
   # Fuseau des dates dans les courriels et de la tâche quotidienne.
   fuseau-horaire: ${BATULO_FUSEAU_HORAIRE:America/Toronto}
   jwt:
+    # Au moins 32 octets (HS256). Obligatoire : l'application refuse de démarrer sans.
     secret: ${JWT_SECRET:}
-    duree-acces-minutes: ${JWT_ACCESS_MINUTES:30}
+    emetteur: batulo
+    duree-acces-minutes: ${JWT_ACCESS_MINUTES:15}
     duree-rafraichissement-jours: ${JWT_REFRESH_DAYS:7}
+  # Origines autorisées à appeler l'API depuis un navigateur (séparées par des virgules, jamais « * »).
+  cors:
+    origines: ${CORS_ORIGINS:http://localhost:4200}
   courriel:
     expediteur: ${MAIL_FROM:Batulo <no-reply@batulo.local>}
   stripe:

@@ -33,7 +33,6 @@ public class NotificationServiceImpl implements NotificationService {
 
     @Override
     public Page<NotificationModel> lister(Long utilisateurId, int page, int taille) {
-        verifierUtilisateur(utilisateurId);
         return notificationRepository.findByDestinataireId(utilisateurId,
                         PageRequest.of(page, taille, Sort.by(Sort.Direction.DESC, "dateCreation", "id")))
                 .map(notificationMapper::toModel);
@@ -41,14 +40,12 @@ public class NotificationServiceImpl implements NotificationService {
 
     @Override
     public long nombreNonLues(Long utilisateurId) {
-        verifierUtilisateur(utilisateurId);
         return notificationRepository.countByDestinataireIdAndLueFalse(utilisateurId);
     }
 
     @Override
     @Transactional
     public NotificationModel marquerLue(Long utilisateurId, Long notificationId) {
-        verifierUtilisateur(utilisateurId);
         // Une notification d'un autre utilisateur donne 404, sans révéler qu'elle existe.
         Notification notification = notificationRepository.findByIdAndDestinataireId(notificationId, utilisateurId)
                 .orElseThrow(() -> new ResourceNotFoundException("NOTIFICATION_INTROUVABLE",
@@ -60,7 +57,6 @@ public class NotificationServiceImpl implements NotificationService {
     @Override
     @Transactional
     public int toutMarquerLu(Long utilisateurId) {
-        verifierUtilisateur(utilisateurId);
         return notificationRepository.marquerToutesLues(utilisateurId);
     }
 
@@ -85,13 +81,5 @@ public class NotificationServiceImpl implements NotificationService {
         notification.setMessage(message);
         notification.setLue(false);
         notificationRepository.save(notification);
-    }
-
-    /** TEMPORAIRE - étape 7 : l'utilisateur viendra du jeton JWT et existera forcément. */
-    private void verifierUtilisateur(Long utilisateurId) {
-        if (!utilisateurRepository.existsById(utilisateurId)) {
-            throw new ResourceNotFoundException("UTILISATEUR_INTROUVABLE",
-                    "Aucun utilisateur avec l'identifiant " + utilisateurId + ".");
-        }
     }
 }
