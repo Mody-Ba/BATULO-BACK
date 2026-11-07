@@ -58,8 +58,15 @@
 			<artifactId>spring-security-crypto</artifactId>
 		</dependency>
 
-		<!-- Ajoutées étape par étape : stripe-java (étape 3),
-		     spring-boot-starter-mail (étape 6), spring-boot-starter-security + jjwt (étape 7). -->
+		<!-- Paiement Stripe en mode TEST (étape 3) -->
+		<dependency>
+			<groupId>com.stripe</groupId>
+			<artifactId>stripe-java</artifactId>
+			<version>${stripe.version}</version>
+		</dependency>
+
+		<!-- Ajoutées étape par étape : spring-boot-starter-mail (étape 6),
+		     spring-boot-starter-security + jjwt (étape 7). -->
 
 		<dependency>
 			<groupId>org.springframework.boot</groupId>

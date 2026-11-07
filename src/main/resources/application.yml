@@ -6,6 +6,10 @@ spring:
     name: batulo
   config:
     import: optional:file:.env.properties
+  profiles:
+    # Profil « dev » par défaut pendant le développement : il active la route /api/dev (carte de test Stripe).
+    # En production : SPRING_PROFILES_ACTIVE=prod (variable d'environnement ou .env.properties).
+    active: ${SPRING_PROFILES_ACTIVE:dev}
   datasource:
     url: ${DB_URL:jdbc:postgresql://localhost:5434/batulo}
     username: ${DB_USERNAME:batulo}
@@ -54,9 +58,12 @@ batulo:
     expediteur: ${MAIL_FROM:Batulo <no-reply@batulo.local>}
   stripe:
     cle-secrete: ${STRIPE_SECRET_KEY:}
+    # Clé publique (pk_test_...) renvoyée au frontend avec le clientSecret, pour Stripe.js.
+    cle-publique: ${STRIPE_PUBLISHABLE_KEY:}
     secret-webhook: ${STRIPE_WEBHOOK_SECRET:}
   abonnement:
-    devise: ${STRIPE_CURRENCY:usd}
+    devise: ${STRIPE_CURRENCY:cad}
+    # Prix des formules en centimes (RG-10) : MENSUEL 1 $, ANNUEL 2 $.
     prix-mensuel-centimes: 100
     prix-annuel-centimes: 200
     jours-alerte-expiration: 7
