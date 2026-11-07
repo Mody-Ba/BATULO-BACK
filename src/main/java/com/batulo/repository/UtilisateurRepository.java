@@ -8,6 +8,7 @@ import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -34,6 +35,15 @@ public interface UtilisateurRepository extends JpaRepository<Utilisateur, Long> 
     /** L'admin d'une entreprise (un seul par entreprise). */
     @EntityGraph(attributePaths = "entreprise")
     Optional<Utilisateur> findFirstByEntrepriseIdAndRole(Long entrepriseId, Role role);
+
+    /** Comptes d'un rôle, avec leur entreprise (liste paginée du super admin). */
+    @EntityGraph(attributePaths = "entreprise")
+    Page<Utilisateur> findByRole(Role role, Pageable pageable);
+
+    /** Admins de plusieurs entreprises en une requête (liste des abonnements). */
+    List<Utilisateur> findByEntrepriseIdInAndRole(Collection<Long> entrepriseIds, Role role);
+
+    long countByEntrepriseIdAndRole(Long entrepriseId, Role role);
 
     Page<Utilisateur> findByEntrepriseIdAndRole(Long entrepriseId, Role role, Pageable pageable);
 

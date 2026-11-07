@@ -24,6 +24,7 @@ public class UtilisateurMapper {
                 entreprise == null ? null : entreprise.getNom(),
                 entity.isActif(),
                 entity.isMotDePasseTemporaire(),
+                entity.getMotDePasseTemporaireExpireLe(),
                 entity.isPeutCreerSondages(),
                 entity.getDateCreation());
     }

@@ -23,6 +23,7 @@ public class AuthMapper {
                 model.entrepriseNom(),
                 model.actif(),
                 model.motDePasseTemporaire(),
+                model.motDePasseTemporaireExpireLe(),
                 model.peutCreerSondages(),
                 model.dateCreation());
     }

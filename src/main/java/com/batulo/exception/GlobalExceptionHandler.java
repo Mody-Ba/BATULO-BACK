@@ -38,6 +38,11 @@ public class GlobalExceptionHandler {
         return reponse(HttpStatus.BAD_REQUEST, ex.getCode(), ex.getMessage());
     }
 
+    @ExceptionHandler(ActionInterditeException.class)
+    public ResponseEntity<ErrorResponse> handleActionInterdite(ActionInterditeException ex) {
+        return reponse(HttpStatus.FORBIDDEN, ex.getCode(), ex.getMessage());
+    }
+
     @ExceptionHandler(ResourceNotFoundException.class)
     public ResponseEntity<ErrorResponse> handleNotFound(ResourceNotFoundException ex) {
         return reponse(HttpStatus.NOT_FOUND, ex.getCode(), ex.getMessage());
