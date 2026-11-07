@@ -29,9 +29,14 @@ spring:
     port: ${MAIL_PORT:1025}
     username: ${MAIL_USERNAME:}
     password: ${MAIL_PASSWORD:}
+    default-encoding: UTF-8
     properties:
       mail:
         smtp:
+          # Un serveur SMTP lent ou absent ne doit pas bloquer les requêtes.
+          connectiontimeout: 5000
+          timeout: 5000
+          writetimeout: 5000
           auth: ${MAIL_SMTP_AUTH:false}
           starttls:
             enable: ${MAIL_STARTTLS:false}
@@ -50,6 +55,8 @@ springdoc:
 
 batulo:
   url-base: ${APP_BASE_URL:http://localhost:${server.port}}
+  # Fuseau des dates dans les courriels et de la tâche quotidienne.
+  fuseau-horaire: ${BATULO_FUSEAU_HORAIRE:America/Toronto}
   jwt:
     secret: ${JWT_SECRET:}
     duree-acces-minutes: ${JWT_ACCESS_MINUTES:30}
@@ -67,7 +74,9 @@ batulo:
     prix-mensuel-centimes: 100
     prix-annuel-centimes: 200
     jours-alerte-expiration: 7
-    cron-expiration: ${ABONNEMENT_CRON:0 0 2 * * *}
+    # Tâche quotidienne (rappels et expirations) : tous les jours à 8 h, heure de batulo.fuseau-horaire.
+    # Elle tourne aussi une fois au démarrage.
+    cron-expiration: ${ABONNEMENT_CRON:0 0 8 * * *}
   mot-de-passe:
     duree-temporaire-heures: 24
     duree-lien-reinitialisation-minutes: 60

@@ -65,8 +65,13 @@
 			<version>${stripe.version}</version>
 		</dependency>
 
-		<!-- Ajoutées étape par étape : spring-boot-starter-mail (étape 6),
-		     spring-boot-starter-security + jjwt (étape 7). -->
+		<!-- Courriels (étape 6) : Mailpit en local, port SMTP 1025 -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-mail</artifactId>
+		</dependency>
+
+		<!-- Ajoutée à l'étape 7 : spring-boot-starter-security + jjwt. -->
 
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
