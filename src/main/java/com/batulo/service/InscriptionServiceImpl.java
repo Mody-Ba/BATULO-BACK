@@ -5,6 +5,7 @@ import com.batulo.entity.Entreprise;
 import com.batulo.entity.Utilisateur;
 import com.batulo.enums.Role;
 import com.batulo.enums.StatutAbonnement;
+import com.batulo.enums.TypeNotification;
 import com.batulo.exception.CompteExistantException;
 import com.batulo.exception.RegleGestionException;
 import com.batulo.repository.AbonnementRepository;
@@ -30,17 +31,20 @@ public class InscriptionServiceImpl implements InscriptionService {
     private final AbonnementRepository abonnementRepository;
     private final UtilisateurMapper utilisateurMapper;
     private final PasswordEncoder passwordEncoder;
+    private final NotificationService notificationService;
 
     public InscriptionServiceImpl(UtilisateurRepository utilisateurRepository,
                                   EntrepriseRepository entrepriseRepository,
                                   AbonnementRepository abonnementRepository,
                                   UtilisateurMapper utilisateurMapper,
-                                  PasswordEncoder passwordEncoder) {
+                                  PasswordEncoder passwordEncoder,
+                                  NotificationService notificationService) {
         this.utilisateurRepository = utilisateurRepository;
         this.entrepriseRepository = entrepriseRepository;
         this.abonnementRepository = abonnementRepository;
         this.utilisateurMapper = utilisateurMapper;
         this.passwordEncoder = passwordEncoder;
+        this.notificationService = notificationService;
     }
 
     @Override
@@ -79,6 +83,10 @@ public class InscriptionServiceImpl implements InscriptionService {
         abonnement.setEntreprise(entreprise);
         abonnement.setStatut(StatutAbonnement.EN_ATTENTE_PAIEMENT);
         abonnement = abonnementRepository.save(abonnement);
+
+        notificationService.notifierSuperAdmins(TypeNotification.NOUVELLE_INSCRIPTION, "Nouvelle inscription",
+                prenom + " " + nom + " (" + courriel + ") a inscrit l'entreprise « " + entreprise.getNom()
+                        + " ». Abonnement en attente de paiement.");
 
         log.info("Inscription : admin {} et entreprise {} créés, abonnement {} en attente de paiement",
                 admin.getId(), entreprise.getId(), abonnement.getId());

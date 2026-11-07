@@ -3,11 +3,15 @@ package com.batulo.service;
 import com.batulo.entity.Abonnement;
 import com.batulo.entity.Paiement;
 import com.batulo.enums.Formule;
+import com.batulo.enums.Role;
+import com.batulo.enums.TypeNotification;
 import com.batulo.enums.StatutPaiement;
 import com.batulo.exception.RegleGestionException;
 import com.batulo.exception.ResourceNotFoundException;
 import com.batulo.repository.AbonnementRepository;
 import com.batulo.repository.PaiementRepository;
+import com.batulo.repository.UtilisateurRepository;
+import com.batulo.service.email.EmailService;
 import com.batulo.service.mappers.AbonnementMapper;
 import com.batulo.service.model.AbonnementModel;
 import com.batulo.service.model.ConfirmationPaiementModel;
@@ -48,6 +52,10 @@ public class AbonnementServiceImpl implements AbonnementService {
     private final PaiementRepository paiementRepository;
     private final AbonnementMapper abonnementMapper;
     private final PaiementService paiementService;
+    private final UtilisateurRepository utilisateurRepository;
+    private final NotificationService notificationService;
+    private final EmailService emailService;
+    private final FormatDate formatDate;
 
     @Value("${batulo.abonnement.devise}")
     private String devise;
@@ -64,11 +72,19 @@ public class AbonnementServiceImpl implements AbonnementService {
     public AbonnementServiceImpl(AbonnementRepository abonnementRepository,
                                  PaiementRepository paiementRepository,
                                  AbonnementMapper abonnementMapper,
-                                 PaiementService paiementService) {
+                                 PaiementService paiementService,
+                                 UtilisateurRepository utilisateurRepository,
+                                 NotificationService notificationService,
+                                 EmailService emailService,
+                                 FormatDate formatDate) {
         this.abonnementRepository = abonnementRepository;
         this.paiementRepository = paiementRepository;
         this.abonnementMapper = abonnementMapper;
         this.paiementService = paiementService;
+        this.utilisateurRepository = utilisateurRepository;
+        this.notificationService = notificationService;
+        this.emailService = emailService;
+        this.formatDate = formatDate;
     }
 
     @Override
@@ -142,6 +158,8 @@ public class AbonnementServiceImpl implements AbonnementService {
                             + "L'abonnement n'est pas modifié.");
         }
 
+        // Renouvellement : l'entreprise avait déjà payé une période (en cours ou expirée).
+        boolean renouvellement = abonnement.getDateExpiration() != null;
         Instant debut = RegleAbonnement.debutNouvellePeriode(abonnement, maintenant);
         if (debut.equals(maintenant)) {
             abonnement.setDateDebut(maintenant);
@@ -157,9 +175,23 @@ public class AbonnementServiceImpl implements AbonnementService {
         paiement.setStatut(StatutPaiement.REUSSI);
         paiement.setDatePaiement(maintenant);
 
+        avertirPaiement(abonnement, paiement, renouvellement);
         log.info("Paiement {} confirmé : abonnement {} {} jusqu'au {}",
                 paymentIntentId, abonnement.getId(), abonnement.getStatut(), abonnement.getDateExpiration());
         return new PaiementConfirmeModel(versModele(abonnement, maintenant), false);
+    }
+
+    /** Courriel de confirmation à l'admin et notification aux super admins (envoyés après validation). */
+    private void avertirPaiement(Abonnement abonnement, Paiement paiement, boolean renouvellement) {
+        String entreprise = abonnement.getEntreprise().getNom();
+        notificationService.notifierSuperAdmins(TypeNotification.PAIEMENT_RECU, "Paiement reçu",
+                entreprise + " a payé " + paiement.getMontant().toPlainString() + " " + paiement.getDevise()
+                        + " (formule " + paiement.getFormule() + (renouvellement ? ", renouvellement" : "")
+                        + "). Abonnement valable jusqu'au " + formatDate.jour(abonnement.getDateExpiration()) + ".");
+        utilisateurRepository.findFirstByEntrepriseIdAndRole(abonnement.getEntreprise().getId(), Role.ADMIN)
+                .ifPresent(admin -> emailService.envoyerConfirmationPaiement(admin.getCourriel(), admin.getPrenom(),
+                        paiement.getFormule(), paiement.getMontant(), paiement.getDevise(),
+                        abonnement.getDateExpiration(), renouvellement));
     }
 
     /** Le PaymentIntent doit être celui créé pour cette entreprise, avec le montant et la devise attendus. */
