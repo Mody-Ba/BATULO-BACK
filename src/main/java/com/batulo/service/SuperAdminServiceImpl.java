@@ -28,11 +28,9 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.Duration;
 import java.time.Instant;
 import java.util.Map;
 import java.util.function.Function;
@@ -49,12 +47,8 @@ public class SuperAdminServiceImpl implements SuperAdminService {
     private final AbonnementRepository abonnementRepository;
     private final UtilisateurMapper utilisateurMapper;
     private final AbonnementMapper abonnementMapper;
-    private final PasswordEncoder passwordEncoder;
-    private final GenerateurMotDePasse generateurMotDePasse;
+    private final MotDePasseTemporaire motDePasseTemporaire;
     private final EmailService emailService;
-
-    @Value("${batulo.mot-de-passe.duree-temporaire-heures}")
-    private long dureeTemporaireHeures;
 
     @Value("${batulo.abonnement.jours-alerte-expiration}")
     private int joursAlerte;
@@ -64,16 +58,14 @@ public class SuperAdminServiceImpl implements SuperAdminService {
                                  AbonnementRepository abonnementRepository,
                                  UtilisateurMapper utilisateurMapper,
                                  AbonnementMapper abonnementMapper,
-                                 PasswordEncoder passwordEncoder,
-                                 GenerateurMotDePasse generateurMotDePasse,
+                                 MotDePasseTemporaire motDePasseTemporaire,
                                  EmailService emailService) {
         this.utilisateurRepository = utilisateurRepository;
         this.entrepriseRepository = entrepriseRepository;
         this.abonnementRepository = abonnementRepository;
         this.utilisateurMapper = utilisateurMapper;
         this.abonnementMapper = abonnementMapper;
-        this.passwordEncoder = passwordEncoder;
-        this.generateurMotDePasse = generateurMotDePasse;
+        this.motDePasseTemporaire = motDePasseTemporaire;
         this.emailService = emailService;
     }
 
@@ -101,7 +93,7 @@ public class SuperAdminServiceImpl implements SuperAdminService {
         admin.setRole(Role.ADMIN);
         admin.setEntreprise(entreprise);
         admin.setActif(true);
-        String motDePasse = attribuerMotDePasseTemporaire(admin);
+        String motDePasse = motDePasseTemporaire.attribuer(admin);
         admin = utilisateurRepository.save(admin);
 
         // RG-09 : pas d'abonnement manuel, l'admin devra payer en ligne pour l'activer.
@@ -176,7 +168,7 @@ public class SuperAdminServiceImpl implements SuperAdminService {
     @Transactional
     public MotDePasseTemporaireModel renvoyerMotDePasseTemporaire(Long adminId) {
         Utilisateur admin = adminTrouve(adminId);
-        String motDePasse = attribuerMotDePasseTemporaire(admin);
+        String motDePasse = motDePasseTemporaire.attribuer(admin);
         emailService.envoyerMotDePasseTemporaire(admin.getCourriel(), admin.getPrenom(), motDePasse,
                 admin.getMotDePasseTemporaireExpireLe());
         log.info("Super admin : nouveau mot de passe temporaire pour l'admin {}", adminId);
@@ -225,15 +217,6 @@ public class SuperAdminServiceImpl implements SuperAdminService {
 
     private static ResourceNotFoundException adminIntrouvable(Long adminId) {
         return new ResourceNotFoundException("ADMIN_INTROUVABLE", "Aucun admin avec l'identifiant " + adminId + ".");
-    }
-
-    /** Hash le nouveau mot de passe temporaire dans le compte et le renvoie en clair pour le courriel. */
-    private String attribuerMotDePasseTemporaire(Utilisateur admin) {
-        String motDePasse = generateurMotDePasse.generer();
-        admin.setMotDePasse(passwordEncoder.encode(motDePasse));
-        admin.setMotDePasseTemporaire(true);
-        admin.setMotDePasseTemporaireExpireLe(Instant.now().plus(Duration.ofHours(dureeTemporaireHeures)));
-        return motDePasse;
     }
 
     private AdminDetailModel detail(Utilisateur admin) {
