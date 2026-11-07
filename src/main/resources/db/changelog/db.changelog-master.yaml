@@ -13,3 +13,5 @@ databaseChangeLog:
       file: db/changelog/changes/006-jeton-rafraichissement.yaml
   - include:
       file: db/changelog/changes/007-notification.yaml
+  - include:
+      file: db/changelog/changes/008-paiement-payment-intent.yaml

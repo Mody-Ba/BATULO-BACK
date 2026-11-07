@@ -1,0 +1,40 @@
+databaseChangeLog:
+  # Étape 3 : le paiement passe par un PaymentIntent Stripe (et non plus une session Stripe Checkout),
+  # et les formules s'appellent MENSUEL / ANNUEL.
+  - changeSet:
+      id: 008-formules-mensuel-annuel
+      author: batulo
+      changes:
+        - sql:
+            sql: >-
+              ALTER TABLE abonnement DROP CONSTRAINT ck_abonnement_formule;
+              UPDATE abonnement SET formule = 'MENSUEL' WHERE formule = 'MENSUELLE';
+              UPDATE abonnement SET formule = 'ANNUEL' WHERE formule = 'ANNUELLE';
+              UPDATE paiement SET formule = 'MENSUEL' WHERE formule = 'MENSUELLE';
+              UPDATE paiement SET formule = 'ANNUEL' WHERE formule = 'ANNUELLE';
+              ALTER TABLE abonnement ADD CONSTRAINT ck_abonnement_formule
+              CHECK (formule IS NULL OR formule IN ('MENSUEL','ANNUEL'));
+              ALTER TABLE paiement ADD CONSTRAINT ck_paiement_formule
+              CHECK (formule IN ('MENSUEL','ANNUEL'));
+              ALTER TABLE paiement ADD CONSTRAINT ck_paiement_statut
+              CHECK (statut IN ('EN_ATTENTE','REUSSI','ECHOUE'))
+
+  - changeSet:
+      id: 008-paiement-payment-intent
+      author: batulo
+      changes:
+        # Aucun paiement n'a pu être enregistré avant l'étape 3 : les anciennes lignes sans PaymentIntent sont retirées.
+        - delete:
+            tableName: paiement
+            where: stripe_payment_intent_id IS NULL
+        - dropColumn:
+            tableName: paiement
+            columnName: stripe_session_id
+        - addNotNullConstraint:
+            tableName: paiement
+            columnName: stripe_payment_intent_id
+            columnDataType: VARCHAR(255)
+        - addUniqueConstraint:
+            tableName: paiement
+            columnNames: stripe_payment_intent_id
+            constraintName: uk_paiement_stripe_payment_intent

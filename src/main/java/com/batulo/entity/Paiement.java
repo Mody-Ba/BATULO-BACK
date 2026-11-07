@@ -19,8 +19,9 @@ import java.math.BigDecimal;
 import java.time.Instant;
 
 /**
- * Trace d'une tentative de paiement Stripe. Aucune donnée de carte n'est stockée chez Batulo :
- * seuls les identifiants Stripe (session, intention de paiement) sont conservés.
+ * Trace d'un paiement Stripe. Créé EN_ATTENTE avec l'intention de paiement (PaymentIntent), passé à REUSSI
+ * une fois le paiement revérifié auprès de Stripe. Aucune donnée de carte n'est stockée chez Batulo :
+ * seul l'identifiant du PaymentIntent est conservé.
  */
 @Entity
 @Table(name = "paiement")
@@ -34,10 +35,7 @@ public class Paiement {
     @JoinColumn(name = "abonnement_id", nullable = false)
     private Abonnement abonnement;
 
-    @Column(name = "stripe_session_id", nullable = false, unique = true)
-    private String stripeSessionId;
-
-    @Column(name = "stripe_payment_intent_id")
+    @Column(name = "stripe_payment_intent_id", nullable = false, unique = true)
     private String stripePaymentIntentId;
 
     @Enumerated(EnumType.STRING)
@@ -78,14 +76,6 @@ public class Paiement {
 
     public void setAbonnement(Abonnement abonnement) {
         this.abonnement = abonnement;
-    }
-
-    public String getStripeSessionId() {
-        return stripeSessionId;
-    }
-
-    public void setStripeSessionId(String stripeSessionId) {
-        this.stripeSessionId = stripeSessionId;
     }
 
     public String getStripePaymentIntentId() {

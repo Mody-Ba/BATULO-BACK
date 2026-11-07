@@ -1,5 +1,6 @@
 package com.batulo.exception;
 
+import com.fasterxml.jackson.databind.exc.InvalidFormatException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -16,6 +17,7 @@ import org.springframework.web.method.annotation.HandlerMethodValidationExceptio
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
+import java.util.Arrays;
 import java.util.stream.Collectors;
 
 /**
@@ -34,6 +36,21 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(RegleGestionException.class)
     public ResponseEntity<ErrorResponse> handleRegleGestion(RegleGestionException ex) {
         return reponse(HttpStatus.BAD_REQUEST, ex.getCode(), ex.getMessage());
+    }
+
+    @ExceptionHandler(ResourceNotFoundException.class)
+    public ResponseEntity<ErrorResponse> handleNotFound(ResourceNotFoundException ex) {
+        return reponse(HttpStatus.NOT_FOUND, ex.getCode(), ex.getMessage());
+    }
+
+    @ExceptionHandler(StripeNonConfigureException.class)
+    public ResponseEntity<ErrorResponse> handleStripeNonConfigure(StripeNonConfigureException ex) {
+        return reponse(HttpStatus.SERVICE_UNAVAILABLE, ex.getCode(), ex.getMessage());
+    }
+
+    @ExceptionHandler(StripeIndisponibleException.class)
+    public ResponseEntity<ErrorResponse> handleStripeIndisponible(StripeIndisponibleException ex) {
+        return reponse(HttpStatus.BAD_GATEWAY, StripeIndisponibleException.CODE, ex.getMessage());
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
@@ -59,6 +76,15 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(HttpMessageNotReadableException.class)
     public ResponseEntity<ErrorResponse> handleNotReadable(HttpMessageNotReadableException ex) {
+        // Valeur d'énumération inconnue (ex. formule « HEBDO ») : on indique les valeurs acceptées.
+        if (ex.getCause() instanceof InvalidFormatException invalide && invalide.getTargetType() != null
+                && invalide.getTargetType().isEnum()) {
+            String champ = invalide.getPath().isEmpty() ? "valeur" : invalide.getPath().getLast().getFieldName();
+            String valeurs = Arrays.stream(invalide.getTargetType().getEnumConstants())
+                    .map(String::valueOf)
+                    .collect(Collectors.joining(", "));
+            return reponse(HttpStatus.BAD_REQUEST, "VALIDATION", champ + " : valeurs acceptées " + valeurs);
+        }
         return reponse(HttpStatus.BAD_REQUEST, "REQUETE_INVALIDE", "Le corps de la requête est absent ou mal formé.");
     }
 
