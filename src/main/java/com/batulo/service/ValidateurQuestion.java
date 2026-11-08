@@ -35,6 +35,7 @@ public class ValidateurQuestion {
     static final int MATRICE_COLONNES_MIN = 2;
     static final int MATRICE_COLONNES_MAX = 10;
     static final int LIBELLE_CONFIG_MAX = 200;
+    static final int TRANCHES_MAX = 19;
 
     private final ObjectMapper objectMapper;
 
@@ -70,6 +71,80 @@ public class ValidateurQuestion {
             case DATE -> date(config);
             case MATRICE -> matrice(config);
         };
+    }
+
+    /** Types qui peuvent être un critère d'analyse. */
+    public static boolean peutEtreCritere(TypeQuestion type) {
+        return type == TypeQuestion.CHOIX_UNIQUE || type == TypeQuestion.OUI_NON
+                || type == TypeQuestion.NUMERIQUE || type == TypeQuestion.DATE;
+    }
+
+    /**
+     * Valide les réglages de critère d'une question et renvoie le découpage normalisé (null si ce n'est pas un
+     * critère, ou s'il n'a pas de découpage). NUMERIQUE : {"tranches": [bornes strictement croissantes, 1 à 19]} ;
+     * sans tranches, 5 tranches égales entre min et max, qui doivent alors être définis. DATE : {"granularite"}.
+     *
+     * @param configurationQuestion configuration normalisée de la question (min, max...)
+     */
+    public ObjectNode validerCritere(TypeQuestion type, JsonNode configurationQuestion, boolean estCritere,
+                                     JsonNode critereConfig) {
+        if (!estCritere) {
+            return null;
+        }
+        if (!peutEtreCritere(type)) {
+            throw erreur("Seules les questions CHOIX_UNIQUE, OUI_NON, NUMERIQUE et DATE peuvent être un critère d'analyse.");
+        }
+        if (critereConfig != null && !critereConfig.isNull() && !critereConfig.isObject()) {
+            throw erreur("critereConfig doit être un objet JSON.");
+        }
+        ObjectNode config = critereConfig == null || critereConfig.isNull()
+                ? objectMapper.createObjectNode() : ((ObjectNode) critereConfig).deepCopy();
+        switch (type) {
+            case CHOIX_UNIQUE, OUI_NON -> {
+                if (!config.isEmpty()) {
+                    throw erreur("Un critère " + type + " n'a pas de découpage : envoyez critereConfig vide.");
+                }
+                return null;
+            }
+            case NUMERIQUE -> {
+                clesAutorisees(config, "tranches");
+                JsonNode tranches = config.get("tranches");
+                if (tranches == null || tranches.isNull()) {
+                    if (!configurationQuestion.hasNonNull("min") || !configurationQuestion.hasNonNull("max")) {
+                        throw erreur("Ce critère NUMERIQUE n'a pas de min et de max : définissez ses tranches "
+                                + "(critereConfig.tranches, ex. [18, 30, 45, 60]).");
+                    }
+                    return null;
+                }
+                if (!tranches.isArray() || tranches.isEmpty() || tranches.size() > TRANCHES_MAX) {
+                    throw erreur("tranches doit être une liste de 1 à " + TRANCHES_MAX + " bornes.");
+                }
+                ArrayNode bornes = objectMapper.createArrayNode();
+                Double precedente = null;
+                for (JsonNode borne : tranches) {
+                    if (!borne.isNumber()) {
+                        throw erreur("Chaque borne de tranches doit être un nombre.");
+                    }
+                    if (precedente != null && borne.doubleValue() <= precedente) {
+                        throw erreur("Les bornes de tranches doivent être strictement croissantes.");
+                    }
+                    precedente = borne.doubleValue();
+                    bornes.add(borne.decimalValue());
+                }
+                config.set("tranches", bornes);
+                return config;
+            }
+            case DATE -> {
+                clesAutorisees(config, "granularite");
+                String granularite = config.path("granularite").asText("MOIS");
+                if (!granularite.equals("MOIS") && !granularite.equals("ANNEE")) {
+                    throw erreur("granularite doit valoir MOIS ou ANNEE.");
+                }
+                config.put("granularite", granularite);
+                return config;
+            }
+            default -> throw new IllegalStateException(type.name());
+        }
     }
 
     private ObjectNode sansConfiguration(TypeQuestion type, ObjectNode config) {

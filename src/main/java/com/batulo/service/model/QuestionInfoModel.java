@@ -12,6 +12,9 @@ public record QuestionInfoModel(
         boolean obligatoire,
         /** Null si absente. */
         JsonNode configuration,
-        List<OptionInfoModel> options
+        List<OptionInfoModel> options,
+        /** Null : inchangé. */
+        Boolean estCritere,
+        JsonNode critereConfig
 ) {
 }

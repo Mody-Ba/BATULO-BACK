@@ -25,6 +25,8 @@ import com.batulo.service.model.SondageInfoModel;
 import com.batulo.service.model.SondageModel;
 import com.batulo.service.model.SondageResumeModel;
 import com.batulo.service.model.VersionModel;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Page;
@@ -297,7 +299,15 @@ public class SondageServiceImpl implements SondageService {
     /** Valide puis recopie le libellé, le type, la configuration et les options dans la question. */
     private void appliquer(Question question, QuestionInfoModel info) {
         List<OptionInfoModel> options = info.options() == null ? List.of() : info.options();
-        question.setConfiguration(validateurQuestion.valider(info.type(), info.configuration(), options.size()));
+        ObjectNode configuration = validateurQuestion.valider(info.type(), info.configuration(), options.size());
+        // Critère : absent de la requête, il est gardé si le type ne change pas, et retiré sinon.
+        boolean memeType = question.getType() == info.type();
+        boolean critere = info.estCritere() != null ? info.estCritere() : question.isEstCritere() && memeType;
+        JsonNode critereConfig = info.estCritere() != null ? info.critereConfig()
+                : memeType ? question.getCritereConfig() : null;
+        question.setCritereConfig(validateurQuestion.validerCritere(info.type(), configuration, critere, critereConfig));
+        question.setEstCritere(critere);
+        question.setConfiguration(configuration);
         question.setLibelle(info.libelle().trim());
         question.setAide(texteFacultatif(info.aide()));
         question.setType(info.type());
@@ -395,6 +405,20 @@ public class SondageServiceImpl implements SondageService {
         }
         // Place laissée pour un suffixe « _NN ».
         return valeur.length() > VALEUR_MAX - 4 ? valeur.substring(0, VALEUR_MAX - 4) : valeur;
+    }
+
+    @Override
+    @Transactional
+    public SondageModel definirCritere(Long utilisateurId, Long sondageId, Long questionId, boolean estCritere,
+                                       JsonNode critereConfig) {
+        // Réglage d'analyse, pas du contenu : permis quel que soit le statut, même après publication.
+        Sondage sondage = sondageGere(utilisateurId, sondageId);
+        Question question = question(sondage, questionId);
+        question.setCritereConfig(validateurQuestion.validerCritere(question.getType(), question.getConfiguration(),
+                estCritere, critereConfig));
+        question.setEstCritere(estCritere);
+        log.info("Question {} du sondage {} : critère d'analyse {}", questionId, sondageId, estCritere ? "activé" : "retiré");
+        return enregistrer(sondage);
     }
 
     // ---------------------------------------------------------------- Publication, versions, copie

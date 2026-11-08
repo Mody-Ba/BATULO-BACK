@@ -75,7 +75,9 @@ public class CollecteMapper {
 
     private QuestionResponse toResponse(QuestionModel model) {
         return new QuestionResponse(model.id(), model.libelle(), model.aide(), model.type(), model.obligatoire(),
-                model.ordre(), model.configuration(), model.options().stream().map(this::toResponse).toList());
+                model.ordre(), model.configuration(), model.options().stream().map(this::toResponse).toList(),
+                // Réglages d'analyse internes : jamais montrés au répondant.
+                null, null);
     }
 
     private OptionResponse toResponse(OptionModel model) {

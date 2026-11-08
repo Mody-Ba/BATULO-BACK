@@ -93,6 +93,9 @@ batulo:
     limite-envoi-par-minute: ${PUBLIC_RATE_POST:20}
     # true seulement derrière un proxy de confiance (l'adresse vient alors de X-Forwarded-For).
     faire-confiance-proxy: ${TRUST_PROXY:false}
+  statistiques:
+    # En dessous de ce nombre de répondants, un groupe est signalé « petitEffectif » (prudence avant de conclure).
+    effectif-minimum: 5
   mot-de-passe:
     duree-temporaire-heures: 24
     duree-lien-reinitialisation-minutes: 60

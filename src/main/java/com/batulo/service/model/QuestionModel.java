@@ -13,6 +13,9 @@ public record QuestionModel(
         boolean obligatoire,
         int ordre,
         JsonNode configuration,
-        List<OptionModel> options
+        List<OptionModel> options,
+        boolean estCritere,
+        /** Null si ce n'est pas un critère, ou s'il n'a pas de découpage. */
+        JsonNode critereConfig
 ) {
 }

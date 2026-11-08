@@ -6,6 +6,7 @@ import com.batulo.mappers.SondageMapper;
 import com.batulo.service.SondageService;
 import com.batulo.service.model.ApercuResponse;
 import com.batulo.service.model.CreationSondageRequest;
+import com.batulo.service.model.CritereRequest;
 import com.batulo.service.model.DatesSondageRequest;
 import com.batulo.service.model.FormulaireResponse;
 import com.batulo.service.model.ModeleRequest;
@@ -211,6 +212,19 @@ public class SondageController {
                                             @Valid @RequestBody QuestionRequest request) {
         return sondageMapper.toResponse(
                 sondageService.modifierQuestion(moi.id(), id, questionId, sondageMapper.toModel(request)));
+    }
+
+    @PutMapping("/{id}/questions/{questionId}/critere")
+    @PreAuthorize(ROLES)
+    @Operation(summary = "Critère d'analyse d'une question",
+            description = "Marque la question comme critère de segmentation (CHOIX_UNIQUE, OUI_NON, NUMERIQUE, DATE) et "
+                    + "règle son découpage. Permis quel que soit le statut, même après publication. Un critère sensible "
+                    + "(ex. sexe) devrait être une question facultative : le cahier le veut « volontairement renseigné ».")
+    public SondageResponse definirCritere(@Parameter(hidden = true) @AuthenticationPrincipal UtilisateurConnecte moi,
+                                          @PathVariable Long id, @PathVariable Long questionId,
+                                          @Valid @RequestBody CritereRequest request) {
+        return sondageMapper.toResponse(sondageService.definirCritere(moi.id(), id, questionId,
+                request.estCritere(), request.critereConfig()));
     }
 
     @DeleteMapping("/{id}/questions/{questionId}")

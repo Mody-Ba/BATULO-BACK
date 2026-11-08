@@ -10,6 +10,8 @@ import com.batulo.exception.ResourceNotFoundException;
 import com.batulo.repository.SondageRepository;
 import com.batulo.repository.StatistiqueRepository;
 import com.batulo.repository.StatistiqueRepository.Filtre;
+import com.batulo.service.model.CritereModel;
+import com.batulo.service.model.CroisementModel;
 import com.batulo.service.model.StatistiquesModel;
 import com.batulo.service.model.StatistiquesModel.Cellule;
 import com.batulo.service.model.StatistiquesModel.Classe;
@@ -59,6 +61,8 @@ public class StatistiqueServiceImpl implements StatistiqueService {
     static final int NOMBRE_TRANCHES = 10;
     /** Écart (en jours) jusqu'auquel une question DATE est regroupée par jour. */
     static final long JOURS_MAX_PAR_JOUR = 62;
+    /** Tranches d'un critère NUMERIQUE sans tranches définies (entre son min et son max). */
+    static final int TRANCHES_PAR_DEFAUT = 5;
 
     private static final BigDecimal CENT = BigDecimal.valueOf(100);
 
@@ -66,14 +70,23 @@ public class StatistiqueServiceImpl implements StatistiqueService {
     private final SondageRepository sondageRepository;
     private final StatistiqueRepository statistiqueRepository;
     private final ZoneId fuseau;
+    /** En dessous, un groupe est signalé « petitEffectif » (conclusions hâtives). */
+    private final int effectifMinimum;
 
     public StatistiqueServiceImpl(AccesSondage accesSondage, SondageRepository sondageRepository,
                                   StatistiqueRepository statistiqueRepository,
-                                  @Value("${batulo.fuseau-horaire}") String fuseauHoraire) {
+                                  @Value("${batulo.fuseau-horaire}") String fuseauHoraire,
+                                  @Value("${batulo.statistiques.effectif-minimum:5}") int effectifMinimum) {
         this.accesSondage = accesSondage;
         this.sondageRepository = sondageRepository;
         this.statistiqueRepository = statistiqueRepository;
         this.fuseau = ZoneId.of(fuseauHoraire);
+        this.effectifMinimum = effectifMinimum;
+    }
+
+    /** Le périmètre d'un calcul : versions retenues, références des questions, filtre (période, critères). */
+    private record Perimetre(Sondage sondage, List<Sondage> versions, Map<String, Reference> references,
+                             Filtre filtre, List<CritereModel> criteres) {
     }
 
     /** Définition de référence d'une question (dernière version qui la contient) et ses occurrences retenues. */
@@ -94,11 +107,13 @@ public class StatistiqueServiceImpl implements StatistiqueService {
 
     @Override
     public StatistiquesModel statistiques(Long utilisateurId, Long sondageId, boolean lignee, LocalDate du,
-                                          LocalDate au, GranulariteDate granulariteDate) {
-        Sondage sondage = accesSondage.sondageLisible(accesSondage.acteur(utilisateurId), sondageId);
-        List<Sondage> versions = versions(sondage, lignee);
-        Map<String, Reference> references = references(versions);
-        Filtre filtre = filtre(versions, du, au);
+                                          LocalDate au, GranulariteDate granulariteDate,
+                                          Map<String, List<String>> criteres) {
+        Perimetre perimetre = perimetre(utilisateurId, sondageId, lignee, du, au, criteres);
+        Sondage sondage = perimetre.sondage();
+        List<Sondage> versions = perimetre.versions();
+        Map<String, Reference> references = perimetre.references();
+        Filtre filtre = perimetre.filtre();
 
         StatistiqueRepository.Resume resume = statistiqueRepository.resume(filtre);
         Map<Long, Long> reponsesParVersion = statistiqueRepository.reponsesParVersion(filtre);
@@ -112,17 +127,15 @@ public class StatistiqueServiceImpl implements StatistiqueService {
                 .toList();
 
         return new StatistiquesModel(sondage.getId(), sondage.getTitre(), lignee,
-                versions.stream().map(Sondage::getVersion).toList(), du, au,
-                new Resume(resume.nombre(), resume.premiere(), resume.derniere()), questions);
+                versions.stream().map(Sondage::getVersion).toList(), du, au, perimetre.criteres(),
+                new Resume(resume.nombre(), petit(resume.nombre()), resume.premiere(), resume.derniere()), questions);
     }
 
     @Override
     public PageTextes textes(Long utilisateurId, Long sondageId, Long questionId, boolean lignee, LocalDate du,
-                             LocalDate au, int page, int taille) {
-        Sondage sondage = accesSondage.sondageLisible(accesSondage.acteur(utilisateurId), sondageId);
-        List<Sondage> versions = versions(sondage, lignee);
-        Map<String, Reference> references = references(versions);
-        Reference reference = references.values().stream()
+                             LocalDate au, Map<String, List<String>> criteres, int page, int taille) {
+        Perimetre perimetre = perimetre(utilisateurId, sondageId, lignee, du, au, criteres);
+        Reference reference = perimetre.references().values().stream()
                 .filter(r -> r.ids.contains(questionId) || r.question.getId().equals(questionId))
                 .findFirst()
                 .orElseThrow(() -> new ResourceNotFoundException("QUESTION_INTROUVABLE",
@@ -131,12 +144,242 @@ public class StatistiqueServiceImpl implements StatistiqueService {
         if (type != TypeQuestion.TEXTE_COURT && type != TypeQuestion.TEXTE_LONG) {
             throw new RegleGestionException("QUESTION_NON_TEXTE", "Cette question n'est pas une question à texte libre.");
         }
-        Filtre filtre = filtre(versions, du, au);
+        Filtre filtre = perimetre.filtre();
         long total = statistiqueRepository.nombreTextes(filtre, reference.ids);
         List<Texte> contenu = statistiqueRepository.pageTextes(filtre, reference.ids, page, taille).stream()
                 .map(t -> new Texte(t.texte(), t.date()))
                 .toList();
         return new PageTextes(contenu, page, taille, total, (int) ((total + taille - 1) / taille));
+    }
+
+    @Override
+    public List<CritereModel> criteres(Long utilisateurId, Long sondageId, boolean lignee) {
+        Perimetre perimetre = perimetre(utilisateurId, sondageId, lignee, null, null, Map.of());
+        return perimetre.references().entrySet().stream()
+                .filter(e -> e.getValue().question.isEstCritere())
+                .map(e -> new CritereModel(e.getKey(), e.getValue().question.getId(), e.getValue().question.getLibelle(),
+                        e.getValue().question.getType(), valeursCritere(e.getValue(), perimetre.filtre())))
+                .toList();
+    }
+
+    @Override
+    public CroisementModel croisement(Long utilisateurId, Long sondageId, String cleQuestion, String clePar,
+                                      boolean lignee, LocalDate du, LocalDate au, Map<String, List<String>> criteres) {
+        Perimetre perimetre = perimetre(utilisateurId, sondageId, lignee, du, au, criteres);
+        Reference question = perimetre.references().get(cleQuestion);
+        if (question == null) {
+            throw new ResourceNotFoundException("QUESTION_INTROUVABLE", "Aucune question de clé " + cleQuestion + ".");
+        }
+        TypeQuestion type = question.question.getType();
+        if (!Set.of(TypeQuestion.CHOIX_UNIQUE, TypeQuestion.CHOIX_MULTIPLE, TypeQuestion.OUI_NON, TypeQuestion.ECHELLE,
+                TypeQuestion.NUMERIQUE).contains(type)) {
+            throw new RegleGestionException("CROISEMENT_INVALIDE",
+                    "Seules les questions à choix, oui/non, échelle et numériques se croisent avec un critère.");
+        }
+        Reference par = critere(perimetre.references(), clePar);
+        if (cleQuestion.equals(clePar)) {
+            throw new RegleGestionException("CROISEMENT_INVALIDE", "Une question ne se croise pas avec elle-même.");
+        }
+        Filtre filtre = perimetre.filtre();
+        StatistiqueRepository.Decoupage decoupage = decoupage(par);
+
+        // Colonnes : toutes les valeurs du critère, puis « Non renseigné » s'il y a des répondants sans valeur.
+        Map<String, Long> repondants = statistiqueRepository.repondantsParColonne(filtre, question.ids, par.ids, decoupage);
+        List<CroisementModel.Colonne> colonnes = new ArrayList<>();
+        for (CritereModel.ValeurCritere valeur : valeursCritere(par, filtre)) {
+            long n = repondants.getOrDefault(valeur.valeur(), 0L);
+            colonnes.add(new CroisementModel.Colonne(valeur.valeur(), valeur.libelle(), n, petit(n)));
+        }
+        if (repondants.getOrDefault(null, 0L) > 0) {
+            long n = repondants.get(null);
+            colonnes.add(new CroisementModel.Colonne(null, "Non renseigné", n, petit(n)));
+        }
+
+        List<CroisementModel.Ligne> lignes = null;
+        if (type != TypeQuestion.NUMERIQUE) {
+            Map<String, Map<String, Long>> parModalite = new HashMap<>();
+            for (StatistiqueRepository.Croisement c :
+                    statistiqueRepository.croisement(filtre, question.ids, type, par.ids, decoupage)) {
+                String modalite = type == TypeQuestion.ECHELLE ? net(new BigDecimal(c.modalite())).toPlainString()
+                        : c.modalite();
+                parModalite.computeIfAbsent(modalite, m -> new HashMap<>()).merge(c.colonne(), c.nombre(), Long::sum);
+            }
+            lignes = modalites(question).entrySet().stream()
+                    .map(m -> {
+                        Map<String, Long> parColonne = parModalite.getOrDefault(m.getKey(), Map.of());
+                        long total = parColonne.values().stream().mapToLong(Long::longValue).sum();
+                        return new CroisementModel.Ligne(m.getKey(), m.getValue(), total, colonnes.stream()
+                                .map(col -> {
+                                    long n = parColonne.getOrDefault(col.valeur(), 0L);
+                                    return new CroisementModel.Cellule(col.valeur(), n, pourcentage(n, total),
+                                            pourcentage(n, col.nombreRepondants()), col.petitEffectif());
+                                })
+                                .toList());
+                    })
+                    .toList();
+        }
+
+        List<CroisementModel.NumeriqueColonne> numerique = null;
+        if (type == TypeQuestion.NUMERIQUE || type == TypeQuestion.ECHELLE) {
+            Map<String, StatistiqueRepository.NumeriqueParColonne> parColonne = new HashMap<>();
+            statistiqueRepository.numeriqueParColonne(filtre, question.ids, par.ids, decoupage)
+                    .forEach(n -> parColonne.put(n.colonne(), n));
+            numerique = colonnes.stream()
+                    .map(col -> {
+                        StatistiqueRepository.NumeriqueParColonne n = parColonne.get(col.valeur());
+                        return n == null
+                                ? new CroisementModel.NumeriqueColonne(col.valeur(), 0, null, null, null, null, true)
+                                : new CroisementModel.NumeriqueColonne(col.valeur(), n.nombre(),
+                                n.moyenne().setScale(2, RoundingMode.HALF_UP), net(n.mediane()), net(n.min()),
+                                net(n.max()), petit(n.nombre()));
+                    })
+                    .toList();
+        }
+        return new CroisementModel(
+                new CroisementModel.Entete(cleQuestion, question.question.getLibelle(), type),
+                new CroisementModel.Entete(clePar, par.question.getLibelle(), par.question.getType()),
+                perimetre.criteres(), colonnes, lignes, numerique);
+    }
+
+    // ---------------------------------------------------------------- Critères (segmentation)
+
+    /** Modalités d'une question (lignes du tableau croisé), dans l'ordre de la référence. */
+    private static Map<String, String> modalites(Reference reference) {
+        Map<String, String> modalites = new LinkedHashMap<>();
+        switch (reference.question.getType()) {
+            case CHOIX_UNIQUE, CHOIX_MULTIPLE -> modalites.putAll(reference.libellesOptions);
+            case OUI_NON -> {
+                modalites.put("true", "Oui");
+                modalites.put("false", "Non");
+            }
+            case ECHELLE -> {
+                JsonNode config = reference.question.getConfiguration();
+                for (int note = config.path("min").asInt(1); note <= config.path("max").asInt(5); note++) {
+                    modalites.put(String.valueOf(note), String.valueOf(note));
+                }
+            }
+            default -> {
+            }
+        }
+        return modalites;
+    }
+
+    /** La question de cette clé doit être un critère d'analyse (dans sa version la plus récente). */
+    private static Reference critere(Map<String, Reference> references, String cle) {
+        Reference reference = references.get(cle);
+        if (reference == null || !reference.question.isEstCritere()) {
+            throw new RegleGestionException("CRITERE_INVALIDE",
+                    "« " + cle + " » n'est pas un critère d'analyse de ce sondage.");
+        }
+        return reference;
+    }
+
+    /** Découpage du critère : tranches (explicites, ou 5 tranches égales entre min et max), granularité des dates. */
+    private static StatistiqueRepository.Decoupage decoupage(Reference reference) {
+        Question question = reference.question;
+        JsonNode config = question.getCritereConfig();
+        List<BigDecimal> bornes = List.of();
+        if (question.getType() == TypeQuestion.NUMERIQUE) {
+            bornes = new ArrayList<>();
+            if (config != null && config.has("tranches")) {
+                for (JsonNode borne : config.get("tranches")) {
+                    bornes.add(borne.decimalValue());
+                }
+            } else {
+                JsonNode configuration = question.getConfiguration();
+                BigDecimal min = configuration.get("min").decimalValue();
+                BigDecimal max = configuration.get("max").decimalValue();
+                int decimales = configuration.path("decimales").asInt(0);
+                BigDecimal largeur = max.subtract(min).divide(BigDecimal.valueOf(TRANCHES_PAR_DEFAUT), 10, RoundingMode.HALF_UP);
+                for (int i = 1; i < TRANCHES_PAR_DEFAUT; i++) {
+                    BigDecimal borne = net(min.add(largeur.multiply(BigDecimal.valueOf(i))).setScale(decimales, RoundingMode.HALF_UP));
+                    if (bornes.isEmpty() || borne.compareTo(bornes.get(bornes.size() - 1)) > 0) {
+                        bornes.add(borne);
+                    }
+                }
+            }
+        }
+        String granularite = config != null ? config.path("granularite").asText("MOIS") : "MOIS";
+        return new StatistiqueRepository.Decoupage(question.getType(), bornes, granularite);
+    }
+
+    /** Valeurs possibles d'un critère, avec leur libellé. DATE : celles présentes dans les réponses retenues. */
+    private List<CritereModel.ValeurCritere> valeursCritere(Reference reference, Filtre filtre) {
+        return switch (reference.question.getType()) {
+            case CHOIX_UNIQUE -> reference.libellesOptions.entrySet().stream()
+                    .map(e -> new CritereModel.ValeurCritere(e.getKey(), e.getValue()))
+                    .toList();
+            case OUI_NON -> List.of(new CritereModel.ValeurCritere("true", "Oui"),
+                    new CritereModel.ValeurCritere("false", "Non"));
+            case NUMERIQUE -> {
+                List<BigDecimal> bornes = decoupage(reference).bornes();
+                List<CritereModel.ValeurCritere> tranches = new ArrayList<>();
+                for (int i = 0; i <= bornes.size(); i++) {
+                    String libelle = i == 0 ? "Moins de " + texte(bornes.get(0))
+                            : i == bornes.size() ? texte(bornes.get(i - 1)) + " et plus"
+                            : texte(bornes.get(i - 1)) + " à moins de " + texte(bornes.get(i));
+                    tranches.add(new CritereModel.ValeurCritere("t" + (i + 1), libelle));
+                }
+                yield tranches;
+            }
+            case DATE -> statistiqueRepository.valeursCritere(filtre, reference.ids, decoupage(reference)).stream()
+                    .map(v -> new CritereModel.ValeurCritere(v, v))
+                    .toList();
+            default -> List.of();
+        };
+    }
+
+    /**
+     * Filtres de segmentation « cle -> valeurs » : chaque clé doit être un critère, chaque valeur l'une de ses valeurs
+     * (DATE : AAAA-MM ou AAAA selon la granularité).
+     */
+    private List<StatistiqueRepository.FiltreCritere> filtresCriteres(Map<String, List<String>> demandes,
+                                                                     Map<String, Reference> references,
+                                                                     Filtre base, List<CritereModel> appliques) {
+        List<StatistiqueRepository.FiltreCritere> filtres = new ArrayList<>();
+        demandes.forEach((cle, valeurs) -> {
+            Reference reference = critere(references, cle);
+            StatistiqueRepository.Decoupage decoupage = decoupage(reference);
+            Map<String, String> autorisees = new LinkedHashMap<>();
+            if (reference.question.getType() == TypeQuestion.DATE) {
+                String motif = "ANNEE".equals(decoupage.granularite()) ? "\\d{4}" : "\\d{4}-\\d{2}";
+                valeurs.stream().filter(v -> v.matches(motif)).forEach(v -> autorisees.put(v, v));
+            } else {
+                valeursCritere(reference, base).forEach(v -> autorisees.put(v.valeur(), v.libelle()));
+            }
+            for (String valeur : valeurs) {
+                if (!autorisees.containsKey(valeur)) {
+                    throw new RegleGestionException("CRITERE_INVALIDE", "« " + valeur + " » n'est pas une valeur du critère « "
+                            + reference.question.getLibelle() + " ».");
+                }
+            }
+            List<String> distinctes = valeurs.stream().distinct().toList();
+            filtres.add(new StatistiqueRepository.FiltreCritere(reference.ids, decoupage, distinctes));
+            appliques.add(new CritereModel(cle, reference.question.getId(), reference.question.getLibelle(),
+                    reference.question.getType(), distinctes.stream()
+                    .map(v -> new CritereModel.ValeurCritere(v, autorisees.get(v))).toList()));
+        });
+        return filtres;
+    }
+
+    private Perimetre perimetre(Long utilisateurId, Long sondageId, boolean lignee, LocalDate du, LocalDate au,
+                                Map<String, List<String>> criteres) {
+        Sondage sondage = accesSondage.sondageLisible(accesSondage.acteur(utilisateurId), sondageId);
+        List<Sondage> versions = versions(sondage, lignee);
+        Map<String, Reference> references = references(versions);
+        Filtre base = filtre(versions, du, au);
+        List<CritereModel> appliques = new ArrayList<>();
+        List<StatistiqueRepository.FiltreCritere> filtres = filtresCriteres(criteres, references, base, appliques);
+        return new Perimetre(sondage, versions, references,
+                new Filtre(base.versions(), base.debut(), base.fin(), filtres), appliques);
+    }
+
+    private boolean petit(long nombre) {
+        return nombre < effectifMinimum;
+    }
+
+    private static String texte(BigDecimal nombre) {
+        return net(nombre).toPlainString();
     }
 
     // ---------------------------------------------------------------- Périmètre
@@ -280,8 +523,8 @@ public class StatistiqueServiceImpl implements StatistiqueService {
                         0, TEXTES_PAR_PAGE, nombre, (int) ((nombre + TEXTES_PAR_PAGE - 1) / TEXTES_PAR_PAGE));
             }
             return new QuestionStat(question.getId(), cle, reference.section, question.getLibelle(), question.getType(),
-                    nombre, Math.max(0, reponsesAuxVersions - nombre), optionStats, numerique, dates, classement,
-                    matrice, pageTextes);
+                    nombre, Math.max(0, reponsesAuxVersions - nombre), petit(nombre), optionStats, numerique, dates,
+                    classement, matrice, pageTextes);
         }
 
         /** Toutes les options (même à 0), celles de la référence d'abord. */
