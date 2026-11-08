@@ -53,8 +53,18 @@ Plateforme SaaS de sondages (Spring Boot 3.5, Java 21, PostgreSQL 16, Liquibase)
   désactivée ou si l'abonnement n'est ni ACTIF ni EXPIRE_BIENTOT (410 SONDAGE_FERME). Matrice remplie : toutes les
   lignes. Limite de requêtes en mémoire par IP sur /api/public/** (une seule instance).
 
+- Statistiques (3.1) : une clé de question stable (`question.cle`, UUID) est recopiée dans les versions et les
+  copies, comme la valeur des options ; elle permet de cumuler une lignée (`?lignee=true`). En lignée, les libellés
+  sont ceux de la dernière version qui contient la question ; une option ou une question retirée reste comptée
+  pour les anciennes réponses ; un changement de type limite le calcul aux versions du type actuel. Pourcentages
+  sur les répondants à la question (`sansReponse` à part) ; NUMERIQUE : une ligne par valeur jusqu'à 20 valeurs
+  distinctes, sinon 10 tranches ; DATE par jour (écart de 62 jours ou moins) ou par mois, imposable avec
+  `granulariteDate` ; textes paginés, sans analyse automatique. Calculs en SQL (agrégations), jamais en chargeant
+  les réponses en mémoire. Route de dev (profil dev) : réponses aléatoires valides sur un sondage EN_COURS.
+
 ## À traiter dans les étapes suivantes
 - Phase 4 : invitations nominatives (l'unicité par appareil se contourne en vidant le navigateur ou en changeant
   d'appareil : limite acceptée pour la phase 2) ; diffusion courriel, SMS, WhatsApp, intégration web, campagnes.
 - Si l'application tourne un jour sur plusieurs instances : limite de requêtes partagée (Redis ou Bucket4j).
-- Phase 3 : le gestionnaire envoie les statistiques d'un sondage terminé à son admin.
+- Phase 3 : segmentation (3.2), exports PDF/Excel/CSV (3.3), messagerie et envoi des statistiques d'un sondage
+  terminé du gestionnaire à son admin (3.4).

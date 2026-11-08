@@ -1,0 +1,51 @@
+databaseChangeLog:
+  # Phase 3, étape 3.1 : clé de question stable, recopiée dans les versions et les copies (comme la valeur des
+  # options). Elle permet de cumuler les statistiques de toutes les versions d'un sondage.
+  - changeSet:
+      id: 014-question-cle
+      author: batulo
+      changes:
+        - addColumn:
+            tableName: question
+            columns:
+              - column: { name: cle, type: VARCHAR(36) }
+
+  # Questions déjà en base : une clé propre à chacune...
+  - changeSet:
+      id: 014-question-cle-remplir-postgresql
+      author: batulo
+      dbms: postgresql
+      changes:
+        - sql:
+            sql: UPDATE question SET cle = gen_random_uuid()::text WHERE cle IS NULL
+        # ... puis, dans une lignée, la même clé que la question de la version 1 retrouvée à la même place
+        # (même ordre de section, même ordre de question, même type). Introuvable : la clé propre est gardée.
+        - sql:
+            sql: >-
+              UPDATE question q SET cle = q0.cle
+              FROM section s, sondage so, section s0, question q0
+              WHERE q.section_id = s.id AND s.sondage_id = so.id AND so.lignee_id IS NOT NULL
+              AND s0.sondage_id = so.lignee_id AND s0.ordre = s.ordre
+              AND q0.section_id = s0.id AND q0.ordre = q.ordre AND q0.type = q.type
+
+  - changeSet:
+      id: 014-question-cle-remplir-h2
+      author: batulo
+      dbms: h2
+      changes:
+        - sql:
+            sql: UPDATE question SET cle = CAST(RANDOM_UUID() AS VARCHAR) WHERE cle IS NULL
+
+  - changeSet:
+      id: 014-question-cle-obligatoire
+      author: batulo
+      changes:
+        - addNotNullConstraint:
+            tableName: question
+            columnName: cle
+            columnDataType: VARCHAR(36)
+        - createIndex:
+            tableName: question
+            indexName: idx_question_cle
+            columns:
+              - column: { name: cle }
