@@ -25,3 +25,5 @@ databaseChangeLog:
       file: db/changelog/changes/012-assignation.yaml
   - include:
       file: db/changelog/changes/013-collecte.yaml
+  - include:
+      file: db/changelog/changes/014-question-cle.yaml

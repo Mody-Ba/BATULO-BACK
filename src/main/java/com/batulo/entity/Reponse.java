@@ -51,7 +51,9 @@ public class Reponse {
 
     @PrePersist
     void avantCreation() {
-        dateSoumission = Instant.now();
+        if (dateSoumission == null) {
+            dateSoumission = Instant.now();
+        }
     }
 
     public Long getId() {
@@ -76,6 +78,11 @@ public class Reponse {
 
     public Instant getDateSoumission() {
         return dateSoumission;
+    }
+
+    /** Réservé aux réponses de test générées en profil dev (dates étalées dans le passé). */
+    public void setDateSoumission(Instant dateSoumission) {
+        this.dateSoumission = dateSoumission;
     }
 
     public String getJetonRepondantHash() {

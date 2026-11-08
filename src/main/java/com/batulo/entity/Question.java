@@ -15,12 +15,14 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.OrderBy;
+import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 
 /** Question d'une section. Sa configuration (JSONB) dépend du type et est validée par le serveur. */
 @Entity
@@ -58,11 +60,33 @@ public class Question {
     @Column(nullable = false)
     private JsonNode configuration;
 
+    /**
+     * Clé stable de la question, recopiée dans les versions et les copies : les statistiques d'une lignée
+     * regroupent les questions de même clé. Ne change jamais, même si le libellé change.
+     */
+    @Column(nullable = false, length = 36, updatable = false)
+    private String cle;
+
     @OneToMany(mappedBy = "question", cascade = CascadeType.ALL, orphanRemoval = true)
     @OrderBy("ordre ASC")
     private List<OptionQuestion> options = new ArrayList<>();
 
     public Question() {
+    }
+
+    @PrePersist
+    void avantCreation() {
+        if (cle == null) {
+            cle = UUID.randomUUID().toString();
+        }
+    }
+
+    public String getCle() {
+        return cle;
+    }
+
+    public void setCle(String cle) {
+        this.cle = cle;
     }
 
     public Long getId() {

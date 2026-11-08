@@ -25,6 +25,8 @@ final class CopieSondage {
             for (Question questionSource : sectionSource.getQuestions()) {
                 Question question = new Question();
                 question.setSection(section);
+                // Même clé : les statistiques d'une lignée (et la comparaison de copies) regroupent ces questions.
+                question.setCle(questionSource.getCle());
                 question.setLibelle(questionSource.getLibelle());
                 question.setAide(questionSource.getAide());
                 question.setType(questionSource.getType());
