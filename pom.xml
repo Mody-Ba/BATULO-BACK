@@ -20,6 +20,7 @@
 		<jjwt.version>0.12.6</jjwt.version>
 		<springdoc.version>2.8.17</springdoc.version>
 		<stripe.version>34.1.0</stripe.version>
+		<zxing.version>3.5.4</zxing.version>
 	</properties>
 
 	<dependencies>
@@ -80,6 +81,13 @@
 			<groupId>com.stripe</groupId>
 			<artifactId>stripe-java</artifactId>
 			<version>${stripe.version}</version>
+		</dependency>
+
+		<!-- QR code des liens de sondage (phase 2, étape 2.4) -->
+		<dependency>
+			<groupId>com.google.zxing</groupId>
+			<artifactId>javase</artifactId>
+			<version>${zxing.version}</version>
 		</dependency>
 
 		<!-- Courriels (étape 6) : Mailpit en local, port SMTP 1025 -->

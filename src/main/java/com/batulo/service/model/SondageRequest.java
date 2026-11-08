@@ -13,6 +13,11 @@ public record SondageRequest(
 
         @Size(max = 5000, message = "la description ne doit pas dépasser 5000 caractères")
         @Schema(example = "Suivi des exploitations du bassin arachidier")
-        String description
+        String description,
+
+        @Schema(description = "true (défaut) : une seule réponse par appareil (sondage en ligne) ; false : collecte "
+                + "terrain, plusieurs réponses depuis le même appareil. Modifiable dans le brouillon, figé à la publication.",
+                example = "true")
+        Boolean reponseUnique
 ) {
 }

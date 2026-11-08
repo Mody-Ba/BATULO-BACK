@@ -11,10 +11,8 @@ import com.batulo.exception.ActionInterditeException;
 import com.batulo.exception.ConflitException;
 import com.batulo.exception.RegleGestionException;
 import com.batulo.exception.ResourceNotFoundException;
-import com.batulo.repository.AssignationRepository;
 import com.batulo.repository.SondageRepository;
 import com.batulo.repository.SondageSpecifications;
-import com.batulo.repository.UtilisateurRepository;
 import com.batulo.service.mappers.SondageMapper;
 import com.batulo.service.model.ApercuModel;
 import com.batulo.service.model.CreationSondageModel;
@@ -62,19 +60,16 @@ public class SondageServiceImpl implements SondageService {
     private static final int TITRE_MAX = 200;
 
     private final SondageRepository sondageRepository;
-    private final AssignationRepository assignationRepository;
-    private final UtilisateurRepository utilisateurRepository;
+    private final AccesSondage accesSondage;
     private final SondageMapper sondageMapper;
     private final ValidateurQuestion validateurQuestion;
 
     public SondageServiceImpl(SondageRepository sondageRepository,
-                              AssignationRepository assignationRepository,
-                              UtilisateurRepository utilisateurRepository,
+                              AccesSondage accesSondage,
                               SondageMapper sondageMapper,
                               ValidateurQuestion validateurQuestion) {
         this.sondageRepository = sondageRepository;
-        this.assignationRepository = assignationRepository;
-        this.utilisateurRepository = utilisateurRepository;
+        this.accesSondage = accesSondage;
         this.sondageMapper = sondageMapper;
         this.validateurQuestion = validateurQuestion;
     }
@@ -101,6 +96,9 @@ public class SondageServiceImpl implements SondageService {
             sondage.setDescription(description != null ? description : source.getDescription());
         }
         sondage.setTitre(creation.titre().trim());
+        if (creation.reponseUnique() != null) {
+            sondage.setReponseUnique(creation.reponseUnique());
+        }
         sondage = sondageRepository.save(sondage);
         log.info("Sondage {} créé par le compte {} (entreprise {}){}", sondage.getId(), acteur.getId(),
                 acteur.getEntreprise().getId(),
@@ -170,6 +168,9 @@ public class SondageServiceImpl implements SondageService {
         Sondage sondage = sondageModifiable(utilisateurId, sondageId);
         sondage.setTitre(info.titre().trim());
         sondage.setDescription(texteFacultatif(info.description()));
+        if (info.reponseUnique() != null) {
+            sondage.setReponseUnique(info.reponseUnique());
+        }
         sondage.marquerModifie();
         return enregistrer(sondage);
     }
@@ -412,6 +413,11 @@ public class SondageServiceImpl implements SondageService {
         verifierFermeture(dates.dateFermeture(), ouverture, maintenant);
         sondage.setDatePublication(ouverture);
         sondage.setDateFermeture(dates.dateFermeture());
+        // Lien public stable : un seul jeton par lignée, porté par la version 1, généré à la première publication.
+        Sondage racine = sondage.getRacine();
+        if (racine.getJetonPublic() == null) {
+            racine.setJetonPublic(HachageJeton.nouveauJeton());
+        }
         fermerVersionsPrecedentes(sondage, maintenant);
         log.info("Sondage {} (version {}) publié par le compte {}, ouverture {}",
                 sondageId, sondage.getVersion(), utilisateurId, ouverture);
@@ -534,6 +540,7 @@ public class SondageServiceImpl implements SondageService {
         brouillon.setCreePar(acteur);
         brouillon.setSondageOrigine(source);
         brouillon.setDescription(source.getDescription());
+        brouillon.setReponseUnique(source.isReponseUnique());
         CopieSondage.copierContenu(source, brouillon);
         return brouillon;
     }
@@ -583,32 +590,15 @@ public class SondageServiceImpl implements SondageService {
     // ---------------------------------------------------------------- Droits et recherche
 
     private Utilisateur acteur(Long utilisateurId) {
-        return utilisateurRepository.findWithEntrepriseById(utilisateurId)
-                .filter(u -> u.getEntreprise() != null)
-                .orElseThrow(() -> new ResourceNotFoundException("UTILISATEUR_INTROUVABLE", "Compte introuvable."));
+        return accesSondage.acteur(utilisateurId);
     }
 
     /** Admin : tout sondage de l'entreprise ; gestionnaire : ceux qu'il a créés. Sinon 404. */
     private Sondage sondageLisible(Utilisateur acteur, Long sondageId) {
-        return sondageRepository.findByIdAndEntrepriseId(sondageId, acteur.getEntreprise().getId())
-                .filter(s -> peutLire(acteur, s))
-                .orElseThrow(() -> new ResourceNotFoundException("SONDAGE_INTROUVABLE",
-                        "Aucun sondage " + sondageId + " accessible."));
+        return accesSondage.sondageLisible(acteur, sondageId);
     }
 
     /** Droit de gérer le sondage (publier, fermer, versionner...), quel que soit son statut. */
-    /**
-     * Admin : tout sondage de l'entreprise. Gestionnaire : la lignée est visible s'il a créé l'une de ses versions
-     * ou si elle lui est assignée (GE-04, RG-02).
-     */
-    private boolean peutLire(Utilisateur acteur, Sondage sondage) {
-        if (acteur.getRole() == Role.ADMIN) {
-            return true;
-        }
-        Long lignee = sondage.getIdLignee();
-        return sondageRepository.aCreeDansLaLignee(lignee, acteur.getId())
-                || assignationRepository.existsBySondageIdAndGestionnaireId(lignee, acteur.getId());
-    }
 
     /**
      * Droit de gérer le sondage (modifier, publier, fermer, versionner, supprimer...), quel que soit son statut :

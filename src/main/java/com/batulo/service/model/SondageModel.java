@@ -21,6 +21,8 @@ public record SondageModel(
         /** Sondage dont celui-ci est issu (source réutilisée ou dupliquée, version précédente) ; null si créé vide. */
         Long sondageOrigineId,
         boolean estModele,
+        /** true : une seule réponse par appareil ; false : collecte terrain. */
+        boolean reponseUnique,
         AuteurModel creePar,
         Instant dateCreation,
         Instant dateModification,

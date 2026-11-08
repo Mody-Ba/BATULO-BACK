@@ -31,6 +31,10 @@ public interface SondageRepository extends JpaRepository<Sondage, Long>, JpaSpec
     @Query("select s from Sondage s where s.id = :ligneeId or s.lignee.id = :ligneeId order by s.version")
     List<Sondage> findLignee(Long ligneeId);
 
+    /** Version 1 d'une lignée par le jeton de son lien public. */
+    @EntityGraph(attributePaths = "entreprise")
+    Optional<Sondage> findByJetonPublic(String jetonPublic);
+
     /** true si l'utilisateur a créé au moins une version de la lignée. */
     @Query("select count(s) > 0 from Sondage s where s.creePar.id = :utilisateurId "
             + "and (s.id = :ligneeId or s.lignee.id = :ligneeId)")

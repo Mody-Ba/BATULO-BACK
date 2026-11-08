@@ -35,6 +35,17 @@ public class GlobalExceptionHandler {
         return reponse(HttpStatus.CONFLICT, CompteExistantException.CODE, ex.getMessage());
     }
 
+    @ExceptionHandler(RessourceFermeeException.class)
+    public ResponseEntity<ErrorResponse> handleFermee(RessourceFermeeException ex) {
+        return reponse(HttpStatus.GONE, ex.getCode(), ex.getMessage());
+    }
+
+    @ExceptionHandler(ReponsesInvalidesException.class)
+    public ResponseEntity<ErrorResponse> handleReponsesInvalides(ReponsesInvalidesException ex) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).contentType(MediaType.APPLICATION_JSON)
+                .body(new ErrorResponse(ReponsesInvalidesException.CODE, ex.getMessage(), ex.getErreurs()));
+    }
+
     @ExceptionHandler(ConflitException.class)
     public ResponseEntity<ErrorResponse> handleConflit(ConflitException ex) {
         return reponse(HttpStatus.CONFLICT, ex.getCode(), ex.getMessage());
@@ -144,6 +155,10 @@ public class GlobalExceptionHandler {
         String cause = String.valueOf(ex.getMostSpecificCause().getMessage());
         if (cause.contains("uk_utilisateur_courriel")) {
             return handleCompteExistant(new CompteExistantException());
+        }
+        // Deux envois simultanés du même appareil : la base garde la première réponse.
+        if (cause.contains("uk_reponse_lignee_jeton")) {
+            return reponse(HttpStatus.CONFLICT, "DEJA_REPONDU", "Vous avez déjà répondu à ce sondage depuis cet appareil.");
         }
         log.warn("Violation d'intégrité : {}", cause);
         return reponse(HttpStatus.CONFLICT, "CONFLIT", "L'opération viole une contrainte de données.");

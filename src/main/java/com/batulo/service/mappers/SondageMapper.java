@@ -9,6 +9,7 @@ import com.batulo.service.RegleSondage;
 import com.batulo.service.model.ApercuModel;
 import com.batulo.service.model.AuteurModel;
 import com.batulo.service.model.FormulaireModel;
+import com.batulo.service.model.FormulairePublicModel;
 import com.batulo.service.model.OptionModel;
 import com.batulo.service.model.QuestionModel;
 import com.batulo.service.model.SectionModel;
@@ -41,6 +42,7 @@ public class SondageMapper {
                 entity.getVersion(),
                 origine(entity),
                 entity.isEstModele(),
+                entity.isReponseUnique(),
                 auteur(entity.getCreePar()),
                 entity.getDateCreation(),
                 entity.getDateModification(),
@@ -88,6 +90,16 @@ public class SondageMapper {
                 nombreQuestions,
                 entity.getDateCreation(),
                 entity.getDateModification());
+    }
+
+    /** Formulaire du répondant : contenu de la version ouverte, sans aucune donnée interne. */
+    public FormulairePublicModel toFormulairePublicModel(Sondage version) {
+        return new FormulairePublicModel(
+                version.getTitre(),
+                version.getDescription(),
+                version.isReponseUnique(),
+                version.getDateFermeture(),
+                sections(version));
     }
 
     public ApercuModel toApercuModel(Sondage entity, Instant maintenant) {

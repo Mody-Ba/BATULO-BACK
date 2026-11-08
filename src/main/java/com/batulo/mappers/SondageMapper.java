@@ -44,7 +44,7 @@ import java.util.List;
 public class SondageMapper {
 
     public CreationSondageModel toModel(CreationSondageRequest req) {
-        return new CreationSondageModel(req.titre(), req.description(), req.sondageSourceId());
+        return new CreationSondageModel(req.titre(), req.description(), req.sondageSourceId(), req.reponseUnique());
     }
 
     public PageResponse<FormulaireResponse> toFormulaireResponses(Page<FormulaireModel> page) {
@@ -60,7 +60,7 @@ public class SondageMapper {
     }
 
     public SondageInfoModel toModel(SondageRequest req) {
-        return new SondageInfoModel(req.titre(), req.description());
+        return new SondageInfoModel(req.titre(), req.description(), req.reponseUnique());
     }
 
     public SectionInfoModel toModel(SectionRequest req) {
@@ -96,6 +96,7 @@ public class SondageMapper {
                 model.version(),
                 model.sondageOrigineId(),
                 model.estModele(),
+                model.reponseUnique(),
                 toResponse(model.creePar()),
                 model.dateCreation(),
                 model.dateModification(),

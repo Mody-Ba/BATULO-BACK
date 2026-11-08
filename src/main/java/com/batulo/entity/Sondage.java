@@ -85,6 +85,14 @@ public class Sondage {
     @Column(name = "est_modele", nullable = false)
     private boolean estModele;
 
+    /** Jeton du lien public, porté par la version 1 de la lignée et généré à la première publication. */
+    @Column(name = "jeton_public", length = 43, unique = true)
+    private String jetonPublic;
+
+    /** true : une seule réponse par appareil ; false : collecte terrain (plusieurs réponses par appareil). */
+    @Column(name = "reponse_unique", nullable = false)
+    private boolean reponseUnique = true;
+
     @OneToMany(mappedBy = "sondage", cascade = CascadeType.ALL, orphanRemoval = true)
     @OrderBy("ordre ASC")
     private List<Section> sections = new ArrayList<>();
@@ -211,6 +219,27 @@ public class Sondage {
 
     public void setEstModele(boolean estModele) {
         this.estModele = estModele;
+    }
+
+    public String getJetonPublic() {
+        return jetonPublic;
+    }
+
+    public void setJetonPublic(String jetonPublic) {
+        this.jetonPublic = jetonPublic;
+    }
+
+    public boolean isReponseUnique() {
+        return reponseUnique;
+    }
+
+    public void setReponseUnique(boolean reponseUnique) {
+        this.reponseUnique = reponseUnique;
+    }
+
+    /** Version 1 de la lignée (lui-même pour une version 1). */
+    public Sondage getRacine() {
+        return lignee == null ? this : lignee;
     }
 
     /** Id de la version 1 de la lignée (le sien pour une version 1). */

@@ -85,6 +85,14 @@ batulo:
     # Tâche quotidienne (rappels et expirations) : tous les jours à 8 h, heure de batulo.fuseau-horaire.
     # Elle tourne aussi une fois au démarrage.
     cron-expiration: ${ABONNEMENT_CRON:0 0 8 * * *}
+  collecte:
+    # Page du formulaire répondant (frontend Angular) : le jeton du sondage y est ajouté (lien et QR code).
+    url-formulaire: ${PUBLIC_FORM_URL:http://localhost:4200/s}
+    # Limite des routes publiques, par adresse IP et par minute.
+    limite-lecture-par-minute: ${PUBLIC_RATE_GET:120}
+    limite-envoi-par-minute: ${PUBLIC_RATE_POST:20}
+    # true seulement derrière un proxy de confiance (l'adresse vient alors de X-Forwarded-For).
+    faire-confiance-proxy: ${TRUST_PROXY:false}
   mot-de-passe:
     duree-temporaire-heures: 24
     duree-lien-reinitialisation-minutes: 60
