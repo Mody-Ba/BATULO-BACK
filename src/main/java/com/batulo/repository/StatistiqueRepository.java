@@ -315,8 +315,11 @@ public class StatistiqueRepository {
         return new MapSqlParameterSource("questions", questions);
     }
 
-    /** Conditions sur la réponse r, avec leurs paramètres (jamais de valeur concaténée dans le SQL). */
-    private static String conditions(Filtre filtre, MapSqlParameterSource p) {
+    /**
+     * Conditions sur la réponse r (versions, période, critères), avec leurs paramètres (jamais de valeur concaténée
+     * dans le SQL). Partagées avec ExportRepository.
+     */
+    static String conditions(Filtre filtre, MapSqlParameterSource p) {
         StringBuilder sql = new StringBuilder("r.sondage_id in (:versions)");
         p.addValue("versions", filtre.versions());
         if (filtre.debut() != null) {

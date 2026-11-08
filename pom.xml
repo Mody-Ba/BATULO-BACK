@@ -21,6 +21,8 @@
 		<springdoc.version>2.8.17</springdoc.version>
 		<stripe.version>34.1.0</stripe.version>
 		<zxing.version>3.5.4</zxing.version>
+		<poi.version>5.2.5</poi.version>
+		<openpdf.version>2.0.3</openpdf.version>
 	</properties>
 
 	<dependencies>
@@ -88,6 +90,24 @@
 			<groupId>com.google.zxing</groupId>
 			<artifactId>javase</artifactId>
 			<version>${zxing.version}</version>
+		</dependency>
+
+		<!-- Exports (phase 3, étape 3.3) : Excel (Apache POI, écriture en flux SXSSF), PDF (OpenPDF, licence LGPL/MPL)
+		     et police libre embarquée (Liberation Sans) pour tous les caractères des réponses -->
+		<dependency>
+			<groupId>org.apache.poi</groupId>
+			<artifactId>poi-ooxml</artifactId>
+			<version>${poi.version}</version>
+		</dependency>
+		<dependency>
+			<groupId>com.github.librepdf</groupId>
+			<artifactId>openpdf</artifactId>
+			<version>${openpdf.version}</version>
+		</dependency>
+		<dependency>
+			<groupId>com.github.librepdf</groupId>
+			<artifactId>openpdf-fonts-extra</artifactId>
+			<version>${openpdf.version}</version>
 		</dependency>
 
 		<!-- Courriels (étape 6) : Mailpit en local, port SMTP 1025 -->

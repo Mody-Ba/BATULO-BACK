@@ -69,10 +69,19 @@ Plateforme SaaS de sondages (Spring Boot 3.5, Java 21, PostgreSQL 16, Liquibase)
   même clé, ET entre clés. Tableau croisé : colonne « Non renseigné » si elle n'est pas vide ; `petitEffectif`
   sous `batulo.statistiques.effectif-minimum` (5). Un critère sensible (sexe) devrait être une question facultative
   (« volontairement renseigné ») : rappelé dans la documentation, non imposé.
+- Exports (3.3) : réponses brutes en CSV ou XLSX (une ligne par réponse ; choix multiple et classement : une
+  colonne par option, 1/0 ou rang, vide si non répondu ; matrice : une colonne par ligne ; LIBELLES ou CODES ;
+  mêmes filtres que les statistiques). CSV UTF-8 avec BOM : VIRGULE (défaut, « ; » et virgule décimale) ou POINT
+  (« , » et point décimal, Python/R) ; textes commençant par = + - @ précédés d'une apostrophe (injection de
+  formule). Écriture en flux directement dans la réponse HTTP (curseur JDBC, SXSSF), sans StreamingResponseBody
+  asynchrone. Rapports PDF (OpenPDF, police Liberation Sans embarquée, barres dessinées dans les tableaux) et XLSX
+  (Résumé + une feuille par question), tableau croisé en PDF ou XLSX. Nom : titre-du-sondage_v2[_statistiques]_date.
+  Le périmètre d'analyse (versions, références, filtres, critères) est partagé dans `AnalysePerimetre`.
 
 ## À traiter dans les étapes suivantes
 - Phase 4 : invitations nominatives (l'unicité par appareil se contourne en vidant le navigateur ou en changeant
   d'appareil : limite acceptée pour la phase 2) ; diffusion courriel, SMS, WhatsApp, intégration web, campagnes.
 - Si l'application tourne un jour sur plusieurs instances : limite de requêtes partagée (Redis ou Bucket4j).
-- Phase 3 : segmentation (3.2), exports PDF/Excel/CSV (3.3), messagerie et envoi des statistiques d'un sondage
-  terminé du gestionnaire à son admin (3.4).
+- Phase 3 : messagerie et envoi des statistiques d'un sondage terminé du gestionnaire à son admin (3.4).
+- Module 4.4, plus tard : logo et identité visuelle dans les rapports, comparaison de plusieurs sondages (la clé de
+  question est déjà recopiée dans les copies), partage sécurisé des rapports, archivage.
