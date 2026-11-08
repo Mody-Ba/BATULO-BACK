@@ -22,6 +22,9 @@ spring:
       hibernate:
         jdbc:
           time_zone: UTC
+        # Charge les collections par lots (sections, questions, options d'un sondage) : peu de requêtes,
+        # sans produit cartésien.
+        default_batch_fetch_size: 100
   liquibase:
     change-log: classpath:db/changelog/db.changelog-master.yaml
   mail:

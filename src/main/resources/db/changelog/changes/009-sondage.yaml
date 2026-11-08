@@ -1,0 +1,133 @@
+databaseChangeLog:
+  # Phase 2, étape 2.1 : modèle du formulaire dynamique (module 4.1). Un sondage est une donnée :
+  # sondage > sections > questions > options, la configuration propre à chaque type de question en JSON.
+
+  # JSONB sous PostgreSQL ; JSON sous H2 (tests de la phase 1).
+  - property: { name: type.json, value: JSONB, dbms: postgresql }
+  - property: { name: type.json, value: JSON, dbms: h2 }
+
+  - changeSet:
+      id: 009-creer-table-sondage
+      author: batulo
+      changes:
+        - createTable:
+            tableName: sondage
+            columns:
+              - column: { name: id, type: BIGINT, autoIncrement: true, constraints: { primaryKey: true, nullable: false } }
+              - column:
+                  name: entreprise_id
+                  type: BIGINT
+                  constraints:
+                    nullable: false
+                    foreignKeyName: fk_sondage_entreprise
+                    references: entreprise(id)
+                    deleteCascade: true
+              - column: { name: titre, type: VARCHAR(200), constraints: { nullable: false } }
+              - column: { name: description, type: TEXT }
+              # Supprimer le gestionnaire qui l'a créé ne supprime pas le sondage (il appartient à l'entreprise).
+              - column: { name: cree_par_id, type: BIGINT }
+              - column: { name: date_creation, type: TIMESTAMP WITH TIME ZONE, constraints: { nullable: false } }
+              - column: { name: date_modification, type: TIMESTAMP WITH TIME ZONE, constraints: { nullable: false } }
+        - addForeignKeyConstraint:
+            constraintName: fk_sondage_cree_par
+            baseTableName: sondage
+            baseColumnNames: cree_par_id
+            referencedTableName: utilisateur
+            referencedColumnNames: id
+            onDelete: SET NULL
+        - createIndex:
+            tableName: sondage
+            indexName: idx_sondage_entreprise
+            columns:
+              - column: { name: entreprise_id }
+        - createIndex:
+            tableName: sondage
+            indexName: idx_sondage_cree_par
+            columns:
+              - column: { name: cree_par_id }
+
+  - changeSet:
+      id: 009-creer-table-section
+      author: batulo
+      changes:
+        - createTable:
+            tableName: section
+            columns:
+              - column: { name: id, type: BIGINT, autoIncrement: true, constraints: { primaryKey: true, nullable: false } }
+              - column:
+                  name: sondage_id
+                  type: BIGINT
+                  constraints:
+                    nullable: false
+                    foreignKeyName: fk_section_sondage
+                    references: sondage(id)
+                    deleteCascade: true
+              - column: { name: titre, type: VARCHAR(200), constraints: { nullable: false } }
+              - column: { name: description, type: TEXT }
+              # Numéroté 1, 2, 3... par le serveur ; pas d'unicité, pour pouvoir réordonner librement.
+              - column: { name: ordre, type: INT, constraints: { nullable: false } }
+        - createIndex:
+            tableName: section
+            indexName: idx_section_sondage_ordre
+            columns:
+              - column: { name: sondage_id }
+              - column: { name: ordre }
+
+  - changeSet:
+      id: 009-creer-table-question
+      author: batulo
+      changes:
+        - createTable:
+            tableName: question
+            columns:
+              - column: { name: id, type: BIGINT, autoIncrement: true, constraints: { primaryKey: true, nullable: false } }
+              - column:
+                  name: section_id
+                  type: BIGINT
+                  constraints:
+                    nullable: false
+                    foreignKeyName: fk_question_section
+                    references: section(id)
+                    deleteCascade: true
+              - column: { name: libelle, type: VARCHAR(500), constraints: { nullable: false } }
+              - column: { name: aide, type: VARCHAR(500) }
+              - column: { name: type, type: VARCHAR(30), constraints: { nullable: false } }
+              - column: { name: obligatoire, type: BOOLEAN, defaultValueBoolean: false, constraints: { nullable: false } }
+              - column: { name: ordre, type: INT, constraints: { nullable: false } }
+              # Propre au type (ECHELLE {min,max}, MATRICE {lignes,colonnes}...), validée par le serveur ; {} sinon.
+              - column: { name: configuration, type: "${type.json}", constraints: { nullable: false } }
+        - createIndex:
+            tableName: question
+            indexName: idx_question_section_ordre
+            columns:
+              - column: { name: section_id }
+              - column: { name: ordre }
+        - sql:
+            sql: >-
+              ALTER TABLE question ADD CONSTRAINT ck_question_type CHECK (type IN ('CHOIX_UNIQUE','CHOIX_MULTIPLE',
+              'OUI_NON','TEXTE_COURT','TEXTE_LONG','ECHELLE','CLASSEMENT','NUMERIQUE','DATE','MATRICE'))
+
+  - changeSet:
+      id: 009-creer-table-option-question
+      author: batulo
+      changes:
+        - createTable:
+            tableName: option_question
+            columns:
+              - column: { name: id, type: BIGINT, autoIncrement: true, constraints: { primaryKey: true, nullable: false } }
+              - column:
+                  name: question_id
+                  type: BIGINT
+                  constraints:
+                    nullable: false
+                    foreignKeyName: fk_option_question
+                    references: question(id)
+                    deleteCascade: true
+              - column: { name: libelle, type: VARCHAR(200), constraints: { nullable: false } }
+              # Code stable de l'option : les statistiques s'appuient dessus, il ne change pas avec le libellé.
+              - column: { name: valeur, type: VARCHAR(100), constraints: { nullable: false } }
+              - column: { name: ordre, type: INT, constraints: { nullable: false } }
+        - addUniqueConstraint:
+            tableName: option_question
+            columnNames: question_id, valeur
+            constraintName: uk_option_question_valeur

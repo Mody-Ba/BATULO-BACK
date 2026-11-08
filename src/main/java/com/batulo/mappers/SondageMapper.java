@@ -1,0 +1,110 @@
+package com.batulo.mappers;
+
+import com.batulo.service.model.AuteurModel;
+import com.batulo.service.model.AuteurResponse;
+import com.batulo.service.model.OptionInfoModel;
+import com.batulo.service.model.OptionModel;
+import com.batulo.service.model.OptionRequest;
+import com.batulo.service.model.OptionResponse;
+import com.batulo.service.model.PageResponse;
+import com.batulo.service.model.QuestionInfoModel;
+import com.batulo.service.model.QuestionModel;
+import com.batulo.service.model.QuestionRequest;
+import com.batulo.service.model.QuestionResponse;
+import com.batulo.service.model.SectionInfoModel;
+import com.batulo.service.model.SectionModel;
+import com.batulo.service.model.SectionRequest;
+import com.batulo.service.model.SectionResponse;
+import com.batulo.service.model.SondageInfoModel;
+import com.batulo.service.model.SondageModel;
+import com.batulo.service.model.SondageRequest;
+import com.batulo.service.model.SondageResponse;
+import com.batulo.service.model.SondageResumeModel;
+import com.batulo.service.model.SondageResumeResponse;
+import org.springframework.data.domain.Page;
+import org.springframework.stereotype.Component;
+
+import java.util.List;
+
+/**
+ * Mapper API : convertit uniquement Request -> Model et Model -> Response.
+ * Ne doit jamais connaître les entités JPA du sondage.
+ */
+@Component("apiSondageMapper")
+public class SondageMapper {
+
+    public SondageInfoModel toModel(SondageRequest req) {
+        return new SondageInfoModel(req.titre(), req.description());
+    }
+
+    public SectionInfoModel toModel(SectionRequest req) {
+        return new SectionInfoModel(req.titre(), req.description());
+    }
+
+    public QuestionInfoModel toModel(QuestionRequest req) {
+        List<OptionInfoModel> options = req.options() == null ? List.of()
+                : req.options().stream().map(this::toModel).toList();
+        return new QuestionInfoModel(
+                req.libelle(),
+                req.aide(),
+                req.type(),
+                Boolean.TRUE.equals(req.obligatoire()),
+                req.configuration(),
+                options);
+    }
+
+    private OptionInfoModel toModel(OptionRequest req) {
+        return new OptionInfoModel(req.id(), req.libelle(), req.valeur());
+    }
+
+    public SondageResponse toResponse(SondageModel model) {
+        return new SondageResponse(
+                model.id(),
+                model.entrepriseId(),
+                model.titre(),
+                model.description(),
+                toResponse(model.creePar()),
+                model.dateCreation(),
+                model.dateModification(),
+                model.sections().stream().map(this::toResponse).toList());
+    }
+
+    public PageResponse<SondageResumeResponse> toResponse(Page<SondageResumeModel> page) {
+        return new PageResponse<>(
+                page.getContent().stream().map(this::toResponse).toList(),
+                page.getNumber(),
+                page.getSize(),
+                page.getTotalElements(),
+                page.getTotalPages());
+    }
+
+    private SondageResumeResponse toResponse(SondageResumeModel model) {
+        return new SondageResumeResponse(
+                model.id(),
+                model.titre(),
+                model.description(),
+                toResponse(model.creePar()),
+                model.nombreSections(),
+                model.nombreQuestions(),
+                model.dateCreation(),
+                model.dateModification());
+    }
+
+    private SectionResponse toResponse(SectionModel model) {
+        return new SectionResponse(model.id(), model.titre(), model.description(), model.ordre(),
+                model.questions().stream().map(this::toResponse).toList());
+    }
+
+    private QuestionResponse toResponse(QuestionModel model) {
+        return new QuestionResponse(model.id(), model.libelle(), model.aide(), model.type(), model.obligatoire(),
+                model.ordre(), model.configuration(), model.options().stream().map(this::toResponse).toList());
+    }
+
+    private OptionResponse toResponse(OptionModel model) {
+        return new OptionResponse(model.id(), model.libelle(), model.valeur(), model.ordre());
+    }
+
+    private AuteurResponse toResponse(AuteurModel model) {
+        return model == null ? null : new AuteurResponse(model.id(), model.prenom(), model.nom());
+    }
+}
