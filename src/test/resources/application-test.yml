@@ -23,6 +23,10 @@ batulo:
     cle-publique: ""
   cors:
     origines: http://localhost:4200
+  collecte:
+    # Les tests envoient beaucoup de requêtes publiques : limite relevée (un test dédié la vérifie).
+    limite-lecture-par-minute: 100000
+    limite-envoi-par-minute: 100000
   abonnement:
     # Pas de passage planifié pendant les tests (le 31 février n'existe pas).
     cron-expiration: "0 0 0 31 2 *"

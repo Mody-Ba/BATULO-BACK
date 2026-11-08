@@ -45,6 +45,9 @@ public class AccesAbonnementInterceptor implements HandlerInterceptor {
             return true; // Route publique : rien à vérifier ici.
         }
         String chemin = request.getRequestURI().substring(request.getContextPath().length());
+        if (chemin.startsWith("/api/public/")) {
+            return true; // Routes du répondant : leurs règles (sondage ouvert, abonnement actif) sont dans le service.
+        }
         boolean routeAuth = chemin.startsWith("/api/auth/");
         boolean routePaiement = chemin.startsWith("/api/abonnements/") || chemin.startsWith("/api/dev/paiements/");
 

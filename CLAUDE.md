@@ -45,9 +45,16 @@ Plateforme SaaS de sondages (Spring Boot 3.5, Java 21, PostgreSQL 16, Liquibase)
   cahier = créés ou assignés). Assigner un gestionnaire désactivé : 409 ; ses assignations sont conservées.
 - Notifications ajoutées au cahier : assignation d'un sondage (tableau de bord + courriel) et retrait d'une
   assignation (tableau de bord seulement).
+- Collecte (2.4) : `reponseUnique` par sondage (true par défaut) répond à la question ouverte du cahier. true :
+  une réponse par appareil sur toute la lignée, contrôlée par un jeton UUID gardé par le navigateur (hash en base,
+  409 DEJA_REPONDU) ; false : collecte terrain. Choisi dans le brouillon, figé à la publication, recopié dans les
+  versions et les copies. Le lien public et le QR code sont stables par lignée (jeton porté par la version 1) et
+  mènent à la version EN_COURS ; chaque réponse reste liée à sa version. Collecte fermée si l'entreprise est
+  désactivée ou si l'abonnement n'est ni ACTIF ni EXPIRE_BIENTOT (410 SONDAGE_FERME). Matrice remplie : toutes les
+  lignes. Limite de requêtes en mémoire par IP sur /api/public/** (une seule instance).
 
 ## À traiter dans les étapes suivantes
-- 2.4 : un abonnement EXPIRE ou DESACTIVE ferme les sondages aux répondants (cahier §5) ; trancher la question
-  ouverte du cahier « un répondant peut-il répondre plusieurs fois au même sondage ? » ; interdire la suppression
-  d'un sondage qui a des réponses.
+- Phase 4 : invitations nominatives (l'unicité par appareil se contourne en vidant le navigateur ou en changeant
+  d'appareil : limite acceptée pour la phase 2) ; diffusion courriel, SMS, WhatsApp, intégration web, campagnes.
+- Si l'application tourne un jour sur plusieurs instances : limite de requêtes partagée (Redis ou Bucket4j).
 - Phase 3 : le gestionnaire envoie les statistiques d'un sondage terminé à son admin.

@@ -23,3 +23,5 @@ databaseChangeLog:
       file: db/changelog/changes/011-sondage-reutilisation.yaml
   - include:
       file: db/changelog/changes/012-assignation.yaml
+  - include:
+      file: db/changelog/changes/013-collecte.yaml

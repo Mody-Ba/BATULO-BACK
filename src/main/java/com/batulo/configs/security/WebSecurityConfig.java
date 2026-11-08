@@ -88,6 +88,8 @@ public class WebSecurityConfig {
                                 "/api/auth/mot-de-passe-oublie",
                                 "/api/auth/reinitialiser-mot-de-passe").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/abonnements/formules").permitAll()
+                        // Formulaire du répondant, sans compte (RE-02) ; limite de requêtes par IP.
+                        .requestMatchers("/api/public/**").permitAll()
                         .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
                         // Rôles par préfixe : vérifiés ici, AVANT les règles d'abonnement de l'intercepteur, pour
                         // qu'un mauvais rôle donne toujours 403 ACCES_REFUSE. @PreAuthorize les répète sur chaque

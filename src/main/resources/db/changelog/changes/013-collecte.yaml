@@ -1,0 +1,115 @@
+databaseChangeLog:
+  # Phase 2, étape 2.4 : collecte des réponses (RE-01 à RE-03, module 4.2 : lien et QR code).
+  # JSONB sous PostgreSQL ; JSON sous H2 (tests de la phase 1).
+  - property: { name: type.json, value: JSONB, dbms: postgresql }
+  - property: { name: type.json, value: JSON, dbms: h2 }
+
+  - changeSet:
+      id: 013-sondage-collecte
+      author: batulo
+      changes:
+        - addColumn:
+            tableName: sondage
+            columns:
+              # Jeton du lien public, porté par la version 1 de la lignée : le même lien sert à toutes les versions.
+              - column: { name: jeton_public, type: VARCHAR(43), constraints: { unique: true, uniqueConstraintName: uk_sondage_jeton_public } }
+              # true : une seule réponse par appareil (sondage en ligne) ; false : collecte terrain.
+              - column: { name: reponse_unique, type: BOOLEAN, defaultValueBoolean: true, constraints: { nullable: false } }
+
+  - changeSet:
+      id: 013-creer-table-reponse
+      author: batulo
+      changes:
+        - createTable:
+            tableName: reponse
+            columns:
+              - column: { name: id, type: BIGINT, autoIncrement: true, constraints: { primaryKey: true, nullable: false } }
+              # Version à laquelle le répondant a répondu.
+              - column:
+                  name: sondage_id
+                  type: BIGINT
+                  constraints:
+                    nullable: false
+                    foreignKeyName: fk_reponse_sondage
+                    references: sondage(id)
+                    deleteCascade: true
+              # Version 1 de la lignée : unicité par appareil sur toutes les versions, statistiques par lignée.
+              - column:
+                  name: lignee_id
+                  type: BIGINT
+                  constraints:
+                    nullable: false
+                    foreignKeyName: fk_reponse_lignee
+                    references: sondage(id)
+                    deleteCascade: true
+              - column: { name: date_soumission, type: TIMESTAMP WITH TIME ZONE, constraints: { nullable: false } }
+              # Hash SHA-256 du jeton de l'appareil ; renseigné seulement si le sondage n'accepte qu'une réponse par appareil.
+              - column: { name: jeton_repondant_hash, type: VARCHAR(64) }
+        - addUniqueConstraint:
+            tableName: reponse
+            columnNames: lignee_id, jeton_repondant_hash
+            constraintName: uk_reponse_lignee_jeton
+        - createIndex:
+            tableName: reponse
+            indexName: idx_reponse_sondage_date
+            columns:
+              - column: { name: sondage_id }
+              - column: { name: date_soumission }
+
+  - changeSet:
+      id: 013-creer-table-reponse-question
+      author: batulo
+      changes:
+        - createTable:
+            tableName: reponse_question
+            columns:
+              - column: { name: id, type: BIGINT, autoIncrement: true, constraints: { primaryKey: true, nullable: false } }
+              - column:
+                  name: reponse_id
+                  type: BIGINT
+                  constraints:
+                    nullable: false
+                    foreignKeyName: fk_reponse_question_reponse
+                    references: reponse(id)
+                    deleteCascade: true
+              - column:
+                  name: question_id
+                  type: BIGINT
+                  constraints:
+                    nullable: false
+                    foreignKeyName: fk_reponse_question_question
+                    references: question(id)
+                    deleteCascade: true
+              # CHOIX_UNIQUE ; CHOIX_MULTIPLE : une ligne par option cochée.
+              - column:
+                  name: option_id
+                  type: BIGINT
+                  constraints:
+                    foreignKeyName: fk_reponse_question_option
+                    references: option_question(id)
+                    deleteCascade: true
+              # ECHELLE, NUMERIQUE.
+              - column: { name: valeur_numerique, type: "NUMERIC(19,4)" }
+              # TEXTE_COURT, TEXTE_LONG.
+              - column: { name: valeur_texte, type: TEXT }
+              # DATE.
+              - column: { name: valeur_date, type: DATE }
+              # OUI_NON.
+              - column: { name: valeur_booleenne, type: BOOLEAN }
+              # CLASSEMENT (liste ordonnée des valeurs d'options), MATRICE ({ligne: colonne}).
+              - column: { name: valeur_json, type: "${type.json}" }
+        - createIndex:
+            tableName: reponse_question
+            indexName: idx_reponse_question_reponse
+            columns:
+              - column: { name: reponse_id }
+        - createIndex:
+            tableName: reponse_question
+            indexName: idx_reponse_question_question
+            columns:
+              - column: { name: question_id }
+        - createIndex:
+            tableName: reponse_question
+            indexName: idx_reponse_question_option
+            columns:
+              - column: { name: option_id }

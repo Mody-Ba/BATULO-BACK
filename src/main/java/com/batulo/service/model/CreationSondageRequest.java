@@ -18,6 +18,11 @@ public record CreationSondageRequest(
         @Schema(description = "Facultatif : id d'un sondage de l'entreprise (quel que soit son statut) dont les sections, "
                 + "questions et options sont copiées, avec les mêmes valeurs d'options. Absent : sondage vide.",
                 example = "12")
-        Long sondageSourceId
+        Long sondageSourceId,
+
+        @Schema(description = "Facultatif. true (défaut, ou valeur de la source) : une seule réponse par appareil (sondage en ligne) ; false : collecte "
+                + "terrain, plusieurs réponses depuis le même appareil. Modifiable dans le brouillon, figé à la publication.",
+                example = "true")
+        Boolean reponseUnique
 ) {
 }
