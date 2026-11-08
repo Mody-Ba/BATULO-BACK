@@ -1,10 +1,16 @@
 package com.batulo.service;
 
+import com.batulo.enums.StatutSondage;
+import com.batulo.service.model.ApercuModel;
+import com.batulo.service.model.CreationSondageModel;
+import com.batulo.service.model.DatesSondageModel;
+import com.batulo.service.model.FormulaireModel;
 import com.batulo.service.model.QuestionInfoModel;
 import com.batulo.service.model.SectionInfoModel;
 import com.batulo.service.model.SondageInfoModel;
 import com.batulo.service.model.SondageModel;
 import com.batulo.service.model.SondageResumeModel;
+import com.batulo.service.model.VersionModel;
 import org.springframework.data.domain.Page;
 
 import java.util.List;
@@ -19,19 +25,37 @@ import java.util.List;
  *   ResourceNotFoundException (404).</li>
  * </ul>
  * Toutes les opérations sur les sections et les questions renvoient le sondage complet.
+ * <p>
+ * Cycle de vie (étape 2.2) : seul un brouillon est modifiable ; un sondage publié est gelé (ConflitException
+ * SONDAGE_PUBLIE, 409) et se modifie par une nouvelle version. Le statut (NON_COMMENCE, EN_COURS, TERMINE) se calcule
+ * à partir des dates. Un brouillon se supprime ; un sondage publié se ferme mais ne se supprime pas.
  */
 public interface SondageService {
 
-    SondageModel creer(Long utilisateurId, SondageInfoModel sondage);
+    /**
+     * Crée un brouillon vide, ou à partir d'un formulaire visible de l'entreprise (quel que soit son statut) :
+     * copie des sections, questions et options avec les mêmes valeurs d'options, sans dates, publication,
+     * assignations ni réponses. La source n'est jamais modifiée ; le nouveau sondage garde sondageOrigineId.
+     */
+    SondageModel creer(Long utilisateurId, CreationSondageModel creation);
 
-    /** Du plus récemment modifié au plus ancien. */
-    Page<SondageResumeModel> lister(Long utilisateurId, int page, int taille);
+    /**
+     * Formulaires réutilisables : tous ceux de l'entreprise pour l'admin, ceux qu'il voit pour le gestionnaire
+     * (avec la permission de créer des sondages). Modèles en premier.
+     */
+    Page<FormulaireModel> formulaires(Long utilisateurId, boolean modelesSeulement, int page, int taille);
+
+    /** Marque ou démarque un sondage comme modèle (permis quel que soit son statut). */
+    SondageModel marquerModele(Long utilisateurId, Long sondageId, boolean estModele);
+
+    /** Du plus récemment modifié au plus ancien ; statut null : tous. */
+    Page<SondageResumeModel> lister(Long utilisateurId, StatutSondage statut, int page, int taille);
 
     SondageModel detail(Long utilisateurId, Long sondageId);
 
     SondageModel modifier(Long utilisateurId, Long sondageId, SondageInfoModel sondage);
 
-    /** Supprime le sondage avec ses sections, questions et options. */
+    /** Supprime un brouillon avec ses sections, questions et options (409 SONDAGE_PUBLIE s'il est publié). */
     void supprimer(Long utilisateurId, Long sondageId);
 
     /** Ajoute la section à la fin. */
@@ -60,4 +84,35 @@ public interface SondageService {
 
     /** @param ids tous les ids des questions de la section, chacun une fois, dans le nouvel ordre */
     SondageModel ordonnerQuestions(Long utilisateurId, Long sondageId, Long sectionId, List<Long> ids);
+
+    /**
+     * Publie un brouillon : ouverture maintenant ou planifiée, fermeture facultative. Ferme les versions
+     * précédentes encore ouvertes au moment où celle-ci s'ouvre.
+     *
+     * @throws com.batulo.exception.RegleGestionException SONDAGE_INCOMPLET (aucune question, section vide)
+     *         ou DATES_INVALIDES
+     */
+    SondageModel publier(Long utilisateurId, Long sondageId, DatesSondageModel dates);
+
+    /** Ajuste les dates d'un sondage publié non terminé (l'ouverture seulement si elle n'est pas atteinte). */
+    SondageModel modifierDates(Long utilisateurId, Long sondageId, DatesSondageModel dates);
+
+    /** Fermeture manuelle, définitive : le sondage passe à TERMINE. */
+    SondageModel fermer(Long utilisateurId, Long sondageId);
+
+    /** Le formulaire tel que le verra le répondant (aussi pour un brouillon). */
+    ApercuModel apercu(Long utilisateurId, Long sondageId);
+
+    /** Copie indépendante : nouveau brouillon « Copie de ... », version 1, créé par l'appelant. */
+    SondageModel dupliquer(Long utilisateurId, Long sondageId);
+
+    /**
+     * Brouillon version N+1 de la même lignée, à partir de la dernière version publiée.
+     *
+     * @throws com.batulo.exception.ConflitException SONDAGE_BROUILLON, BROUILLON_EXISTANT ou VERSION_OBSOLETE
+     */
+    SondageModel nouvelleVersion(Long utilisateurId, Long sondageId);
+
+    /** Versions de la lignée visibles par l'appelant, de la plus ancienne à la plus récente. */
+    List<VersionModel> versions(Long utilisateurId, Long sondageId);
 }

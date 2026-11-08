@@ -35,6 +35,11 @@ public class GlobalExceptionHandler {
         return reponse(HttpStatus.CONFLICT, CompteExistantException.CODE, ex.getMessage());
     }
 
+    @ExceptionHandler(ConflitException.class)
+    public ResponseEntity<ErrorResponse> handleConflit(ConflitException ex) {
+        return reponse(HttpStatus.CONFLICT, ex.getCode(), ex.getMessage());
+    }
+
     @ExceptionHandler(RegleGestionException.class)
     public ResponseEntity<ErrorResponse> handleRegleGestion(RegleGestionException ex) {
         return reponse(HttpStatus.BAD_REQUEST, ex.getCode(), ex.getMessage());

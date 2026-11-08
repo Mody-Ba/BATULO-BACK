@@ -6,27 +6,37 @@ import com.batulo.entity.Section;
 import com.batulo.entity.Sondage;
 import com.batulo.entity.Utilisateur;
 import com.batulo.enums.Role;
+import com.batulo.enums.StatutSondage;
 import com.batulo.exception.ActionInterditeException;
+import com.batulo.exception.ConflitException;
 import com.batulo.exception.RegleGestionException;
 import com.batulo.exception.ResourceNotFoundException;
 import com.batulo.repository.SondageRepository;
+import com.batulo.repository.SondageSpecifications;
 import com.batulo.repository.UtilisateurRepository;
 import com.batulo.service.mappers.SondageMapper;
+import com.batulo.service.model.ApercuModel;
+import com.batulo.service.model.CreationSondageModel;
+import com.batulo.service.model.FormulaireModel;
+import com.batulo.service.model.DatesSondageModel;
 import com.batulo.service.model.OptionInfoModel;
 import com.batulo.service.model.QuestionInfoModel;
 import com.batulo.service.model.SectionInfoModel;
 import com.batulo.service.model.SondageInfoModel;
 import com.batulo.service.model.SondageModel;
 import com.batulo.service.model.SondageResumeModel;
+import com.batulo.service.model.VersionModel;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.text.Normalizer;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -48,6 +58,7 @@ public class SondageServiceImpl implements SondageService {
     static final int SECTIONS_MAX = 50;
     static final int QUESTIONS_MAX_PAR_SECTION = 100;
     private static final int VALEUR_MAX = 100;
+    private static final int TITRE_MAX = 200;
 
     private final SondageRepository sondageRepository;
     private final UtilisateurRepository utilisateurRepository;
@@ -68,43 +79,85 @@ public class SondageServiceImpl implements SondageService {
 
     @Override
     @Transactional
-    public SondageModel creer(Long utilisateurId, SondageInfoModel info) {
+    public SondageModel creer(Long utilisateurId, CreationSondageModel creation) {
         Utilisateur acteur = acteur(utilisateurId);
         verifierDroitDeModifier(acteur);
-        Sondage sondage = new Sondage();
-        sondage.setEntreprise(acteur.getEntreprise());
-        sondage.setCreePar(acteur);
-        sondage.setTitre(info.titre().trim());
-        sondage.setDescription(texteFacultatif(info.description()));
+        Sondage sondage;
+        if (creation.sondageSourceId() == null) {
+            sondage = new Sondage();
+            sondage.setEntreprise(acteur.getEntreprise());
+            sondage.setCreePar(acteur);
+            sondage.setDescription(texteFacultatif(creation.description()));
+        } else {
+            // Réutilisation : n'importe quel formulaire visible de l'entreprise, même TERMINE. Seul le contenu est
+            // copié (mêmes valeurs d'options) : ni dates, ni publication, ni assignations, ni réponses.
+            Sondage source = sondageLisible(acteur, creation.sondageSourceId());
+            sondage = nouveauBrouillon(source, acteur);
+            String description = texteFacultatif(creation.description());
+            sondage.setDescription(description != null ? description : source.getDescription());
+        }
+        sondage.setTitre(creation.titre().trim());
         sondage = sondageRepository.save(sondage);
-        log.info("Sondage {} créé par le compte {} (entreprise {})",
-                sondage.getId(), acteur.getId(), acteur.getEntreprise().getId());
-        return sondageMapper.toModel(sondage);
+        log.info("Sondage {} créé par le compte {} (entreprise {}){}", sondage.getId(), acteur.getId(),
+                acteur.getEntreprise().getId(),
+                creation.sondageSourceId() == null ? "" : " à partir du sondage " + creation.sondageSourceId());
+        return enregistrer(sondage);
     }
 
     @Override
-    public Page<SondageResumeModel> lister(Long utilisateurId, int page, int taille) {
+    public Page<FormulaireModel> formulaires(Long utilisateurId, boolean modelesSeulement, int page, int taille) {
         Utilisateur acteur = acteur(utilisateurId);
-        Long entrepriseId = acteur.getEntreprise().getId();
+        // Réutiliser un formulaire, c'est créer un sondage : même permission.
+        verifierDroitDeModifier(acteur);
+        Specification<Sondage> filtre = SondageSpecifications.deLEntreprise(acteur.getEntreprise().getId());
+        if (acteur.getRole() != Role.ADMIN) {
+            filtre = filtre.and(SondageSpecifications.creePar(acteur.getId()));
+        }
+        if (modelesSeulement) {
+            filtre = filtre.and(SondageSpecifications.modelesSeulement());
+        }
+        Page<Sondage> sondages = sondageRepository.findAll(filtre, PageRequest.of(page, taille,
+                Sort.by(Sort.Order.desc("estModele"), Sort.Order.desc("dateModification"), Sort.Order.desc("id"))));
+        Map<Long, long[]> contenu = compterContenu(sondages);
+        Instant maintenant = Instant.now();
+        return sondages.map(s -> sondageMapper.toFormulaireModel(s, maintenant,
+                contenu.getOrDefault(s.getId(), new long[]{0, 0})[1]));
+    }
+
+    @Override
+    @Transactional
+    public SondageModel marquerModele(Long utilisateurId, Long sondageId, boolean estModele) {
+        // Métadonnée, pas du contenu : permis quel que soit le statut.
+        Sondage sondage = sondageGere(utilisateurId, sondageId);
+        sondage.setEstModele(estModele);
+        log.info("Sondage {} {} comme modèle par le compte {}", sondageId, estModele ? "marqué" : "démarqué",
+                utilisateurId);
+        return enregistrer(sondage);
+    }
+
+    @Override
+    public Page<SondageResumeModel> lister(Long utilisateurId, StatutSondage statut, int page, int taille) {
+        Utilisateur acteur = acteur(utilisateurId);
+        Instant maintenant = Instant.now();
         PageRequest pageRequest = PageRequest.of(page, taille, Sort.by(Sort.Direction.DESC, "dateModification", "id"));
         // L'admin voit tous les sondages de l'entreprise ; le gestionnaire, ceux qu'il a créés (assignation : 2.3).
-        Page<Sondage> sondages = acteur.getRole() == Role.ADMIN
-                ? sondageRepository.findByEntrepriseId(entrepriseId, pageRequest)
-                : sondageRepository.findByEntrepriseIdAndCreeParId(entrepriseId, acteur.getId(), pageRequest);
+        Specification<Sondage> filtre = SondageSpecifications.deLEntreprise(acteur.getEntreprise().getId())
+                .and(SondageSpecifications.parStatut(statut, maintenant));
+        if (acteur.getRole() != Role.ADMIN) {
+            filtre = filtre.and(SondageSpecifications.creePar(acteur.getId()));
+        }
+        Page<Sondage> sondages = sondageRepository.findAll(filtre, pageRequest);
 
-        Map<Long, long[]> contenu = sondages.isEmpty() ? Map.of()
-                : sondageRepository.compterContenu(sondages.map(Sondage::getId).toList()).stream()
-                .collect(Collectors.toMap(ligne -> (Long) ligne[0],
-                        ligne -> new long[]{(Long) ligne[1], (Long) ligne[2]}));
+        Map<Long, long[]> contenu = compterContenu(sondages);
         return sondages.map(s -> {
             long[] nombres = contenu.getOrDefault(s.getId(), new long[]{0, 0});
-            return sondageMapper.toResumeModel(s, nombres[0], nombres[1]);
+            return sondageMapper.toResumeModel(s, maintenant, nombres[0], nombres[1]);
         });
     }
 
     @Override
     public SondageModel detail(Long utilisateurId, Long sondageId) {
-        return sondageMapper.toModel(sondageLisible(acteur(utilisateurId), sondageId));
+        return sondageMapper.toModel(sondageLisible(acteur(utilisateurId), sondageId), Instant.now());
     }
 
     @Override
@@ -120,7 +173,11 @@ public class SondageServiceImpl implements SondageService {
     @Override
     @Transactional
     public void supprimer(Long utilisateurId, Long sondageId) {
-        Sondage sondage = sondageModifiable(utilisateurId, sondageId);
+        Sondage sondage = sondageGere(utilisateurId, sondageId);
+        if (sondage.isPublie()) {
+            throw new ConflitException("SONDAGE_PUBLIE",
+                    "Un sondage publié ne se supprime pas : fermez-le (ses réponses sont conservées).");
+        }
         sondageRepository.delete(sondage);
         log.info("Sondage {} supprimé par le compte {}", sondageId, utilisateurId);
     }
@@ -335,6 +392,191 @@ public class SondageServiceImpl implements SondageService {
         return valeur.length() > VALEUR_MAX - 4 ? valeur.substring(0, VALEUR_MAX - 4) : valeur;
     }
 
+    // ---------------------------------------------------------------- Publication, versions, copie
+
+    @Override
+    @Transactional
+    public SondageModel publier(Long utilisateurId, Long sondageId, DatesSondageModel dates) {
+        Sondage sondage = sondageGere(utilisateurId, sondageId);
+        if (sondage.isPublie()) {
+            throw new ConflitException("SONDAGE_PUBLIE", "Ce sondage est déjà publié.");
+        }
+        verifierComplet(sondage);
+        Instant maintenant = Instant.now();
+        Instant ouverture = dates.datePublication() == null || dates.datePublication().isBefore(maintenant)
+                ? maintenant : dates.datePublication();
+        verifierFermeture(dates.dateFermeture(), ouverture, maintenant);
+        sondage.setDatePublication(ouverture);
+        sondage.setDateFermeture(dates.dateFermeture());
+        fermerVersionsPrecedentes(sondage, maintenant);
+        log.info("Sondage {} (version {}) publié par le compte {}, ouverture {}",
+                sondageId, sondage.getVersion(), utilisateurId, ouverture);
+        return enregistrer(sondage);
+    }
+
+    @Override
+    @Transactional
+    public SondageModel modifierDates(Long utilisateurId, Long sondageId, DatesSondageModel dates) {
+        Sondage sondage = sondageGere(utilisateurId, sondageId);
+        Instant maintenant = Instant.now();
+        StatutSondage statut = RegleSondage.statut(sondage, maintenant);
+        if (!sondage.isPublie()) {
+            throw new ConflitException("SONDAGE_BROUILLON",
+                    "Ce sondage n'est pas publié : les dates se fixent à la publication.");
+        }
+        if (statut == StatutSondage.TERMINE) {
+            throw new ConflitException("SONDAGE_TERMINE", "Ce sondage est terminé : ses dates ne changent plus.");
+        }
+        Instant ouverture = sondage.getDatePublication();
+        if (dates.datePublication() != null && !dates.datePublication().equals(ouverture)) {
+            if (statut == StatutSondage.EN_COURS) {
+                throw new RegleGestionException("DATES_INVALIDES",
+                        "Le sondage est déjà ouvert : sa date d'ouverture ne peut plus changer.");
+            }
+            ouverture = dates.datePublication().isBefore(maintenant) ? maintenant : dates.datePublication();
+        }
+        verifierFermeture(dates.dateFermeture(), ouverture, maintenant);
+        sondage.setDatePublication(ouverture);
+        sondage.setDateFermeture(dates.dateFermeture());
+        log.info("Sondage {} : dates modifiées par le compte {}", sondageId, utilisateurId);
+        return enregistrer(sondage);
+    }
+
+    @Override
+    @Transactional
+    public SondageModel fermer(Long utilisateurId, Long sondageId) {
+        Sondage sondage = sondageGere(utilisateurId, sondageId);
+        if (!sondage.isPublie()) {
+            throw new ConflitException("SONDAGE_BROUILLON",
+                    "Un brouillon ne se ferme pas : il n'a jamais été publié (vous pouvez le supprimer).");
+        }
+        Instant maintenant = Instant.now();
+        if (RegleSondage.statut(sondage, maintenant) == StatutSondage.TERMINE) {
+            throw new ConflitException("SONDAGE_TERMINE", "Ce sondage est déjà terminé.");
+        }
+        sondage.setFermeLe(maintenant);
+        log.info("Sondage {} fermé manuellement par le compte {}", sondageId, utilisateurId);
+        return enregistrer(sondage);
+    }
+
+    @Override
+    public ApercuModel apercu(Long utilisateurId, Long sondageId) {
+        return sondageMapper.toApercuModel(sondageLisible(acteur(utilisateurId), sondageId), Instant.now());
+    }
+
+    @Override
+    @Transactional
+    public SondageModel dupliquer(Long utilisateurId, Long sondageId) {
+        Utilisateur acteur = acteur(utilisateurId);
+        verifierDroitDeModifier(acteur);
+        Sondage source = sondageLisible(acteur, sondageId);
+
+        Sondage copie = nouveauBrouillon(source, acteur);
+        String titre = "Copie de " + source.getTitre();
+        copie.setTitre(titre.length() > TITRE_MAX ? titre.substring(0, TITRE_MAX) : titre);
+        copie = sondageRepository.save(copie);
+        log.info("Sondage {} dupliqué en {} par le compte {}", sondageId, copie.getId(), utilisateurId);
+        return enregistrer(copie);
+    }
+
+    @Override
+    @Transactional
+    public SondageModel nouvelleVersion(Long utilisateurId, Long sondageId) {
+        Utilisateur acteur = acteur(utilisateurId);
+        verifierDroitDeModifier(acteur);
+        Sondage source = sondageLisible(acteur, sondageId);
+        if (!source.isPublie()) {
+            throw new ConflitException("SONDAGE_BROUILLON",
+                    "Ce sondage est un brouillon : modifiez-le directement, sans nouvelle version.");
+        }
+        List<Sondage> lignee = sondageRepository.findLignee(source.getIdLignee());
+        Sondage derniere = lignee.get(lignee.size() - 1);
+        if (!derniere.isPublie()) {
+            throw new ConflitException("BROUILLON_EXISTANT", "Une nouvelle version est déjà en préparation : "
+                    + "modifiez le brouillon " + derniere.getId() + " (version " + derniere.getVersion() + ").");
+        }
+        if (!derniere.getId().equals(source.getId())) {
+            throw new ConflitException("VERSION_OBSOLETE", "Ce n'est pas la dernière version : partez de la version "
+                    + derniere.getVersion() + " (sondage " + derniere.getId() + ").");
+        }
+
+        Sondage version = nouveauBrouillon(source, acteur);
+        version.setTitre(source.getTitre());
+        version.setVersion(source.getVersion() + 1);
+        version.setLignee(source.getLignee() == null ? source : source.getLignee());
+        version = sondageRepository.save(version);
+        log.info("Sondage {} : version {} créée ({}) par le compte {}",
+                source.getIdLignee(), version.getVersion(), version.getId(), utilisateurId);
+        return enregistrer(version);
+    }
+
+    @Override
+    public List<VersionModel> versions(Long utilisateurId, Long sondageId) {
+        Utilisateur acteur = acteur(utilisateurId);
+        Sondage sondage = sondageLisible(acteur, sondageId);
+        Instant maintenant = Instant.now();
+        return sondageRepository.findLignee(sondage.getIdLignee()).stream()
+                .filter(version -> peutLire(acteur, version))
+                .map(version -> sondageMapper.toVersionModel(version, maintenant))
+                .toList();
+    }
+
+    /**
+     * Brouillon avec une copie profonde du contenu de la source, créé par l'acteur et issu de la source
+     * (sondageOrigine). La source n'est jamais modifiée ; dates, publication et statut de modèle ne sont pas copiés.
+     */
+    private Sondage nouveauBrouillon(Sondage source, Utilisateur acteur) {
+        Sondage brouillon = new Sondage();
+        brouillon.setEntreprise(source.getEntreprise());
+        brouillon.setCreePar(acteur);
+        brouillon.setSondageOrigine(source);
+        brouillon.setDescription(source.getDescription());
+        CopieSondage.copierContenu(source, brouillon);
+        return brouillon;
+    }
+
+    /**
+     * Une seule version ouverte à la fois : publier la version N ferme les précédentes au moment où elle s'ouvre
+     * (immédiatement, ou à sa date d'ouverture si elle est planifiée). Une précédente pas encore ouverte ne
+     * s'ouvrira jamais. Les réponses restent liées à leur version.
+     */
+    private void fermerVersionsPrecedentes(Sondage publiee, Instant maintenant) {
+        Instant ouverture = publiee.getDatePublication();
+        for (Sondage precedente : sondageRepository.findLignee(publiee.getIdLignee())) {
+            if (precedente.getId().equals(publiee.getId()) || !precedente.isPublie()
+                    || RegleSondage.statut(precedente, maintenant) == StatutSondage.TERMINE) {
+                continue;
+            }
+            if (!ouverture.isAfter(maintenant) || ouverture.isBefore(precedente.getDatePublication())) {
+                precedente.setFermeLe(maintenant);
+            } else if (precedente.getDateFermeture() == null || precedente.getDateFermeture().isAfter(ouverture)) {
+                precedente.setDateFermeture(ouverture);
+            }
+            log.info("Sondage {} (version {}) fermé par la publication de la version {}",
+                    precedente.getId(), precedente.getVersion(), publiee.getVersion());
+        }
+    }
+
+    /** Au moins une question, et aucune section vide. */
+    private static void verifierComplet(Sondage sondage) {
+        if (sondage.getSections().isEmpty()) {
+            throw new RegleGestionException("SONDAGE_INCOMPLET", "Le sondage n'a aucune section : rien à publier.");
+        }
+        for (Section section : sondage.getSections()) {
+            if (section.getQuestions().isEmpty()) {
+                throw new RegleGestionException("SONDAGE_INCOMPLET",
+                        "La section « " + section.getTitre() + " » n'a aucune question.");
+            }
+        }
+    }
+
+    private static void verifierFermeture(Instant fermeture, Instant ouverture, Instant maintenant) {
+        if (fermeture != null && (!fermeture.isAfter(ouverture) || !fermeture.isAfter(maintenant))) {
+            throw new RegleGestionException("DATES_INVALIDES",
+                    "La date de fermeture doit être postérieure à l'ouverture et à maintenant.");
+        }
+    }
+
     // ---------------------------------------------------------------- Droits et recherche
 
     private Utilisateur acteur(Long utilisateurId) {
@@ -346,16 +588,31 @@ public class SondageServiceImpl implements SondageService {
     /** Admin : tout sondage de l'entreprise ; gestionnaire : ceux qu'il a créés. Sinon 404. */
     private Sondage sondageLisible(Utilisateur acteur, Long sondageId) {
         return sondageRepository.findByIdAndEntrepriseId(sondageId, acteur.getEntreprise().getId())
-                .filter(s -> acteur.getRole() == Role.ADMIN
-                        || (s.getCreePar() != null && s.getCreePar().getId().equals(acteur.getId())))
+                .filter(s -> peutLire(acteur, s))
                 .orElseThrow(() -> new ResourceNotFoundException("SONDAGE_INTROUVABLE",
                         "Aucun sondage " + sondageId + " accessible."));
     }
 
-    private Sondage sondageModifiable(Long utilisateurId, Long sondageId) {
+    /** Droit de gérer le sondage (publier, fermer, versionner...), quel que soit son statut. */
+    private static boolean peutLire(Utilisateur acteur, Sondage sondage) {
+        return acteur.getRole() == Role.ADMIN
+                || (sondage.getCreePar() != null && sondage.getCreePar().getId().equals(acteur.getId()));
+    }
+
+    private Sondage sondageGere(Long utilisateurId, Long sondageId) {
         Utilisateur acteur = acteur(utilisateurId);
         verifierDroitDeModifier(acteur);
         return sondageLisible(acteur, sondageId);
+    }
+
+    /** Droit de gérer ET contenu modifiable : seul un brouillon l'est, un sondage publié est gelé. */
+    private Sondage sondageModifiable(Long utilisateurId, Long sondageId) {
+        Sondage sondage = sondageGere(utilisateurId, sondageId);
+        if (sondage.isPublie()) {
+            throw new ConflitException("SONDAGE_PUBLIE", "Ce sondage est publié : son contenu est gelé. "
+                    + "Créez une nouvelle version (POST /api/sondages/" + sondageId + "/nouvelle-version) pour le modifier.");
+        }
+        return sondage;
     }
 
     /** Un gestionnaire sans la permission garde la lecture de ses sondages, mais ne crée ni ne modifie plus. */
@@ -400,10 +657,20 @@ public class SondageServiceImpl implements SondageService {
         }
     }
 
+    /** Nombre de sections et de questions des sondages de la page : sondageId -> [sections, questions]. */
+    private Map<Long, long[]> compterContenu(Page<Sondage> sondages) {
+        if (sondages.isEmpty()) {
+            return Map.of();
+        }
+        return sondageRepository.compterContenu(sondages.map(Sondage::getId).toList()).stream()
+                .collect(Collectors.toMap(ligne -> (Long) ligne[0],
+                        ligne -> new long[]{(Long) ligne[1], (Long) ligne[2]}));
+    }
+
     /** Écrit les changements (les nouveaux éléments reçoivent leur id) et renvoie le sondage complet. */
     private SondageModel enregistrer(Sondage sondage) {
         sondageRepository.flush();
-        return sondageMapper.toModel(sondage);
+        return sondageMapper.toModel(sondage, Instant.now());
     }
 
     private static String texteFacultatif(String texte) {

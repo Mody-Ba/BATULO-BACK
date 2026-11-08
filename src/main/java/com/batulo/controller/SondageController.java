@@ -1,8 +1,14 @@
 package com.batulo.controller;
 
 import com.batulo.configs.security.UtilisateurConnecte;
+import com.batulo.enums.StatutSondage;
 import com.batulo.mappers.SondageMapper;
 import com.batulo.service.SondageService;
+import com.batulo.service.model.ApercuResponse;
+import com.batulo.service.model.CreationSondageRequest;
+import com.batulo.service.model.DatesSondageRequest;
+import com.batulo.service.model.FormulaireResponse;
+import com.batulo.service.model.ModeleRequest;
 import com.batulo.service.model.OrdreRequest;
 import com.batulo.service.model.PageResponse;
 import com.batulo.service.model.QuestionRequest;
@@ -10,6 +16,7 @@ import com.batulo.service.model.SectionRequest;
 import com.batulo.service.model.SondageRequest;
 import com.batulo.service.model.SondageResponse;
 import com.batulo.service.model.SondageResumeResponse;
+import com.batulo.service.model.VersionResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -30,11 +37,15 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.List;
+
 /**
  * Construction des formulaires dynamiques (module 4.1). ADMIN : tous les sondages de son entreprise.
  * GESTIONNAIRE : ses propres sondages, et seulement avec la permission de créer des sondages pour créer ou
  * modifier. Les règles d'abonnement s'appliquent (EXPIRE : lecture seule). Toute modification d'une section ou
  * d'une question renvoie le sondage complet.
+ * Seul un brouillon est modifiable : un sondage publié est gelé (409 SONDAGE_PUBLIE) et se modifie par une
+ * nouvelle version. Statut calculé à partir des dates : NON_COMMENCE, EN_COURS, TERMINE.
  */
 @RestController
 @RequestMapping("/api/sondages")
@@ -54,10 +65,13 @@ public class SondageController {
     @PostMapping
     @PreAuthorize(ROLES)
     @ResponseStatus(HttpStatus.CREATED)
-    @Operation(summary = "Créer un sondage", description = "Sans section. 403 PERMISSION_SONDAGES_REQUISE pour un "
-            + "gestionnaire sans la permission de créer des sondages.")
+    @Operation(summary = "Créer un sondage (vide ou à partir d'un formulaire existant)",
+            description = "Sans sondageSourceId : sondage vide. Avec : copie des sections, questions et options d'un "
+                    + "sondage de l'entreprise (même TERMINE), avec les mêmes valeurs d'options ; ni dates, ni "
+                    + "publication, ni réponses ; la source n'est pas modifiée. 403 PERMISSION_SONDAGES_REQUISE pour un "
+                    + "gestionnaire sans la permission de créer des sondages, 404 si la source n'est pas visible.")
     public SondageResponse creer(@Parameter(hidden = true) @AuthenticationPrincipal UtilisateurConnecte moi,
-                                 @Valid @RequestBody SondageRequest request) {
+                                 @Valid @RequestBody CreationSondageRequest request) {
         return sondageMapper.toResponse(sondageService.creer(moi.id(), sondageMapper.toModel(request)));
     }
 
@@ -65,13 +79,40 @@ public class SondageController {
     @PreAuthorize(ROLES)
     @Operation(summary = "Lister les sondages",
             description = "Admin : tous ceux de l'entreprise ; gestionnaire : ceux qu'il a créés. Du plus récemment "
-                    + "modifié au plus ancien, avec le nombre de sections et de questions.")
+                    + "modifié au plus ancien, avec le statut, la version et le nombre de sections et de questions.")
     public PageResponse<SondageResumeResponse> lister(
             @Parameter(hidden = true) @AuthenticationPrincipal UtilisateurConnecte moi,
+            @Parameter(description = "Facultatif : NON_COMMENCE, EN_COURS ou TERMINE")
+            @RequestParam(required = false) StatutSondage statut,
             @RequestParam(defaultValue = "0") @Min(value = 0, message = "page doit être positif ou nul") int page,
             @RequestParam(defaultValue = "20") @Min(value = 1, message = "taille doit être au moins 1")
             @Max(value = 100, message = "taille ne doit pas dépasser 100") int taille) {
-        return sondageMapper.toResponse(sondageService.lister(moi.id(), page, taille));
+        return sondageMapper.toResponse(sondageService.lister(moi.id(), statut, page, taille));
+    }
+
+    @GetMapping("/formulaires")
+    @PreAuthorize(ROLES)
+    @Operation(summary = "Formulaires réutilisables",
+            description = "Sondages pouvant servir de base à un nouveau sondage (POST /api/sondages avec "
+                    + "sondageSourceId) : titre, nombre de questions, date. Admin : tous ceux de l'entreprise ; "
+                    + "gestionnaire (avec permission) : ceux qu'il voit. Modèles en premier.")
+    public PageResponse<FormulaireResponse> formulaires(
+            @Parameter(hidden = true) @AuthenticationPrincipal UtilisateurConnecte moi,
+            @Parameter(description = "true : modèles seulement ; false (défaut) : tous")
+            @RequestParam(defaultValue = "false") boolean modelesSeulement,
+            @RequestParam(defaultValue = "0") @Min(value = 0, message = "page doit être positif ou nul") int page,
+            @RequestParam(defaultValue = "20") @Min(value = 1, message = "taille doit être au moins 1")
+            @Max(value = 100, message = "taille ne doit pas dépasser 100") int taille) {
+        return sondageMapper.toFormulaireResponses(sondageService.formulaires(moi.id(), modelesSeulement, page, taille));
+    }
+
+    @PutMapping("/{id}/modele")
+    @PreAuthorize(ROLES)
+    @Operation(summary = "Marquer ou démarquer comme modèle",
+            description = "Permis quel que soit le statut (ce n'est pas une modification du contenu).")
+    public SondageResponse marquerModele(@Parameter(hidden = true) @AuthenticationPrincipal UtilisateurConnecte moi,
+                                         @PathVariable Long id, @Valid @RequestBody ModeleRequest request) {
+        return sondageMapper.toResponse(sondageService.marquerModele(moi.id(), id, request.estModele()));
     }
 
     @GetMapping("/{id}")
@@ -93,7 +134,9 @@ public class SondageController {
     @DeleteMapping("/{id}")
     @PreAuthorize(ROLES)
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    @Operation(summary = "Supprimer un sondage", description = "Avec ses sections, questions et options. Irréversible.")
+    @Operation(summary = "Supprimer un brouillon",
+            description = "Avec ses sections, questions et options. Irréversible. 409 SONDAGE_PUBLIE pour un sondage "
+                    + "publié : il se ferme mais ne se supprime pas.")
     public void supprimer(@Parameter(hidden = true) @AuthenticationPrincipal UtilisateurConnecte moi,
                           @PathVariable Long id) {
         sondageService.supprimer(moi.id(), id);
@@ -176,5 +219,76 @@ public class SondageController {
     public SondageResponse supprimerQuestion(@Parameter(hidden = true) @AuthenticationPrincipal UtilisateurConnecte moi,
                                              @PathVariable Long id, @PathVariable Long questionId) {
         return sondageMapper.toResponse(sondageService.supprimerQuestion(moi.id(), id, questionId));
+    }
+
+    // ---------------------------------------------------------------- Publication et versions
+
+    @PostMapping("/{id}/publier")
+    @PreAuthorize(ROLES)
+    @Operation(summary = "Publier un brouillon",
+            description = "Corps facultatif. Ouverture maintenant ou planifiée (datePublication), fermeture facultative "
+                    + "(dateFermeture). Le contenu est ensuite gelé. Ferme la version précédente au moment où celle-ci "
+                    + "s'ouvre. 400 SONDAGE_INCOMPLET (aucune question, section vide) ou DATES_INVALIDES.")
+    public SondageResponse publier(@Parameter(hidden = true) @AuthenticationPrincipal UtilisateurConnecte moi,
+                                   @PathVariable Long id, @RequestBody(required = false) DatesSondageRequest request) {
+        return sondageMapper.toResponse(sondageService.publier(moi.id(), id, sondageMapper.toModel(request)));
+    }
+
+    @PutMapping("/{id}/dates")
+    @PreAuthorize(ROLES)
+    @Operation(summary = "Ajuster les dates d'un sondage publié",
+            description = "datePublication absente : inchangée (modifiable seulement avant l'ouverture). "
+                    + "dateFermeture absente : pas de fermeture prévue. 409 si le sondage est un brouillon ou terminé.")
+    public SondageResponse modifierDates(@Parameter(hidden = true) @AuthenticationPrincipal UtilisateurConnecte moi,
+                                         @PathVariable Long id, @RequestBody DatesSondageRequest request) {
+        return sondageMapper.toResponse(sondageService.modifierDates(moi.id(), id, sondageMapper.toModel(request)));
+    }
+
+    @PostMapping("/{id}/fermer")
+    @PreAuthorize(ROLES)
+    @Operation(summary = "Fermer un sondage", description = "Définitif : TERMINE immédiatement. Pour le rouvrir, "
+            + "créez une nouvelle version. 409 si c'est un brouillon ou s'il est déjà terminé.")
+    public SondageResponse fermer(@Parameter(hidden = true) @AuthenticationPrincipal UtilisateurConnecte moi,
+                                  @PathVariable Long id) {
+        return sondageMapper.toResponse(sondageService.fermer(moi.id(), id));
+    }
+
+    @GetMapping("/{id}/apercu")
+    @PreAuthorize(ROLES)
+    @Operation(summary = "Prévisualiser", description = "Le formulaire tel que le verra le répondant, sans les "
+            + "informations internes. Fonctionne aussi pour un brouillon.")
+    public ApercuResponse apercu(@Parameter(hidden = true) @AuthenticationPrincipal UtilisateurConnecte moi,
+                                 @PathVariable Long id) {
+        return sondageMapper.toResponse(sondageService.apercu(moi.id(), id));
+    }
+
+    @PostMapping("/{id}/dupliquer")
+    @PreAuthorize(ROLES)
+    @ResponseStatus(HttpStatus.CREATED)
+    @Operation(summary = "Dupliquer", description = "Nouveau brouillon indépendant « Copie de ... » (version 1), "
+            + "avec tout le contenu. Possible quel que soit le statut.")
+    public SondageResponse dupliquer(@Parameter(hidden = true) @AuthenticationPrincipal UtilisateurConnecte moi,
+                                     @PathVariable Long id) {
+        return sondageMapper.toResponse(sondageService.dupliquer(moi.id(), id));
+    }
+
+    @PostMapping("/{id}/nouvelle-version")
+    @PreAuthorize(ROLES)
+    @ResponseStatus(HttpStatus.CREATED)
+    @Operation(summary = "Créer une nouvelle version",
+            description = "Seule façon de modifier un sondage publié : brouillon version N+1 avec tout le contenu "
+                    + "(valeurs des options conservées). À partir de la dernière version publiée seulement. "
+                    + "409 SONDAGE_BROUILLON, BROUILLON_EXISTANT ou VERSION_OBSOLETE.")
+    public SondageResponse nouvelleVersion(@Parameter(hidden = true) @AuthenticationPrincipal UtilisateurConnecte moi,
+                                           @PathVariable Long id) {
+        return sondageMapper.toResponse(sondageService.nouvelleVersion(moi.id(), id));
+    }
+
+    @GetMapping("/{id}/versions")
+    @PreAuthorize(ROLES)
+    @Operation(summary = "Versions du sondage", description = "Toute la lignée, de la plus ancienne à la plus récente.")
+    public List<VersionResponse> versions(@Parameter(hidden = true) @AuthenticationPrincipal UtilisateurConnecte moi,
+                                          @PathVariable Long id) {
+        return sondageMapper.toVersionResponses(sondageService.versions(moi.id(), id));
     }
 }
