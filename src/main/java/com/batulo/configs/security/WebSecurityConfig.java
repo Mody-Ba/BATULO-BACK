@@ -94,6 +94,7 @@ public class WebSecurityConfig {
                         // méthode des controllers (seconde barrière si une route change de préfixe).
                         .requestMatchers("/api/super-admin/**", "/api/dev/taches/**").hasRole("SUPER_ADMIN")
                         .requestMatchers("/api/admin/**", "/api/abonnements/**", "/api/dev/paiements/**").hasRole("ADMIN")
+                        .requestMatchers("/api/sondages/*/assignations/**").hasRole("ADMIN")
                         .requestMatchers("/api/sondages/**").hasAnyRole("ADMIN", "GESTIONNAIRE")
                         .anyRequest().authenticated());
 

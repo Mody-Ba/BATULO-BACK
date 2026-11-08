@@ -1,7 +1,11 @@
 package com.batulo.repository;
 
+import com.batulo.entity.Assignation;
 import com.batulo.entity.Sondage;
 import com.batulo.enums.StatutSondage;
+import jakarta.persistence.criteria.Expression;
+import jakarta.persistence.criteria.Root;
+import jakarta.persistence.criteria.Subquery;
 import org.springframework.data.jpa.domain.Specification;
 
 import java.time.Instant;
@@ -19,8 +23,26 @@ public final class SondageSpecifications {
         return (root, query, cb) -> cb.equal(root.get("entreprise").get("id"), entrepriseId);
     }
 
-    public static Specification<Sondage> creePar(Long utilisateurId) {
-        return (root, query, cb) -> cb.equal(root.get("creePar").get("id"), utilisateurId);
+    /**
+     * Sondages visibles par un gestionnaire (GE-04, RG-02) : la LIGNÉE est visible s'il a créé l'une de ses versions
+     * ou si elle lui est assignée. Jamais ceux d'un autre gestionnaire.
+     */
+    public static Specification<Sondage> visiblesParGestionnaire(Long gestionnaireId) {
+        return (root, query, cb) -> {
+            Expression<Long> lignee = cb.coalesce(root.get("lignee").<Long>get("id"), root.<Long>get("id"));
+
+            Subquery<Long> creees = query.subquery(Long.class);
+            Root<Sondage> version = creees.from(Sondage.class);
+            creees.select(cb.coalesce(version.get("lignee").<Long>get("id"), version.<Long>get("id")))
+                    .where(cb.equal(version.get("creePar").get("id"), gestionnaireId));
+
+            Subquery<Long> assignees = query.subquery(Long.class);
+            Root<Assignation> assignation = assignees.from(Assignation.class);
+            assignees.select(assignation.get("sondage").<Long>get("id"))
+                    .where(cb.equal(assignation.get("gestionnaire").get("id"), gestionnaireId));
+
+            return cb.or(lignee.in(creees), lignee.in(assignees));
+        };
     }
 
     public static Specification<Sondage> modelesSeulement() {

@@ -11,6 +11,7 @@ import com.batulo.exception.ActionInterditeException;
 import com.batulo.exception.ConflitException;
 import com.batulo.exception.RegleGestionException;
 import com.batulo.exception.ResourceNotFoundException;
+import com.batulo.repository.AssignationRepository;
 import com.batulo.repository.SondageRepository;
 import com.batulo.repository.SondageSpecifications;
 import com.batulo.repository.UtilisateurRepository;
@@ -61,15 +62,18 @@ public class SondageServiceImpl implements SondageService {
     private static final int TITRE_MAX = 200;
 
     private final SondageRepository sondageRepository;
+    private final AssignationRepository assignationRepository;
     private final UtilisateurRepository utilisateurRepository;
     private final SondageMapper sondageMapper;
     private final ValidateurQuestion validateurQuestion;
 
     public SondageServiceImpl(SondageRepository sondageRepository,
+                              AssignationRepository assignationRepository,
                               UtilisateurRepository utilisateurRepository,
                               SondageMapper sondageMapper,
                               ValidateurQuestion validateurQuestion) {
         this.sondageRepository = sondageRepository;
+        this.assignationRepository = assignationRepository;
         this.utilisateurRepository = utilisateurRepository;
         this.sondageMapper = sondageMapper;
         this.validateurQuestion = validateurQuestion;
@@ -111,7 +115,7 @@ public class SondageServiceImpl implements SondageService {
         verifierDroitDeModifier(acteur);
         Specification<Sondage> filtre = SondageSpecifications.deLEntreprise(acteur.getEntreprise().getId());
         if (acteur.getRole() != Role.ADMIN) {
-            filtre = filtre.and(SondageSpecifications.creePar(acteur.getId()));
+            filtre = filtre.and(SondageSpecifications.visiblesParGestionnaire(acteur.getId()));
         }
         if (modelesSeulement) {
             filtre = filtre.and(SondageSpecifications.modelesSeulement());
@@ -140,11 +144,11 @@ public class SondageServiceImpl implements SondageService {
         Utilisateur acteur = acteur(utilisateurId);
         Instant maintenant = Instant.now();
         PageRequest pageRequest = PageRequest.of(page, taille, Sort.by(Sort.Direction.DESC, "dateModification", "id"));
-        // L'admin voit tous les sondages de l'entreprise ; le gestionnaire, ceux qu'il a créés (assignation : 2.3).
+        // L'admin voit tous les sondages de l'entreprise ; le gestionnaire, les lignées qu'il a créées ou qui lui sont assignées.
         Specification<Sondage> filtre = SondageSpecifications.deLEntreprise(acteur.getEntreprise().getId())
                 .and(SondageSpecifications.parStatut(statut, maintenant));
         if (acteur.getRole() != Role.ADMIN) {
-            filtre = filtre.and(SondageSpecifications.creePar(acteur.getId()));
+            filtre = filtre.and(SondageSpecifications.visiblesParGestionnaire(acteur.getId()));
         }
         Page<Sondage> sondages = sondageRepository.findAll(filtre, pageRequest);
 
@@ -483,8 +487,7 @@ public class SondageServiceImpl implements SondageService {
     @Transactional
     public SondageModel nouvelleVersion(Long utilisateurId, Long sondageId) {
         Utilisateur acteur = acteur(utilisateurId);
-        verifierDroitDeModifier(acteur);
-        Sondage source = sondageLisible(acteur, sondageId);
+        Sondage source = sondageGere(utilisateurId, sondageId);
         if (!source.isPublie()) {
             throw new ConflitException("SONDAGE_BROUILLON",
                     "Ce sondage est un brouillon : modifiez-le directement, sans nouvelle version.");
@@ -515,8 +518,8 @@ public class SondageServiceImpl implements SondageService {
         Utilisateur acteur = acteur(utilisateurId);
         Sondage sondage = sondageLisible(acteur, sondageId);
         Instant maintenant = Instant.now();
+        // Visibilité par lignée : si l'une des versions est visible, toutes le sont.
         return sondageRepository.findLignee(sondage.getIdLignee()).stream()
-                .filter(version -> peutLire(acteur, version))
                 .map(version -> sondageMapper.toVersionModel(version, maintenant))
                 .toList();
     }
@@ -594,15 +597,35 @@ public class SondageServiceImpl implements SondageService {
     }
 
     /** Droit de gérer le sondage (publier, fermer, versionner...), quel que soit son statut. */
-    private static boolean peutLire(Utilisateur acteur, Sondage sondage) {
-        return acteur.getRole() == Role.ADMIN
-                || (sondage.getCreePar() != null && sondage.getCreePar().getId().equals(acteur.getId()));
+    /**
+     * Admin : tout sondage de l'entreprise. Gestionnaire : la lignée est visible s'il a créé l'une de ses versions
+     * ou si elle lui est assignée (GE-04, RG-02).
+     */
+    private boolean peutLire(Utilisateur acteur, Sondage sondage) {
+        if (acteur.getRole() == Role.ADMIN) {
+            return true;
+        }
+        Long lignee = sondage.getIdLignee();
+        return sondageRepository.aCreeDansLaLignee(lignee, acteur.getId())
+                || assignationRepository.existsBySondageIdAndGestionnaireId(lignee, acteur.getId());
     }
 
+    /**
+     * Droit de gérer le sondage (modifier, publier, fermer, versionner, supprimer...), quel que soit son statut :
+     * l'admin, ou le gestionnaire qui a créé CETTE version, avec la permission de créer des sondages. Un gestionnaire
+     * qui le voit seulement par assignation (ou par sa lignée) ne le gère pas : 403 ACTION_RESERVEE_CREATEUR.
+     */
     private Sondage sondageGere(Long utilisateurId, Long sondageId) {
         Utilisateur acteur = acteur(utilisateurId);
         verifierDroitDeModifier(acteur);
-        return sondageLisible(acteur, sondageId);
+        Sondage sondage = sondageLisible(acteur, sondageId);
+        if (acteur.getRole() == Role.GESTIONNAIRE
+                && (sondage.getCreePar() == null || !sondage.getCreePar().getId().equals(acteur.getId()))) {
+            throw new ActionInterditeException("ACTION_RESERVEE_CREATEUR",
+                    "Vous pouvez consulter ce sondage, mais seuls son créateur et l'admin peuvent le modifier, "
+                            + "le publier ou le fermer.");
+        }
+        return sondage;
     }
 
     /** Droit de gérer ET contenu modifiable : seul un brouillon l'est, un sondage publié est gelé. */

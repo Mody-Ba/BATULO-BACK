@@ -37,9 +37,16 @@ Plateforme SaaS de sondages (Spring Boot 3.5, Java 21, PostgreSQL 16, Liquibase)
   `sondageOrigineId` = sondage dont il est issu (source réutilisée/dupliquée, ou version précédente) ; les versions
   sont reliées par `lignee_id`. `estModele` marque un modèle.
 - Valeur d'une option : générée depuis le libellé si absente, unique dans la question, jamais régénérée.
+- Assignation (2.3) : elle porte sur la lignée (table `assignation`, version 1), donc toutes les versions partagent
+  les mêmes assignations ; une copie (réutilisation, duplication) n'en hérite pas. Un gestionnaire voit une lignée
+  s'il a créé l'une de ses versions ou si elle lui est assignée. Il ne gère (modifie, publie, ferme, versionne,
+  supprime, marque modèle) que les versions qu'il a créées, avec la permission : sinon 403 ACTION_RESERVEE_CREATEUR.
+  Le gestionnaire assigné voit, prévisualise, suivra la collecte et verra les statistiques (« ses sondages » du
+  cahier = créés ou assignés). Assigner un gestionnaire désactivé : 409 ; ses assignations sont conservées.
+- Notifications ajoutées au cahier : assignation d'un sondage (tableau de bord + courriel) et retrait d'une
+  assignation (tableau de bord seulement).
 
 ## À traiter dans les étapes suivantes
-- 2.3 : assignation (GE-04 : le gestionnaire voit aussi les sondages qui lui sont assignés).
 - 2.4 : un abonnement EXPIRE ou DESACTIVE ferme les sondages aux répondants (cahier §5) ; trancher la question
   ouverte du cahier « un répondant peut-il répondre plusieurs fois au même sondage ? » ; interdire la suppression
   d'un sondage qui a des réponses.

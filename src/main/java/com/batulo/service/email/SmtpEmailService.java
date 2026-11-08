@@ -113,6 +113,17 @@ public class SmtpEmailService implements EmailService {
     }
 
     @Override
+    public void envoyerAssignationSondage(String courriel, String prenom, String titreSondage, String nomAdmin) {
+        envoyer(courriel, "Batulo – Un sondage vous a été assigné", """
+                Bonjour %s,
+
+                %s vous a assigné le sondage « %s ».
+
+                Connectez-vous à Batulo pour le consulter, le prévisualiser et suivre sa collecte.
+                """.formatted(prenom, nomAdmin, titreSondage));
+    }
+
+    @Override
     public void envoyerLienReinitialisation(String courriel, String prenom, String lien, Instant expireLe) {
         envoyer(courriel, "Batulo – Réinitialisation de votre mot de passe", """
                 Bonjour %s,

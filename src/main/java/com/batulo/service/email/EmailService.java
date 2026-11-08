@@ -29,6 +29,9 @@ public interface EmailService {
     /** Avis à l'admin : l'abonnement est expiré, l'accès passe en lecture seule. */
     void envoyerAbonnementExpire(String courriel, String prenom, String entreprise, Instant dateExpiration);
 
+    /** Un sondage a été assigné au gestionnaire par son admin (AD-10). */
+    void envoyerAssignationSondage(String courriel, String prenom, String titreSondage, String nomAdmin);
+
     /**
      * Lien « mot de passe oublié ». Prêt pour l'étape 7, qui créera le jeton et appellera cette méthode.
      *
