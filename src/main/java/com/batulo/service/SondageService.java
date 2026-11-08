@@ -1,6 +1,7 @@
 package com.batulo.service;
 
 import com.batulo.enums.StatutSondage;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.batulo.service.model.ApercuModel;
 import com.batulo.service.model.CreationSondageModel;
 import com.batulo.service.model.DatesSondageModel;
@@ -79,6 +80,15 @@ public interface SondageService {
 
     /** Le type peut changer ; la liste d'options remplace l'ancienne (valeurs existantes conservées). */
     SondageModel modifierQuestion(Long utilisateurId, Long sondageId, Long questionId, QuestionInfoModel question);
+
+    /**
+     * Marque (ou démarque) une question comme critère d'analyse et règle son découpage (tranches, granularité).
+     * Réglage d'analyse : permis quel que soit le statut, même après publication.
+     *
+     * @throws com.batulo.exception.RegleGestionException QUESTION_INVALIDE (type non éligible, tranches invalides)
+     */
+    SondageModel definirCritere(Long utilisateurId, Long sondageId, Long questionId, boolean estCritere,
+                                JsonNode critereConfig);
 
     /** Supprime la question, puis renumérote les questions de sa section. */
     SondageModel supprimerQuestion(Long utilisateurId, Long sondageId, Long questionId);

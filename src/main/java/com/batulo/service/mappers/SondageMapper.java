@@ -138,7 +138,9 @@ public class SondageMapper {
                 entity.isObligatoire(),
                 entity.getOrdre(),
                 entity.getConfiguration().deepCopy(),
-                entity.getOptions().stream().map(this::toModel).toList());
+                entity.getOptions().stream().map(this::toModel).toList(),
+                entity.isEstCritere(),
+                entity.getCritereConfig() == null ? null : entity.getCritereConfig().deepCopy());
     }
 
     private OptionModel toModel(OptionQuestion entity) {

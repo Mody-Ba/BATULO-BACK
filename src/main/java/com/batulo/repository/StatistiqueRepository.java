@@ -1,5 +1,6 @@
 package com.batulo.repository;
 
+import com.batulo.enums.TypeQuestion;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Repository;
@@ -16,7 +17,7 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Agrégations SQL des statistiques (module 4.3) : les réponses ne sont jamais chargées en mémoire. Chaque méthode
+ * Agrégations SQL des statistiques (module 4.3), de la segmentation et des tableaux croisés : les réponses ne sont jamais chargées en mémoire. Chaque méthode
  * fait UNE requête pour toutes les questions concernées (désignées par leurs ids, toutes versions confondues) et
  * regroupe par clé de question (question.cle), ce qui cumule les versions d'une lignée.
  * Requêtes natives PostgreSQL (percentile_cont, width_bucket, fonctions JSONB).
@@ -33,8 +34,33 @@ public class StatistiqueRepository {
         this.jdbc = jdbc;
     }
 
-    /** Réponses retenues : ces versions, et la période [debut, fin[ si elle est donnée. */
-    public record Filtre(Collection<Long> versions, Instant debut, Instant fin) {
+    /**
+     * Réponses retenues : ces versions, la période [debut, fin[ si elle est donnée, et les critères (segmentation) :
+     * plusieurs valeurs d'un même critère se combinent en OU, des critères différents en ET.
+     */
+    public record Filtre(Collection<Long> versions, Instant debut, Instant fin, List<FiltreCritere> criteres) {
+        public Filtre(Collection<Long> versions, Instant debut, Instant fin) {
+            this(versions, debut, fin, List.of());
+        }
+    }
+
+    /**
+     * Valeur d'un critère pour une réponse : code d'option (CHOIX_UNIQUE), 'true'/'false' (OUI_NON), code de tranche
+     * t1..tN (NUMERIQUE, bornes [a ; b[), 'AAAA-MM' ou 'AAAA' (DATE).
+     */
+    public record Decoupage(TypeQuestion type, List<BigDecimal> bornes, String granularite) {
+    }
+
+    /** Le répondant a donné au critère (questions de même clé) l'une de ces valeurs. */
+    public record FiltreCritere(Collection<Long> questions, Decoupage decoupage, Collection<String> valeurs) {
+    }
+
+    /** Nombre de réponses par valeur du critère (colonne, null : non renseigné) et par modalité de la question. */
+    public record Croisement(String colonne, String modalite, long nombre) {
+    }
+
+    public record NumeriqueParColonne(String colonne, long nombre, BigDecimal moyenne, BigDecimal mediane,
+                                      BigDecimal min, BigDecimal max) {
     }
 
     public record Resume(long nombre, Instant premiere, Instant derniere) {
@@ -200,6 +226,91 @@ public class StatistiqueRepository {
         return nombre == null ? 0 : nombre;
     }
 
+    /** Valeurs d'un critère réellement présentes dans les réponses (critère DATE : mois ou années). */
+    public List<String> valeursCritere(Filtre filtre, Collection<Long> questions, Decoupage decoupage) {
+        MapSqlParameterSource p = parametres(questions);
+        String valeur = expressionCritere("rq", "o", decoupage, "dv", p);
+        return jdbc.queryForList("select distinct " + valeur + DEPUIS_LIGNES
+                + "left join option_question o on o.id = rq.option_id where " + conditions(filtre, p)
+                + " and rq.question_id in (:questions) order by 1", p, String.class);
+    }
+
+    /**
+     * Tableau croisé : pour chaque réponse à la question, sa modalité et la valeur du critère donnée dans la MÊME
+     * réponse (null si le critère n'a pas été renseigné).
+     */
+    public List<Croisement> croisement(Filtre filtre, Collection<Long> questions, TypeQuestion type,
+                                       Collection<Long> questionsCritere, Decoupage critere) {
+        MapSqlParameterSource p = parametres(questions);
+        String modalite = switch (type) {
+            case CHOIX_UNIQUE, CHOIX_MULTIPLE -> "o.valeur";
+            case OUI_NON -> "case when rq.valeur_booleenne then 'true' else 'false' end";
+            default -> "cast(rq.valeur_numerique as varchar)";
+        };
+        return jdbc.query(avecCritere(questionsCritere, critere, p) + "select c.col, " + modalite
+                + ", count(distinct rq.reponse_id)" + DEPUIS_LIGNES + "left join option_question o on o.id = rq.option_id "
+                + "left join critere c on c.reponse_id = rq.reponse_id where " + conditions(filtre, p)
+                + " and rq.question_id in (:questions) group by c.col, " + modalite, p,
+                (rs, i) -> new Croisement(rs.getString(1), rs.getString(2), rs.getLong(3)));
+    }
+
+    /** Répondants à la question, par valeur du critère (base des pourcentages de colonne). */
+    public Map<String, Long> repondantsParColonne(Filtre filtre, Collection<Long> questions,
+                                                 Collection<Long> questionsCritere, Decoupage critere) {
+        MapSqlParameterSource p = parametres(questions);
+        Map<String, Long> resultat = new HashMap<>();
+        jdbc.query(avecCritere(questionsCritere, critere, p) + "select c.col, count(distinct rq.reponse_id)"
+                + DEPUIS_LIGNES + "left join critere c on c.reponse_id = rq.reponse_id where " + conditions(filtre, p)
+                + " and rq.question_id in (:questions) group by c.col", p, rs -> {
+            resultat.put(rs.getString(1), rs.getLong(2));
+        });
+        return resultat;
+    }
+
+    /** ECHELLE, NUMERIQUE : nombre, moyenne, médiane, min et max par valeur du critère (ex. poids moyen par région). */
+    public List<NumeriqueParColonne> numeriqueParColonne(Filtre filtre, Collection<Long> questions,
+                                                         Collection<Long> questionsCritere, Decoupage critere) {
+        MapSqlParameterSource p = parametres(questions);
+        return jdbc.query(avecCritere(questionsCritere, critere, p) + "select c.col, count(*), avg(rq.valeur_numerique), "
+                + "percentile_cont(0.5) within group (order by rq.valeur_numerique), min(rq.valeur_numerique), "
+                + "max(rq.valeur_numerique)" + DEPUIS_LIGNES + "left join critere c on c.reponse_id = rq.reponse_id "
+                + "where " + conditions(filtre, p) + " and rq.question_id in (:questions) "
+                + "and rq.valeur_numerique is not null group by c.col", p,
+                (rs, i) -> new NumeriqueParColonne(rs.getString(1), rs.getLong(2), rs.getBigDecimal(3),
+                        rs.getBigDecimal(4), rs.getBigDecimal(5), rs.getBigDecimal(6)));
+    }
+
+    /** CTE « critere » : (reponse_id, col) = valeur du critère de chaque réponse. */
+    private static String avecCritere(Collection<Long> questionsCritere, Decoupage critere, MapSqlParameterSource p) {
+        p.addValue("questionsCritere", questionsCritere);
+        return "with critere as (select rc.reponse_id, " + expressionCritere("rc", "oc", critere, "cc", p)
+                + " as col from reponse_question rc left join option_question oc on oc.id = rc.option_id "
+                + "where rc.question_id in (:questionsCritere)) ";
+    }
+
+    /** Expression SQL de la valeur d'un critère, sur la ligne « ligne » (et son option « option »). */
+    private static String expressionCritere(String ligne, String option, Decoupage decoupage, String prefixe,
+                                            MapSqlParameterSource p) {
+        return switch (decoupage.type()) {
+            case CHOIX_UNIQUE -> option + ".valeur";
+            case OUI_NON -> "case when " + ligne + ".valeur_booleenne then 'true' else 'false' end";
+            case NUMERIQUE -> {
+                StringBuilder sql = new StringBuilder("case");
+                List<BigDecimal> bornes = decoupage.bornes();
+                for (int i = 0; i < bornes.size(); i++) {
+                    String parametre = prefixe + "b" + i;
+                    p.addValue(parametre, bornes.get(i));
+                    sql.append(" when ").append(ligne).append(".valeur_numerique < :").append(parametre)
+                            .append(" then 't").append(i + 1).append("'");
+                }
+                yield sql.append(" else 't").append(bornes.size() + 1).append("' end").toString();
+            }
+            case DATE -> "to_char(" + ligne + ".valeur_date, '" + ("ANNEE".equals(decoupage.granularite())
+                    ? "YYYY" : "YYYY-MM") + "')";
+            default -> throw new IllegalArgumentException("Type non éligible comme critère : " + decoupage.type());
+        };
+    }
+
     private static MapSqlParameterSource parametres(Collection<Long> questions) {
         return new MapSqlParameterSource("questions", questions);
     }
@@ -215,6 +326,19 @@ public class StatistiqueRepository {
         if (filtre.fin() != null) {
             sql.append(" and r.date_soumission < :fin");
             p.addValue("fin", Timestamp.from(filtre.fin()));
+        }
+        for (int i = 0; i < filtre.criteres().size(); i++) {
+            FiltreCritere critere = filtre.criteres().get(i);
+            String q = "fq" + i;
+            String v = "fv" + i;
+            p.addValue(q, critere.questions());
+            p.addValue(v, critere.valeurs());
+            sql.append(" and exists (select 1 from reponse_question rc").append(i)
+                    .append(" left join option_question oc").append(i).append(" on oc").append(i).append(".id = rc")
+                    .append(i).append(".option_id where rc").append(i).append(".reponse_id = r.id and rc").append(i)
+                    .append(".question_id in (:").append(q).append(") and ")
+                    .append(expressionCritere("rc" + i, "oc" + i, critere.decoupage(), "fb" + i + "_", p))
+                    .append(" in (:").append(v).append("))");
         }
         return sql.toString();
     }

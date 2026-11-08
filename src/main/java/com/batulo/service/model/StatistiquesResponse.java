@@ -21,10 +21,13 @@ public record StatistiquesResponse(
         List<Integer> versions,
         LocalDate du,
         LocalDate au,
+        /** Critères appliqués (segmentation) ; vide : tous les répondants. */
+        List<CritereResponse> criteres,
         Resume resume,
         List<QuestionStat> questions
 ) {
-    public record Resume(long nombreReponses, Instant premiereReponse, Instant derniereReponse) {
+    /** petitEffectif : moins de répondants que l'effectif minimum (5) : prudence avant de conclure. */
+    public record Resume(long nombreReponses, boolean petitEffectif, Instant premiereReponse, Instant derniereReponse) {
     }
 
     @JsonInclude(JsonInclude.Include.NON_NULL)
@@ -36,6 +39,7 @@ public record QuestionStat(
             TypeQuestion type,
             long nombreRepondants,
             long sansReponse,
+            boolean petitEffectif,
             /** CHOIX_UNIQUE, CHOIX_MULTIPLE, OUI_NON. */
             List<OptionStat> options,
             /** ECHELLE, NUMERIQUE. */

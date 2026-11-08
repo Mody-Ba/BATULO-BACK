@@ -67,6 +67,15 @@ public class Question {
     @Column(nullable = false, length = 36, updatable = false)
     private String cle;
 
+    /** Critère d'analyse (segmentation, tableaux croisés) : CHOIX_UNIQUE, OUI_NON, NUMERIQUE ou DATE. */
+    @Column(name = "est_critere", nullable = false)
+    private boolean estCritere;
+
+    /** Découpage du critère : NUMERIQUE {"tranches": [...]}, DATE {"granularite": "MOIS"|"ANNEE"} ; null sinon. */
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "critere_config")
+    private JsonNode critereConfig;
+
     @OneToMany(mappedBy = "question", cascade = CascadeType.ALL, orphanRemoval = true)
     @OrderBy("ordre ASC")
     private List<OptionQuestion> options = new ArrayList<>();
@@ -79,6 +88,22 @@ public class Question {
         if (cle == null) {
             cle = UUID.randomUUID().toString();
         }
+    }
+
+    public boolean isEstCritere() {
+        return estCritere;
+    }
+
+    public void setEstCritere(boolean estCritere) {
+        this.estCritere = estCritere;
+    }
+
+    public JsonNode getCritereConfig() {
+        return critereConfig;
+    }
+
+    public void setCritereConfig(JsonNode critereConfig) {
+        this.critereConfig = critereConfig;
     }
 
     public String getCle() {

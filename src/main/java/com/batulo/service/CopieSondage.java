@@ -33,6 +33,9 @@ final class CopieSondage {
                 question.setObligatoire(questionSource.isObligatoire());
                 question.setOrdre(questionSource.getOrdre());
                 question.setConfiguration(questionSource.getConfiguration().deepCopy());
+                question.setEstCritere(questionSource.isEstCritere());
+                question.setCritereConfig(questionSource.getCritereConfig() == null ? null
+                        : questionSource.getCritereConfig().deepCopy());
                 for (OptionQuestion optionSource : questionSource.getOptions()) {
                     OptionQuestion option = new OptionQuestion();
                     option.setQuestion(question);

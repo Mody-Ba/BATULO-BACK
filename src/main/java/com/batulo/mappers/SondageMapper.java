@@ -76,7 +76,9 @@ public class SondageMapper {
                 req.type(),
                 Boolean.TRUE.equals(req.obligatoire()),
                 req.configuration(),
-                options);
+                options,
+                req.estCritere(),
+                req.critereConfig());
     }
 
     private OptionInfoModel toModel(OptionRequest req) {
@@ -154,7 +156,8 @@ public class SondageMapper {
 
     private QuestionResponse toResponse(QuestionModel model) {
         return new QuestionResponse(model.id(), model.libelle(), model.aide(), model.type(), model.obligatoire(),
-                model.ordre(), model.configuration(), model.options().stream().map(this::toResponse).toList());
+                model.ordre(), model.configuration(), model.options().stream().map(this::toResponse).toList(),
+                model.estCritere(), model.critereConfig());
     }
 
     private OptionResponse toResponse(OptionModel model) {

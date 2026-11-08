@@ -38,6 +38,14 @@ public record QuestionRequest(
 
         @Size(max = 50, message = "une question ne peut pas avoir plus de 50 options")
         @Schema(description = "Au moins 2 pour CHOIX_UNIQUE, CHOIX_MULTIPLE et CLASSEMENT ; aucune pour les autres types")
-        List<@Valid @NotNull(message = "option vide") OptionRequest> options
+        List<@Valid @NotNull(message = "option vide") OptionRequest> options,
+
+        @Schema(description = "Critère d'analyse (CHOIX_UNIQUE, OUI_NON, NUMERIQUE, DATE). Absent : inchangé. "
+                + "Modifiable aussi après publication par PUT .../questions/{id}/critere", example = "false")
+        Boolean estCritere,
+
+        @Schema(description = "Découpage du critère : NUMERIQUE {\"tranches\": [18, 30, 45]} (sinon 5 tranches égales "
+                + "entre min et max) ; DATE {\"granularite\": \"MOIS\"|\"ANNEE\"}")
+        JsonNode critereConfig
 ) {
 }

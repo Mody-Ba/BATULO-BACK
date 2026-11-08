@@ -61,6 +61,14 @@ Plateforme SaaS de sondages (Spring Boot 3.5, Java 21, PostgreSQL 16, Liquibase)
   distinctes, sinon 10 tranches ; DATE par jour (écart de 62 jours ou moins) ou par mois, imposable avec
   `granulariteDate` ; textes paginés, sans analyse automatique. Calculs en SQL (agrégations), jamais en chargeant
   les réponses en mémoire. Route de dev (profil dev) : réponses aléatoires valides sur un sondage EN_COURS.
+- Segmentation et tableaux croisés (3.2) : avancés en phase 3 (le cahier les place en phase 4). Une question
+  CHOIX_UNIQUE, OUI_NON, NUMERIQUE ou DATE peut être « critère d'analyse » (`estCritere`, `critereConfig` :
+  tranches NUMERIQUE [a ; b[, 5 tranches égales entre min et max par défaut ; DATE par MOIS ou ANNEE). Ce sont des
+  réglages d'analyse : modifiables à tout moment (même après publication) par PUT .../questions/{id}/critere,
+  recopiés dans les versions et les copies, jamais montrés au répondant. Filtres `critere=cle:valeur` : OU dans une
+  même clé, ET entre clés. Tableau croisé : colonne « Non renseigné » si elle n'est pas vide ; `petitEffectif`
+  sous `batulo.statistiques.effectif-minimum` (5). Un critère sensible (sexe) devrait être une question facultative
+  (« volontairement renseigné ») : rappelé dans la documentation, non imposé.
 
 ## À traiter dans les étapes suivantes
 - Phase 4 : invitations nominatives (l'unicité par appareil se contourne en vidant le navigateur ou en changeant

@@ -1,0 +1,17 @@
+databaseChangeLog:
+  # Phase 3, étape 3.2 : questions « critère d'analyse » (segmentation, tableaux croisés).
+  # Réglages d'analyse, modifiables à tout moment (même après publication), recopiés dans les versions et les copies.
+  - property: { name: type.json, value: JSONB, dbms: postgresql }
+  - property: { name: type.json, value: JSON, dbms: h2 }
+
+  - changeSet:
+      id: 015-question-critere
+      author: batulo
+      changes:
+        - addColumn:
+            tableName: question
+            columns:
+              # Seulement CHOIX_UNIQUE, OUI_NON, NUMERIQUE et DATE.
+              - column: { name: est_critere, type: BOOLEAN, defaultValueBoolean: false, constraints: { nullable: false } }
+              # NUMERIQUE : {"tranches": [bornes croissantes]} ; DATE : {"granularite": "MOIS" | "ANNEE"}.
+              - column: { name: critere_config, type: "${type.json}" }
