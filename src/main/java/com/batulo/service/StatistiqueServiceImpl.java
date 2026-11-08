@@ -1,15 +1,15 @@
 package com.batulo.service;
 
 import com.batulo.entity.Question;
-import com.batulo.entity.Section;
 import com.batulo.entity.Sondage;
 import com.batulo.enums.GranulariteDate;
 import com.batulo.enums.TypeQuestion;
 import com.batulo.exception.RegleGestionException;
 import com.batulo.exception.ResourceNotFoundException;
-import com.batulo.repository.SondageRepository;
 import com.batulo.repository.StatistiqueRepository;
 import com.batulo.repository.StatistiqueRepository.Filtre;
+import com.batulo.service.AnalysePerimetre.Perimetre;
+import com.batulo.service.AnalysePerimetre.Reference;
 import com.batulo.service.model.CritereModel;
 import com.batulo.service.model.CroisementModel;
 import com.batulo.service.model.StatistiquesModel;
@@ -33,9 +33,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import java.time.Instant;
 import java.time.LocalDate;
-import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -61,55 +59,26 @@ public class StatistiqueServiceImpl implements StatistiqueService {
     static final int NOMBRE_TRANCHES = 10;
     /** Écart (en jours) jusqu'auquel une question DATE est regroupée par jour. */
     static final long JOURS_MAX_PAR_JOUR = 62;
-    /** Tranches d'un critère NUMERIQUE sans tranches définies (entre son min et son max). */
-    static final int TRANCHES_PAR_DEFAUT = 5;
 
     private static final BigDecimal CENT = BigDecimal.valueOf(100);
 
-    private final AccesSondage accesSondage;
-    private final SondageRepository sondageRepository;
+    private final AnalysePerimetre analyse;
     private final StatistiqueRepository statistiqueRepository;
-    private final ZoneId fuseau;
     /** En dessous, un groupe est signalé « petitEffectif » (conclusions hâtives). */
     private final int effectifMinimum;
 
-    public StatistiqueServiceImpl(AccesSondage accesSondage, SondageRepository sondageRepository,
-                                  StatistiqueRepository statistiqueRepository,
-                                  @Value("${batulo.fuseau-horaire}") String fuseauHoraire,
+    public StatistiqueServiceImpl(AnalysePerimetre analyse, StatistiqueRepository statistiqueRepository,
                                   @Value("${batulo.statistiques.effectif-minimum:5}") int effectifMinimum) {
-        this.accesSondage = accesSondage;
-        this.sondageRepository = sondageRepository;
+        this.analyse = analyse;
         this.statistiqueRepository = statistiqueRepository;
-        this.fuseau = ZoneId.of(fuseauHoraire);
         this.effectifMinimum = effectifMinimum;
-    }
-
-    /** Le périmètre d'un calcul : versions retenues, références des questions, filtre (période, critères). */
-    private record Perimetre(Sondage sondage, List<Sondage> versions, Map<String, Reference> references,
-                             Filtre filtre, List<CritereModel> criteres) {
-    }
-
-    /** Définition de référence d'une question (dernière version qui la contient) et ses occurrences retenues. */
-    private static final class Reference {
-        private final Question question;
-        private final String section;
-        /** Ids des questions de même clé et de même type, dans les versions retenues. */
-        private final Set<Long> ids = new LinkedHashSet<>();
-        private final Set<Long> versions = new HashSet<>();
-        /** Libellé de chaque valeur d'option (celui de la version la plus récente qui la contient). */
-        private final Map<String, String> libellesOptions = new LinkedHashMap<>();
-
-        private Reference(Question question, String section) {
-            this.question = question;
-            this.section = section;
-        }
     }
 
     @Override
     public StatistiquesModel statistiques(Long utilisateurId, Long sondageId, boolean lignee, LocalDate du,
                                           LocalDate au, GranulariteDate granulariteDate,
                                           Map<String, List<String>> criteres) {
-        Perimetre perimetre = perimetre(utilisateurId, sondageId, lignee, du, au, criteres);
+        Perimetre perimetre = analyse.perimetre(utilisateurId, sondageId, lignee, du, au, criteres);
         Sondage sondage = perimetre.sondage();
         List<Sondage> versions = perimetre.versions();
         Map<String, Reference> references = perimetre.references();
@@ -134,7 +103,7 @@ public class StatistiqueServiceImpl implements StatistiqueService {
     @Override
     public PageTextes textes(Long utilisateurId, Long sondageId, Long questionId, boolean lignee, LocalDate du,
                              LocalDate au, Map<String, List<String>> criteres, int page, int taille) {
-        Perimetre perimetre = perimetre(utilisateurId, sondageId, lignee, du, au, criteres);
+        Perimetre perimetre = analyse.perimetre(utilisateurId, sondageId, lignee, du, au, criteres);
         Reference reference = perimetre.references().values().stream()
                 .filter(r -> r.ids.contains(questionId) || r.question.getId().equals(questionId))
                 .findFirst()
@@ -154,18 +123,18 @@ public class StatistiqueServiceImpl implements StatistiqueService {
 
     @Override
     public List<CritereModel> criteres(Long utilisateurId, Long sondageId, boolean lignee) {
-        Perimetre perimetre = perimetre(utilisateurId, sondageId, lignee, null, null, Map.of());
+        Perimetre perimetre = analyse.perimetre(utilisateurId, sondageId, lignee, null, null, Map.of());
         return perimetre.references().entrySet().stream()
                 .filter(e -> e.getValue().question.isEstCritere())
                 .map(e -> new CritereModel(e.getKey(), e.getValue().question.getId(), e.getValue().question.getLibelle(),
-                        e.getValue().question.getType(), valeursCritere(e.getValue(), perimetre.filtre())))
+                        e.getValue().question.getType(), analyse.valeursCritere(e.getValue(), perimetre.filtre())))
                 .toList();
     }
 
     @Override
     public CroisementModel croisement(Long utilisateurId, Long sondageId, String cleQuestion, String clePar,
                                       boolean lignee, LocalDate du, LocalDate au, Map<String, List<String>> criteres) {
-        Perimetre perimetre = perimetre(utilisateurId, sondageId, lignee, du, au, criteres);
+        Perimetre perimetre = analyse.perimetre(utilisateurId, sondageId, lignee, du, au, criteres);
         Reference question = perimetre.references().get(cleQuestion);
         if (question == null) {
             throw new ResourceNotFoundException("QUESTION_INTROUVABLE", "Aucune question de clé " + cleQuestion + ".");
@@ -176,17 +145,17 @@ public class StatistiqueServiceImpl implements StatistiqueService {
             throw new RegleGestionException("CROISEMENT_INVALIDE",
                     "Seules les questions à choix, oui/non, échelle et numériques se croisent avec un critère.");
         }
-        Reference par = critere(perimetre.references(), clePar);
+        Reference par = analyse.critere(perimetre.references(), clePar);
         if (cleQuestion.equals(clePar)) {
             throw new RegleGestionException("CROISEMENT_INVALIDE", "Une question ne se croise pas avec elle-même.");
         }
         Filtre filtre = perimetre.filtre();
-        StatistiqueRepository.Decoupage decoupage = decoupage(par);
+        StatistiqueRepository.Decoupage decoupage = analyse.decoupage(par);
 
         // Colonnes : toutes les valeurs du critère, puis « Non renseigné » s'il y a des répondants sans valeur.
         Map<String, Long> repondants = statistiqueRepository.repondantsParColonne(filtre, question.ids, par.ids, decoupage);
         List<CroisementModel.Colonne> colonnes = new ArrayList<>();
-        for (CritereModel.ValeurCritere valeur : valeursCritere(par, filtre)) {
+        for (CritereModel.ValeurCritere valeur : analyse.valeursCritere(par, filtre)) {
             long n = repondants.getOrDefault(valeur.valeur(), 0L);
             colonnes.add(new CroisementModel.Colonne(valeur.valeur(), valeur.libelle(), n, petit(n)));
         }
@@ -264,183 +233,8 @@ public class StatistiqueServiceImpl implements StatistiqueService {
         return modalites;
     }
 
-    /** La question de cette clé doit être un critère d'analyse (dans sa version la plus récente). */
-    private static Reference critere(Map<String, Reference> references, String cle) {
-        Reference reference = references.get(cle);
-        if (reference == null || !reference.question.isEstCritere()) {
-            throw new RegleGestionException("CRITERE_INVALIDE",
-                    "« " + cle + " » n'est pas un critère d'analyse de ce sondage.");
-        }
-        return reference;
-    }
-
-    /** Découpage du critère : tranches (explicites, ou 5 tranches égales entre min et max), granularité des dates. */
-    private static StatistiqueRepository.Decoupage decoupage(Reference reference) {
-        Question question = reference.question;
-        JsonNode config = question.getCritereConfig();
-        List<BigDecimal> bornes = List.of();
-        if (question.getType() == TypeQuestion.NUMERIQUE) {
-            bornes = new ArrayList<>();
-            if (config != null && config.has("tranches")) {
-                for (JsonNode borne : config.get("tranches")) {
-                    bornes.add(borne.decimalValue());
-                }
-            } else {
-                JsonNode configuration = question.getConfiguration();
-                BigDecimal min = configuration.get("min").decimalValue();
-                BigDecimal max = configuration.get("max").decimalValue();
-                int decimales = configuration.path("decimales").asInt(0);
-                BigDecimal largeur = max.subtract(min).divide(BigDecimal.valueOf(TRANCHES_PAR_DEFAUT), 10, RoundingMode.HALF_UP);
-                for (int i = 1; i < TRANCHES_PAR_DEFAUT; i++) {
-                    BigDecimal borne = net(min.add(largeur.multiply(BigDecimal.valueOf(i))).setScale(decimales, RoundingMode.HALF_UP));
-                    if (bornes.isEmpty() || borne.compareTo(bornes.get(bornes.size() - 1)) > 0) {
-                        bornes.add(borne);
-                    }
-                }
-            }
-        }
-        String granularite = config != null ? config.path("granularite").asText("MOIS") : "MOIS";
-        return new StatistiqueRepository.Decoupage(question.getType(), bornes, granularite);
-    }
-
-    /** Valeurs possibles d'un critère, avec leur libellé. DATE : celles présentes dans les réponses retenues. */
-    private List<CritereModel.ValeurCritere> valeursCritere(Reference reference, Filtre filtre) {
-        return switch (reference.question.getType()) {
-            case CHOIX_UNIQUE -> reference.libellesOptions.entrySet().stream()
-                    .map(e -> new CritereModel.ValeurCritere(e.getKey(), e.getValue()))
-                    .toList();
-            case OUI_NON -> List.of(new CritereModel.ValeurCritere("true", "Oui"),
-                    new CritereModel.ValeurCritere("false", "Non"));
-            case NUMERIQUE -> {
-                List<BigDecimal> bornes = decoupage(reference).bornes();
-                List<CritereModel.ValeurCritere> tranches = new ArrayList<>();
-                for (int i = 0; i <= bornes.size(); i++) {
-                    String libelle = i == 0 ? "Moins de " + texte(bornes.get(0))
-                            : i == bornes.size() ? texte(bornes.get(i - 1)) + " et plus"
-                            : texte(bornes.get(i - 1)) + " à moins de " + texte(bornes.get(i));
-                    tranches.add(new CritereModel.ValeurCritere("t" + (i + 1), libelle));
-                }
-                yield tranches;
-            }
-            case DATE -> statistiqueRepository.valeursCritere(filtre, reference.ids, decoupage(reference)).stream()
-                    .map(v -> new CritereModel.ValeurCritere(v, v))
-                    .toList();
-            default -> List.of();
-        };
-    }
-
-    /**
-     * Filtres de segmentation « cle -> valeurs » : chaque clé doit être un critère, chaque valeur l'une de ses valeurs
-     * (DATE : AAAA-MM ou AAAA selon la granularité).
-     */
-    private List<StatistiqueRepository.FiltreCritere> filtresCriteres(Map<String, List<String>> demandes,
-                                                                     Map<String, Reference> references,
-                                                                     Filtre base, List<CritereModel> appliques) {
-        List<StatistiqueRepository.FiltreCritere> filtres = new ArrayList<>();
-        demandes.forEach((cle, valeurs) -> {
-            Reference reference = critere(references, cle);
-            StatistiqueRepository.Decoupage decoupage = decoupage(reference);
-            Map<String, String> autorisees = new LinkedHashMap<>();
-            if (reference.question.getType() == TypeQuestion.DATE) {
-                String motif = "ANNEE".equals(decoupage.granularite()) ? "\\d{4}" : "\\d{4}-\\d{2}";
-                valeurs.stream().filter(v -> v.matches(motif)).forEach(v -> autorisees.put(v, v));
-            } else {
-                valeursCritere(reference, base).forEach(v -> autorisees.put(v.valeur(), v.libelle()));
-            }
-            for (String valeur : valeurs) {
-                if (!autorisees.containsKey(valeur)) {
-                    throw new RegleGestionException("CRITERE_INVALIDE", "« " + valeur + " » n'est pas une valeur du critère « "
-                            + reference.question.getLibelle() + " ».");
-                }
-            }
-            List<String> distinctes = valeurs.stream().distinct().toList();
-            filtres.add(new StatistiqueRepository.FiltreCritere(reference.ids, decoupage, distinctes));
-            appliques.add(new CritereModel(cle, reference.question.getId(), reference.question.getLibelle(),
-                    reference.question.getType(), distinctes.stream()
-                    .map(v -> new CritereModel.ValeurCritere(v, autorisees.get(v))).toList()));
-        });
-        return filtres;
-    }
-
-    private Perimetre perimetre(Long utilisateurId, Long sondageId, boolean lignee, LocalDate du, LocalDate au,
-                                Map<String, List<String>> criteres) {
-        Sondage sondage = accesSondage.sondageLisible(accesSondage.acteur(utilisateurId), sondageId);
-        List<Sondage> versions = versions(sondage, lignee);
-        Map<String, Reference> references = references(versions);
-        Filtre base = filtre(versions, du, au);
-        List<CritereModel> appliques = new ArrayList<>();
-        List<StatistiqueRepository.FiltreCritere> filtres = filtresCriteres(criteres, references, base, appliques);
-        return new Perimetre(sondage, versions, references,
-                new Filtre(base.versions(), base.debut(), base.fin(), filtres), appliques);
-    }
-
     private boolean petit(long nombre) {
         return nombre < effectifMinimum;
-    }
-
-    private static String texte(BigDecimal nombre) {
-        return net(nombre).toPlainString();
-    }
-
-    // ---------------------------------------------------------------- Périmètre
-
-    /** Cette version, ou toutes les versions publiées de la lignée (plus celle demandée), de la plus ancienne. */
-    private List<Sondage> versions(Sondage sondage, boolean lignee) {
-        if (!lignee) {
-            return List.of(sondage);
-        }
-        return sondageRepository.findLignee(sondage.getIdLignee()).stream()
-                .filter(v -> v.isPublie() || v.getId().equals(sondage.getId()))
-                .sorted(Comparator.comparingInt(Sondage::getVersion))
-                .toList();
-    }
-
-    /**
-     * Une référence par clé de question : la définition de la version la plus récente qui la contient, dans
-     * l'ordre de cette version ; les questions retirées depuis viennent ensuite. Une occurrence d'un autre type
-     * (type changé entre deux versions) n'est pas retenue.
-     */
-    private static Map<String, Reference> references(List<Sondage> versions) {
-        Map<String, Reference> references = new LinkedHashMap<>();
-        for (int i = versions.size() - 1; i >= 0; i--) {
-            for (Section section : versions.get(i).getSections()) {
-                for (Question question : section.getQuestions()) {
-                    references.putIfAbsent(question.getCle(), new Reference(question, section.getTitre()));
-                }
-            }
-        }
-        for (Sondage version : versions) {
-            for (Section section : version.getSections()) {
-                for (Question question : section.getQuestions()) {
-                    Reference reference = references.get(question.getCle());
-                    if (reference.question.getType() != question.getType()) {
-                        continue;
-                    }
-                    reference.ids.add(question.getId());
-                    reference.versions.add(version.getId());
-                    question.getOptions().forEach(o -> reference.libellesOptions.put(o.getValeur(), o.getLibelle()));
-                }
-            }
-        }
-        // Options de la référence d'abord, dans son ordre ; puis les options retirées depuis.
-        for (Reference reference : references.values()) {
-            Map<String, String> ordonnees = new LinkedHashMap<>();
-            reference.question.getOptions().forEach(o -> ordonnees.put(o.getValeur(), o.getLibelle()));
-            reference.libellesOptions.forEach(ordonnees::putIfAbsent);
-            reference.libellesOptions.clear();
-            reference.libellesOptions.putAll(ordonnees);
-        }
-        return references;
-    }
-
-    private Filtre filtre(List<Sondage> versions, LocalDate du, LocalDate au) {
-        if (du != null && au != null && du.isAfter(au)) {
-            throw new RegleGestionException("PERIODE_INVALIDE", "La date « du » doit être antérieure ou égale à « au ».");
-        }
-        return new Filtre(
-                versions.stream().map(Sondage::getId).toList(),
-                du == null ? null : du.atStartOfDay(fuseau).toInstant(),
-                au == null ? null : au.plusDays(1).atStartOfDay(fuseau).toInstant());
     }
 
     /** Réponses aux versions qui contiennent la question : base de « sansReponse ». */
