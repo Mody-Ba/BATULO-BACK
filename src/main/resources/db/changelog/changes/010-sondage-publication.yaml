@@ -1,0 +1,31 @@
+databaseChangeLog:
+  # Phase 2, étape 2.2 : publication, fermeture et versions d'un sondage.
+  # Le statut (NON_COMMENCE, EN_COURS, TERMINE) n'est pas stocké : il se calcule à partir de ces dates.
+  - changeSet:
+      id: 010-sondage-publication
+      author: batulo
+      changes:
+        - addColumn:
+            tableName: sondage
+            columns:
+              # Null : brouillon. Date future : ouverture planifiée.
+              - column: { name: date_publication, type: TIMESTAMP WITH TIME ZONE }
+              # Fermeture prévue (facultative).
+              - column: { name: date_fermeture, type: TIMESTAMP WITH TIME ZONE }
+              # Fermeture manuelle ; un sondage fermé ne se rouvre pas (nouvelle version).
+              - column: { name: ferme_le, type: TIMESTAMP WITH TIME ZONE }
+              - column: { name: version, type: INT, defaultValueNumeric: 1, constraints: { nullable: false } }
+              # Version 1 de la lignée ; null pour la version 1 elle-même.
+              - column: { name: sondage_origine_id, type: BIGINT }
+        - addForeignKeyConstraint:
+            constraintName: fk_sondage_origine
+            baseTableName: sondage
+            baseColumnNames: sondage_origine_id
+            referencedTableName: sondage
+            referencedColumnNames: id
+            onDelete: SET NULL
+        - createIndex:
+            tableName: sondage
+            indexName: idx_sondage_origine
+            columns:
+              - column: { name: sondage_origine_id }

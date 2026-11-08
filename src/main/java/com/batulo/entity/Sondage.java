@@ -52,6 +52,39 @@ public class Sondage {
     @Column(name = "date_modification", nullable = false)
     private Instant dateModification;
 
+    /** Null : brouillon (seul état modifiable). Date future : ouverture planifiée. */
+    @Column(name = "date_publication")
+    private Instant datePublication;
+
+    /** Fermeture prévue, facultative. */
+    @Column(name = "date_fermeture")
+    private Instant dateFermeture;
+
+    /** Fermeture manuelle (définitive). */
+    @Column(name = "ferme_le")
+    private Instant fermeLe;
+
+    /** 1, 2, 3... dans la lignée. */
+    @Column(nullable = false)
+    private int version = 1;
+
+    /**
+     * Sondage dont celui-ci est issu : source d'une réutilisation ou d'une duplication, version précédente pour
+     * une nouvelle version. Null pour un sondage créé vide.
+     */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "sondage_origine_id")
+    private Sondage sondageOrigine;
+
+    /** Version 1 de la lignée des versions ; null pour une version 1. */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "lignee_id")
+    private Sondage lignee;
+
+    /** Formulaire marqué comme modèle, proposé pour créer de nouveaux sondages. */
+    @Column(name = "est_modele", nullable = false)
+    private boolean estModele;
+
     @OneToMany(mappedBy = "sondage", cascade = CascadeType.ALL, orphanRemoval = true)
     @OrderBy("ordre ASC")
     private List<Section> sections = new ArrayList<>();
@@ -117,6 +150,72 @@ public class Sondage {
 
     public Instant getDateModification() {
         return dateModification;
+    }
+
+    public Instant getDatePublication() {
+        return datePublication;
+    }
+
+    public void setDatePublication(Instant datePublication) {
+        this.datePublication = datePublication;
+    }
+
+    public Instant getDateFermeture() {
+        return dateFermeture;
+    }
+
+    public void setDateFermeture(Instant dateFermeture) {
+        this.dateFermeture = dateFermeture;
+    }
+
+    public Instant getFermeLe() {
+        return fermeLe;
+    }
+
+    public void setFermeLe(Instant fermeLe) {
+        this.fermeLe = fermeLe;
+    }
+
+    public int getVersion() {
+        return version;
+    }
+
+    public void setVersion(int version) {
+        this.version = version;
+    }
+
+    public Sondage getSondageOrigine() {
+        return sondageOrigine;
+    }
+
+    public void setSondageOrigine(Sondage sondageOrigine) {
+        this.sondageOrigine = sondageOrigine;
+    }
+
+    /** true dès que le sondage a été publié : son contenu est alors gelé. */
+    public boolean isPublie() {
+        return datePublication != null;
+    }
+
+    public Sondage getLignee() {
+        return lignee;
+    }
+
+    public void setLignee(Sondage lignee) {
+        this.lignee = lignee;
+    }
+
+    public boolean isEstModele() {
+        return estModele;
+    }
+
+    public void setEstModele(boolean estModele) {
+        this.estModele = estModele;
+    }
+
+    /** Id de la version 1 de la lignée (le sien pour une version 1). */
+    public Long getIdLignee() {
+        return lignee == null ? id : lignee.getId();
     }
 
     public List<Section> getSections() {

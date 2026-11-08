@@ -1,0 +1,30 @@
+databaseChangeLog:
+  # Phase 2, étape 2.2 (suite) : réutilisation des formulaires.
+  # sondage_origine_id signifie désormais « sondage dont celui-ci est issu » (source d'une réutilisation ou d'une
+  # duplication, version précédente pour une nouvelle version) ; les versions sont reliées par lignee_id.
+  - changeSet:
+      id: 011-sondage-reutilisation
+      author: batulo
+      changes:
+        - addColumn:
+            tableName: sondage
+            columns:
+              # Version 1 de la lignée des versions ; null pour une version 1.
+              - column: { name: lignee_id, type: BIGINT }
+              # Marqué comme modèle : proposé en premier pour créer de nouveaux sondages.
+              - column: { name: est_modele, type: BOOLEAN, defaultValueBoolean: false, constraints: { nullable: false } }
+        - addForeignKeyConstraint:
+            constraintName: fk_sondage_lignee
+            baseTableName: sondage
+            baseColumnNames: lignee_id
+            referencedTableName: sondage
+            referencedColumnNames: id
+            onDelete: SET NULL
+        - createIndex:
+            tableName: sondage
+            indexName: idx_sondage_lignee
+            columns:
+              - column: { name: lignee_id }
+        # Avant ce changeset, sondage_origine_id d'une version N > 1 désignait la version 1 : c'est sa lignée.
+        - sql:
+            sql: UPDATE sondage SET lignee_id = sondage_origine_id WHERE version > 1
