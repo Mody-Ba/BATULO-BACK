@@ -1,0 +1,158 @@
+databaseChangeLog:
+  # Phase 3, étape 3.4 : messagerie interne, envoi des statistiques, demandes d'augmentation d'abonnement.
+  - property: { name: type.json, value: JSONB, dbms: postgresql }
+  - property: { name: type.json, value: JSON, dbms: h2 }
+
+  - changeSet:
+      id: 016-creer-table-conversation
+      author: batulo
+      changes:
+        # Toujours ancrée sur un admin : avec l'un de ses gestionnaires, ou (gestionnaire_id null) avec Batulo,
+        # c'est-à-dire les super admins (boîte partagée).
+        - createTable:
+            tableName: conversation
+            columns:
+              - column: { name: id, type: BIGINT, autoIncrement: true, constraints: { primaryKey: true, nullable: false } }
+              - column:
+                  name: admin_id
+                  type: BIGINT
+                  constraints: { nullable: false, foreignKeyName: fk_conversation_admin, references: utilisateur(id), deleteCascade: true }
+              - column:
+                  name: gestionnaire_id
+                  type: BIGINT
+                  constraints: { foreignKeyName: fk_conversation_gestionnaire, references: utilisateur(id), deleteCascade: true }
+              - column: { name: date_creation, type: TIMESTAMP WITH TIME ZONE, constraints: { nullable: false } }
+              - column: { name: dernier_message_le, type: TIMESTAMP WITH TIME ZONE, constraints: { nullable: false } }
+        - addUniqueConstraint:
+            tableName: conversation
+            columnNames: admin_id, gestionnaire_id
+            constraintName: uk_conversation_admin_gestionnaire
+        - createIndex:
+            tableName: conversation
+            indexName: idx_conversation_gestionnaire
+            columns:
+              - column: { name: gestionnaire_id }
+
+  - changeSet:
+      id: 016-conversation-plateforme-unique
+      author: batulo
+      dbms: postgresql
+      changes:
+        # Une seule conversation « admin <-> Batulo » par admin (l'unicité ci-dessus ignore les gestionnaire_id null).
+        - sql:
+            sql: CREATE UNIQUE INDEX uk_conversation_plateforme ON conversation (admin_id) WHERE gestionnaire_id IS NULL
+
+  - changeSet:
+      id: 016-creer-table-message
+      author: batulo
+      changes:
+        - createTable:
+            tableName: message
+            columns:
+              - column: { name: id, type: BIGINT, autoIncrement: true, constraints: { primaryKey: true, nullable: false } }
+              - column:
+                  name: conversation_id
+                  type: BIGINT
+                  constraints: { nullable: false, foreignKeyName: fk_message_conversation, references: conversation(id), deleteCascade: true }
+              - column: { name: expediteur_id, type: BIGINT }
+              # Nom de l'expéditeur au moment de l'envoi : conservé si son compte est supprimé.
+              - column: { name: expediteur_nom, type: VARCHAR(201), constraints: { nullable: false } }
+              # Côté de l'expéditeur (ADMIN, GESTIONNAIRE, PLATEFORME) : un message est « reçu » par l'autre côté.
+              - column: { name: cote, type: VARCHAR(20), constraints: { nullable: false } }
+              - column: { name: type, type: VARCHAR(30), constraints: { nullable: false } }
+              # Envoi de statistiques ou demande d'abonnement liée au message.
+              - column: { name: reference_id, type: BIGINT }
+              - column: { name: contenu, type: TEXT, constraints: { nullable: false } }
+              - column: { name: date_envoi, type: TIMESTAMP WITH TIME ZONE, constraints: { nullable: false } }
+              - column: { name: lu_le, type: TIMESTAMP WITH TIME ZONE }
+        - addForeignKeyConstraint:
+            constraintName: fk_message_expediteur
+            baseTableName: message
+            baseColumnNames: expediteur_id
+            referencedTableName: utilisateur
+            referencedColumnNames: id
+            onDelete: SET NULL
+        - createIndex:
+            tableName: message
+            indexName: idx_message_conversation_date
+            columns:
+              - column: { name: conversation_id }
+              - column: { name: date_envoi }
+
+  - changeSet:
+      id: 016-creer-table-envoi-statistique
+      author: batulo
+      changes:
+        - createTable:
+            tableName: envoi_statistique
+            columns:
+              - column: { name: id, type: BIGINT, autoIncrement: true, constraints: { primaryKey: true, nullable: false } }
+              - column:
+                  name: sondage_id
+                  type: BIGINT
+                  constraints: { nullable: false, foreignKeyName: fk_envoi_sondage, references: sondage(id), deleteCascade: true }
+              - column: { name: lignee, type: BOOLEAN, constraints: { nullable: false } }
+              # Filtres appliqués : {"du", "au", "granularite", "criteres": {cle: [valeurs]}, "descriptionCriteres": [...]}.
+              - column: { name: filtres, type: "${type.json}", constraints: { nullable: false } }
+              - column: { name: gestionnaire_id, type: BIGINT }
+              # GE-06 : le nom de l'expéditeur reste enregistré, même si son compte est supprimé.
+              - column: { name: expediteur_nom, type: VARCHAR(201), constraints: { nullable: false } }
+              - column:
+                  name: admin_id
+                  type: BIGINT
+                  constraints: { nullable: false, foreignKeyName: fk_envoi_admin, references: utilisateur(id), deleteCascade: true }
+              - column: { name: commentaire, type: TEXT }
+              - column: { name: date_envoi, type: TIMESTAMP WITH TIME ZONE, constraints: { nullable: false } }
+              - column: { name: consulte_le, type: TIMESTAMP WITH TIME ZONE }
+        - addForeignKeyConstraint:
+            constraintName: fk_envoi_gestionnaire
+            baseTableName: envoi_statistique
+            baseColumnNames: gestionnaire_id
+            referencedTableName: utilisateur
+            referencedColumnNames: id
+            onDelete: SET NULL
+        - createIndex:
+            tableName: envoi_statistique
+            indexName: idx_envoi_admin
+            columns:
+              - column: { name: admin_id }
+
+  - changeSet:
+      id: 016-creer-table-demande-abonnement
+      author: batulo
+      changes:
+        - createTable:
+            tableName: demande_abonnement
+            columns:
+              - column: { name: id, type: BIGINT, autoIncrement: true, constraints: { primaryKey: true, nullable: false } }
+              - column:
+                  name: entreprise_id
+                  type: BIGINT
+                  constraints: { nullable: false, foreignKeyName: fk_demande_entreprise, references: entreprise(id), deleteCascade: true }
+              - column:
+                  name: admin_id
+                  type: BIGINT
+                  constraints: { nullable: false, foreignKeyName: fk_demande_admin, references: utilisateur(id), deleteCascade: true }
+              - column: { name: formule_souhaitee, type: VARCHAR(20), constraints: { nullable: false } }
+              - column: { name: message, type: TEXT, constraints: { nullable: false } }
+              - column: { name: statut, type: VARCHAR(20), constraints: { nullable: false } }
+              - column: { name: reponse, type: TEXT }
+              - column: { name: traitee_par_id, type: BIGINT }
+              - column: { name: date_demande, type: TIMESTAMP WITH TIME ZONE, constraints: { nullable: false } }
+              - column: { name: date_traitement, type: TIMESTAMP WITH TIME ZONE }
+        - addForeignKeyConstraint:
+            constraintName: fk_demande_traitee_par
+            baseTableName: demande_abonnement
+            baseColumnNames: traitee_par_id
+            referencedTableName: utilisateur
+            referencedColumnNames: id
+            onDelete: SET NULL
+        - createIndex:
+            tableName: demande_abonnement
+            indexName: idx_demande_statut
+            columns:
+              - column: { name: statut }
+        - sql:
+            sql: >-
+              ALTER TABLE demande_abonnement ADD CONSTRAINT ck_demande_statut
+              CHECK (statut IN ('EN_ATTENTE','TRAITEE','REFUSEE'))

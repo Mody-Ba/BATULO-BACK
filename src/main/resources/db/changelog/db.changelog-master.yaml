@@ -29,3 +29,5 @@ databaseChangeLog:
       file: db/changelog/changes/014-question-cle.yaml
   - include:
       file: db/changelog/changes/015-question-critere.yaml
+  - include:
+      file: db/changelog/changes/016-messagerie.yaml

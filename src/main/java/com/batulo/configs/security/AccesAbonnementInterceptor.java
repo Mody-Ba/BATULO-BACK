@@ -11,6 +11,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.servlet.HandlerInterceptor;
 
 import java.io.IOException;
+import java.util.regex.Pattern;
 
 /**
  * Règles d'accès liées au compte et à l'abonnement, appliquées à chaque requête authentifiée sur /api/** :
@@ -19,8 +20,10 @@ import java.io.IOException;
  *   <li>ADMIN et GESTIONNAIRE, selon le statut effectif de l'abonnement de l'entreprise :
  *     <ul>
  *       <li>DESACTIVE : tout est bloqué (RG-01), y compris pour les gestionnaires ; seule la déconnexion reste ;</li>
- *       <li>EN_ATTENTE_PAIEMENT : seulement /api/auth/** et /api/abonnements/** (pour payer) ;</li>
- *       <li>EXPIRE : lecture seule (GET), sauf /api/auth/** et /api/abonnements/** pour renouveler ;</li>
+ *       <li>EN_ATTENTE_PAIEMENT : seulement /api/auth/**, /api/abonnements/** (pour payer ou demander une
+ *       augmentation) et /api/messagerie/** (écrire à Batulo) ;</li>
+ *       <li>EXPIRE : lecture seule (GET), sauf /api/auth/**, /api/abonnements/**, /api/messagerie/** et l'envoi des
+ *       statistiques d'un sondage terminé ;</li>
  *       <li>ACTIF ou EXPIRE_BIENTOT : accès complet.</li>
  *     </ul>
  *   </li>
@@ -30,6 +33,8 @@ import java.io.IOException;
  */
 @Component
 public class AccesAbonnementInterceptor implements HandlerInterceptor {
+
+    private static final Pattern ENVOI_STATISTIQUES = Pattern.compile("^/api/sondages/\\d+/envois-statistiques$");
 
     private final ReponseErreurJson reponseErreurJson;
 
@@ -50,6 +55,11 @@ public class AccesAbonnementInterceptor implements HandlerInterceptor {
         }
         boolean routeAuth = chemin.startsWith("/api/auth/");
         boolean routePaiement = chemin.startsWith("/api/abonnements/") || chemin.startsWith("/api/dev/paiements/");
+        // Messagerie : l'admin doit pouvoir écrire à Batulo quand son abonnement n'est pas actif ; le service met la
+        // conversation admin <-> gestionnaire en lecture seule dans ce cas.
+        boolean routeMessagerie = chemin.startsWith("/api/messagerie/");
+        // Envoi des statistiques d'un sondage terminé : du reporting, autorisé abonnement expiré.
+        boolean routeEnvoiStatistiques = ENVOI_STATISTIQUES.matcher(chemin).matches();
 
         if (utilisateur.motDePasseTemporaire() && !routeAuth) {
             return refuser(response, "MOT_DE_PASSE_TEMPORAIRE",
@@ -62,10 +72,11 @@ public class AccesAbonnementInterceptor implements HandlerInterceptor {
         return switch (statut) {
             case DESACTIVE -> chemin.equals("/api/auth/deconnexion") || refuser(response, "ABONNEMENT_DESACTIVE",
                     "Votre entreprise a été désactivée par Batulo : aucun accès n'est possible.");
-            case EN_ATTENTE_PAIEMENT -> routeAuth || routePaiement || refuser(response,
+            case EN_ATTENTE_PAIEMENT -> routeAuth || routePaiement || routeMessagerie || refuser(response,
                     "ABONNEMENT_EN_ATTENTE_PAIEMENT",
                     "Votre abonnement est en attente de paiement : payez une formule pour accéder à Batulo.");
-            case EXPIRE -> lecture(request) || routeAuth || routePaiement || refuser(response, "ABONNEMENT_EXPIRE",
+            case EXPIRE -> lecture(request) || routeAuth || routePaiement || routeMessagerie || routeEnvoiStatistiques
+                    || refuser(response, "ABONNEMENT_EXPIRE",
                     "Votre abonnement est expiré : accès en lecture seule. Renouvelez-le pour modifier vos données.");
             case ACTIF, EXPIRE_BIENTOT -> true;
         };
