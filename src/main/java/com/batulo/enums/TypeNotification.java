@@ -9,5 +9,9 @@ public enum TypeNotification {
     /** Admin et super admins : l'abonnement expire dans 7 jours ou moins. */
     ABONNEMENT_EXPIRE_BIENTOT,
     /** Admin et super admins : la date d'expiration est dépassée. */
-    ABONNEMENT_EXPIRE
+    ABONNEMENT_EXPIRE,
+    /** Gestionnaire : un sondage lui a été assigné (tableau de bord + courriel). */
+    SONDAGE_ASSIGNE,
+    /** Gestionnaire : une assignation lui a été retirée (tableau de bord seulement). */
+    SONDAGE_DESASSIGNE
 }

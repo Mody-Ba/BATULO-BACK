@@ -1,12 +1,15 @@
 package com.batulo.controller;
 
 import com.batulo.configs.security.UtilisateurConnecte;
+import com.batulo.mappers.AssignationMapper;
 import com.batulo.mappers.GestionnaireMapper;
+import com.batulo.service.AssignationService;
 import com.batulo.service.GestionnaireService;
 import com.batulo.service.model.CreationGestionnaireRequest;
 import com.batulo.service.model.ModificationGestionnaireRequest;
 import com.batulo.service.model.PageResponse;
 import com.batulo.service.model.PermissionSondagesRequest;
+import com.batulo.service.model.SondageGestionnaireResponse;
 import com.batulo.service.model.UtilisateurResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -41,10 +44,29 @@ public class GestionnaireController {
 
     private final GestionnaireService gestionnaireService;
     private final GestionnaireMapper gestionnaireMapper;
+    private final AssignationService assignationService;
+    private final AssignationMapper assignationMapper;
 
-    public GestionnaireController(GestionnaireService gestionnaireService, GestionnaireMapper gestionnaireMapper) {
+    public GestionnaireController(GestionnaireService gestionnaireService, GestionnaireMapper gestionnaireMapper,
+                                  AssignationService assignationService, AssignationMapper assignationMapper) {
         this.gestionnaireService = gestionnaireService;
         this.gestionnaireMapper = gestionnaireMapper;
+        this.assignationService = assignationService;
+        this.assignationMapper = assignationMapper;
+    }
+
+    @GetMapping("/{id}/sondages")
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "Sondages d'un gestionnaire (AD-10, GE-04)",
+            description = "Ceux qu'il voit : créés par lui (relation CREATEUR) ou assignés (ASSIGNE). Paginé, du plus "
+                    + "récemment modifié au plus ancien.")
+    public PageResponse<SondageGestionnaireResponse> sondages(
+            @Parameter(hidden = true) @AuthenticationPrincipal UtilisateurConnecte moi,
+            @PathVariable Long id,
+            @RequestParam(defaultValue = "0") @Min(value = 0, message = "page doit être positif ou nul") int page,
+            @RequestParam(defaultValue = "20") @Min(value = 1, message = "taille doit être au moins 1")
+            @Max(value = 100, message = "taille ne doit pas dépasser 100") int taille) {
+        return assignationMapper.toResponse(assignationService.sondagesDuGestionnaire(moi.id(), id, page, taille));
     }
 
     @PostMapping

@@ -31,6 +31,11 @@ public interface SondageRepository extends JpaRepository<Sondage, Long>, JpaSpec
     @Query("select s from Sondage s where s.id = :ligneeId or s.lignee.id = :ligneeId order by s.version")
     List<Sondage> findLignee(Long ligneeId);
 
+    /** true si l'utilisateur a créé au moins une version de la lignée. */
+    @Query("select count(s) > 0 from Sondage s where s.creePar.id = :utilisateurId "
+            + "and (s.id = :ligneeId or s.lignee.id = :ligneeId)")
+    boolean aCreeDansLaLignee(Long ligneeId, Long utilisateurId);
+
     /** Nombre de sections et de questions de plusieurs sondages en une requête : [sondageId, sections, questions]. */
     @Query("select s.id, count(distinct se.id), count(q.id) from Sondage s "
             + "left join s.sections se left join se.questions q where s.id in :ids group by s.id")

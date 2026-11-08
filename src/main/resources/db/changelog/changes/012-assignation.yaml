@@ -1,0 +1,46 @@
+databaseChangeLog:
+  # Phase 2, étape 2.3 : assignation des sondages aux gestionnaires (AD-10, GE-04, RG-03).
+  # L'assignation porte sur la LIGNÉE (version 1) : toutes les versions partagent les mêmes assignations.
+  - changeSet:
+      id: 012-creer-table-assignation
+      author: batulo
+      changes:
+        - createTable:
+            tableName: assignation
+            columns:
+              - column: { name: id, type: BIGINT, autoIncrement: true, constraints: { primaryKey: true, nullable: false } }
+              - column:
+                  name: sondage_id
+                  type: BIGINT
+                  constraints:
+                    nullable: false
+                    foreignKeyName: fk_assignation_sondage
+                    references: sondage(id)
+                    deleteCascade: true
+              # Supprimer le gestionnaire supprime ses assignations.
+              - column:
+                  name: gestionnaire_id
+                  type: BIGINT
+                  constraints:
+                    nullable: false
+                    foreignKeyName: fk_assignation_gestionnaire
+                    references: utilisateur(id)
+                    deleteCascade: true
+              - column: { name: assigne_par_id, type: BIGINT }
+              - column: { name: date_assignation, type: TIMESTAMP WITH TIME ZONE, constraints: { nullable: false } }
+        - addForeignKeyConstraint:
+            constraintName: fk_assignation_assigne_par
+            baseTableName: assignation
+            baseColumnNames: assigne_par_id
+            referencedTableName: utilisateur
+            referencedColumnNames: id
+            onDelete: SET NULL
+        - addUniqueConstraint:
+            tableName: assignation
+            columnNames: sondage_id, gestionnaire_id
+            constraintName: uk_assignation_sondage_gestionnaire
+        - createIndex:
+            tableName: assignation
+            indexName: idx_assignation_gestionnaire
+            columns:
+              - column: { name: gestionnaire_id }

@@ -19,8 +19,9 @@ import java.util.List;
  * Formulaires dynamiques (module 4.1) : CRUD du sondage, de ses sections et de ses questions.
  * <ul>
  *   <li>ADMIN : tous les sondages de son entreprise.</li>
- *   <li>GESTIONNAIRE : lit les sondages qu'il a créés ; crée et modifie seulement avec peutCreerSondages
- *   (ActionInterditeException PERMISSION_SONDAGES_REQUISE, 403).</li>
+ *   <li>GESTIONNAIRE : voit une lignée s'il a créé l'une de ses versions ou si elle lui est assignée (GE-04) ;
+ *   ne gère (modifie, publie, ferme, versionne) que les versions qu'il a créées, avec peutCreerSondages
+ *   (PERMISSION_SONDAGES_REQUISE ou ACTION_RESERVEE_CREATEUR, 403).</li>
  *   <li>Sondage d'une autre entreprise ou d'un autre gestionnaire, section ou question hors du sondage :
  *   ResourceNotFoundException (404).</li>
  * </ul>
