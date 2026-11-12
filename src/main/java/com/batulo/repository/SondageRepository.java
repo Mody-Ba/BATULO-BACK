@@ -44,4 +44,12 @@ public interface SondageRepository extends JpaRepository<Sondage, Long>, JpaSpec
     @Query("select s.id, count(distinct se.id), count(q.id) from Sondage s "
             + "left join s.sections se left join se.questions q where s.id in :ids group by s.id")
     List<Object[]> compterContenu(Collection<Long> ids);
+
+    /**
+     * Brouillons (jamais publiés) de plusieurs lignées en une requête : [ligneeId, sondageId, version]. Une lignée
+     * a au plus un brouillon (BROUILLON_EXISTANT).
+     */
+    @Query("select coalesce(s.lignee.id, s.id), s.id, s.version from Sondage s "
+            + "where (s.id in :ligneeIds or s.lignee.id in :ligneeIds) and s.datePublication is null")
+    List<Object[]> brouillonsDesLignees(Collection<Long> ligneeIds);
 }

@@ -8,12 +8,16 @@ import com.batulo.service.model.ConfirmationPaiementRequest;
 import com.batulo.service.model.FormuleResponse;
 import com.batulo.service.model.IntentionPaiementRequest;
 import com.batulo.service.model.IntentionPaiementResponse;
+import com.batulo.service.model.PageResponse;
 import com.batulo.service.model.PaiementConfirmeResponse;
+import com.batulo.service.model.PaiementResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.security.SecurityRequirements;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -21,6 +25,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -59,6 +64,19 @@ public class AbonnementController {
     public AbonnementResponse monAbonnement(
             @Parameter(hidden = true) @AuthenticationPrincipal UtilisateurConnecte moi) {
         return abonnementMapper.toResponse(abonnementService.monAbonnement(moi.entrepriseId()));
+    }
+
+    @GetMapping("/paiements")
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "Historique des paiements de mon entreprise",
+            description = "Paiements réussis seulement (les intentions abandonnées ou échouées n'y sont pas), du plus "
+                    + "récent au plus ancien : date, formule, montant, devise. Permis abonnement expiré ou en attente.")
+    public PageResponse<PaiementResponse> paiements(
+            @Parameter(hidden = true) @AuthenticationPrincipal UtilisateurConnecte moi,
+            @RequestParam(defaultValue = "0") @Min(value = 0, message = "page doit être positif ou nul") int page,
+            @RequestParam(defaultValue = "20") @Min(value = 1, message = "taille doit être au moins 1")
+            @Max(value = 100, message = "taille ne doit pas dépasser 100") int taille) {
+        return abonnementMapper.toPaiementResponses(abonnementService.paiements(moi.entrepriseId(), page, taille));
     }
 
     @PostMapping("/paiement/intention")

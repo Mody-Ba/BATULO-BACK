@@ -79,16 +79,22 @@ public class SondageController {
     @GetMapping
     @PreAuthorize(ROLES)
     @Operation(summary = "Lister les sondages",
-            description = "Admin : tous ceux de l'entreprise ; gestionnaire : ceux qu'il a créés. Du plus récemment "
-                    + "modifié au plus ancien, avec le statut, la version et le nombre de sections et de questions.")
+            description = "Admin : tous ceux de l'entreprise ; gestionnaire : ceux qu'il a créés ou qui lui sont "
+                    + "assignés. Du plus récemment modifié au plus ancien, avec le statut, la version, le nombre de "
+                    + "sections, de questions et de réponses (de la version et de toute la lignée), le brouillon en "
+                    + "préparation éventuel et, pour l'admin seulement, les gestionnaires assignés (null pour un "
+                    + "gestionnaire).")
     public PageResponse<SondageResumeResponse> lister(
             @Parameter(hidden = true) @AuthenticationPrincipal UtilisateurConnecte moi,
             @Parameter(description = "Facultatif : NON_COMMENCE, EN_COURS ou TERMINE")
             @RequestParam(required = false) StatutSondage statut,
+            @Parameter(description = "true : une ligne par lignée, la dernière version publiée en cours ou terminée "
+                    + "si elle existe, sinon la dernière version (brouillon) ; le statut filtre cette ligne")
+            @RequestParam(defaultValue = "false") boolean derniereVersion,
             @RequestParam(defaultValue = "0") @Min(value = 0, message = "page doit être positif ou nul") int page,
             @RequestParam(defaultValue = "20") @Min(value = 1, message = "taille doit être au moins 1")
             @Max(value = 100, message = "taille ne doit pas dépasser 100") int taille) {
-        return sondageMapper.toResponse(sondageService.lister(moi.id(), statut, page, taille));
+        return sondageMapper.toResponse(sondageService.lister(moi.id(), statut, derniereVersion, page, taille));
     }
 
     @GetMapping("/formulaires")

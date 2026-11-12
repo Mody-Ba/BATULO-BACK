@@ -92,6 +92,13 @@ Plateforme SaaS de sondages (Spring Boot 3.5, Java 21, PostgreSQL 16, Liquibase)
 - Demande d'augmentation (3.4, AD-05, SA-07) : purement informative (RG-09, aucun effet sur l'abonnement : acceptée,
   l'admin paie lui-même) ; une seule EN_ATTENTE par entreprise (409 DEMANDE_EN_COURS) ; postée dans la conversation
   avec Batulo ; le super admin répond TRAITEE ou REFUSEE une seule fois (409 DEMANDE_DEJA_TRAITEE).
+- Ajouts pour le frontend : une lignée est représentée (GET /api/sondages?derniereVersion=true, tableau de bord) par
+  sa dernière version démarrée (EN_COURS ou TERMINE), sinon par sa dernière version ; `brouillonEnPreparation(Id)`
+  signale un brouillon plus récent que la ligne (une version planifiée plus récente n'est pas signalée). La liste
+  donne `nombreReponses` (version), `nombreReponsesLignee` et `gestionnairesAssignes` (null pour un gestionnaire,
+  comme GET .../assignations), calculés par requêtes groupées (`ResumesSondages`, pas de N+1). Recherche des
+  gestionnaires sans majuscules ni accents par `lower` + `translate` (pas d'extension unaccent), jokers échappés.
+  GET /api/abonnements/paiements : paiements REUSSI seulement, du plus récent au plus ancien.
 
 ## À traiter dans les étapes suivantes
 - Phase 4 : invitations nominatives (l'unicité par appareil se contourne en vidant le navigateur ou en changeant

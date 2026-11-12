@@ -6,8 +6,11 @@ import com.batulo.service.model.DemandeIntentionPaiementModel;
 import com.batulo.service.model.FormuleModel;
 import com.batulo.service.model.IntentionPaiementModel;
 import com.batulo.service.model.PaiementConfirmeModel;
+import com.batulo.service.model.PaiementModel;
+import org.springframework.data.domain.Page;
 
 import java.util.List;
+import java.util.Optional;
 
 /**
  * Abonnement d'une entreprise et paiement en ligne (RG-08 à RG-10). Un abonnement ne devient ACTIF que par un
@@ -20,6 +23,9 @@ public interface AbonnementService {
 
     /** @throws com.batulo.exception.ResourceNotFoundException aucun abonnement pour cette entreprise */
     AbonnementModel monAbonnement(Long entrepriseId);
+
+    /** Comme {@link #monAbonnement}, mais vide si l'entreprise n'a pas d'abonnement. */
+    Optional<AbonnementModel> trouverAbonnement(Long entrepriseId);
 
     /**
      * Crée un PaymentIntent Stripe pour la formule choisie et enregistre un paiement EN_ATTENTE.
@@ -37,4 +43,7 @@ public interface AbonnementService {
      * @throws com.batulo.exception.RegleGestionException paiement pas (encore) réussi ou incohérent
      */
     PaiementConfirmeModel confirmerPaiement(Long entrepriseId, ConfirmationPaiementModel confirmation);
+
+    /** Paiements REUSSI de l'entreprise, du plus récent au plus ancien (les intentions abandonnées n'y sont pas). */
+    Page<PaiementModel> paiements(Long entrepriseId, int page, int taille);
 }

@@ -65,15 +65,18 @@ public class SondageServiceImpl implements SondageService {
     private final AccesSondage accesSondage;
     private final SondageMapper sondageMapper;
     private final ValidateurQuestion validateurQuestion;
+    private final ResumesSondages resumesSondages;
 
     public SondageServiceImpl(SondageRepository sondageRepository,
                               AccesSondage accesSondage,
                               SondageMapper sondageMapper,
-                              ValidateurQuestion validateurQuestion) {
+                              ValidateurQuestion validateurQuestion,
+                              ResumesSondages resumesSondages) {
         this.sondageRepository = sondageRepository;
         this.accesSondage = accesSondage;
         this.sondageMapper = sondageMapper;
         this.validateurQuestion = validateurQuestion;
+        this.resumesSondages = resumesSondages;
     }
 
     // ---------------------------------------------------------------- Sondage
@@ -140,23 +143,23 @@ public class SondageServiceImpl implements SondageService {
     }
 
     @Override
-    public Page<SondageResumeModel> lister(Long utilisateurId, StatutSondage statut, int page, int taille) {
+    public Page<SondageResumeModel> lister(Long utilisateurId, StatutSondage statut, boolean derniereVersion, int page,
+                                           int taille) {
         Utilisateur acteur = acteur(utilisateurId);
         Instant maintenant = Instant.now();
         PageRequest pageRequest = PageRequest.of(page, taille, Sort.by(Sort.Direction.DESC, "dateModification", "id"));
         // L'admin voit tous les sondages de l'entreprise ; le gestionnaire, les lignées qu'il a créées ou qui lui sont assignées.
         Specification<Sondage> filtre = SondageSpecifications.deLEntreprise(acteur.getEntreprise().getId())
                 .and(SondageSpecifications.parStatut(statut, maintenant));
-        if (acteur.getRole() != Role.ADMIN) {
+        boolean admin = acteur.getRole() == Role.ADMIN;
+        if (!admin) {
             filtre = filtre.and(SondageSpecifications.visiblesParGestionnaire(acteur.getId()));
         }
-        Page<Sondage> sondages = sondageRepository.findAll(filtre, pageRequest);
-
-        Map<Long, long[]> contenu = compterContenu(sondages);
-        return sondages.map(s -> {
-            long[] nombres = contenu.getOrDefault(s.getId(), new long[]{0, 0});
-            return sondageMapper.toResumeModel(s, maintenant, nombres[0], nombres[1]);
-        });
+        if (derniereVersion) {
+            filtre = filtre.and(SondageSpecifications.representantDeLignee(maintenant));
+        }
+        // Les assignations ne sont communiquées qu'à l'admin (comme GET /api/sondages/{id}/assignations).
+        return resumesSondages.resumer(sondageRepository.findAll(filtre, pageRequest), maintenant, admin);
     }
 
     @Override

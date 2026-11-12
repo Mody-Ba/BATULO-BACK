@@ -27,6 +27,7 @@ import com.batulo.service.model.SondageInfoModel;
 import com.batulo.service.model.SondageModel;
 import com.batulo.service.model.SondageRequest;
 import com.batulo.service.model.SondageResponse;
+import com.batulo.service.model.GestionnaireAssigneResponse;
 import com.batulo.service.model.SondageResumeModel;
 import com.batulo.service.model.SondageResumeResponse;
 import com.batulo.service.model.VersionModel;
@@ -145,6 +146,12 @@ public class SondageMapper {
                 toResponse(model.creePar()),
                 model.nombreSections(),
                 model.nombreQuestions(),
+                model.nombreReponses(),
+                model.nombreReponsesLignee(),
+                model.gestionnairesAssignes() == null ? null : model.gestionnairesAssignes().stream()
+                        .map(g -> new GestionnaireAssigneResponse(g.id(), g.prenom(), g.nom(), g.actif())).toList(),
+                model.brouillonEnPreparation(),
+                model.brouillonEnPreparationId(),
                 model.dateCreation(),
                 model.dateModification());
     }

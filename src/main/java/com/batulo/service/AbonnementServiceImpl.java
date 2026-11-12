@@ -20,10 +20,14 @@ import com.batulo.service.model.FormuleModel;
 import com.batulo.service.model.IntentionPaiementModel;
 import com.batulo.service.model.IntentionStripeModel;
 import com.batulo.service.model.PaiementConfirmeModel;
+import com.batulo.service.model.PaiementModel;
 import com.batulo.service.paiement.PaiementService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -33,6 +37,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 
 @Service
 @Transactional(readOnly = true)
@@ -98,6 +103,19 @@ public class AbonnementServiceImpl implements AbonnementService {
     @Override
     public AbonnementModel monAbonnement(Long entrepriseId) {
         return versModele(abonnementDe(entrepriseId), Instant.now());
+    }
+
+    @Override
+    public Optional<AbonnementModel> trouverAbonnement(Long entrepriseId) {
+        Instant maintenant = Instant.now();
+        return abonnementRepository.findByEntrepriseId(entrepriseId).map(a -> versModele(a, maintenant));
+    }
+
+    @Override
+    public Page<PaiementModel> paiements(Long entrepriseId, int page, int taille) {
+        return paiementRepository.findByAbonnementEntrepriseIdAndStatut(entrepriseId, StatutPaiement.REUSSI,
+                        PageRequest.of(page, taille, Sort.by(Sort.Direction.DESC, "datePaiement", "id")))
+                .map(abonnementMapper::toModel);
     }
 
     @Override
