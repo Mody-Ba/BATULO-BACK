@@ -10,17 +10,23 @@ import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
 @Repository
-public interface AbonnementRepository extends JpaRepository<Abonnement, Long>, JpaSpecificationExecutor<Abonnement> {
+public interface AbonnementRepository extends JpaRepository<Abonnement, Long>, JpaSpecificationExecutor<Abonnement>,
+        AbonnementRepositoryCustom {
 
     @EntityGraph(attributePaths = "entreprise")
     Optional<Abonnement> findByEntrepriseId(Long entrepriseId);
 
     @EntityGraph(attributePaths = "entreprise")
     Optional<Abonnement> findWithEntrepriseById(Long id);
+
+    /** Abonnements de plusieurs entreprises en une requête (liste des admins). */
+    @EntityGraph(attributePaths = "entreprise")
+    List<Abonnement> findByEntrepriseIdIn(Collection<Long> entrepriseIds);
 
     /** Liste filtrée par {@link AbonnementSpecifications}, avec l'entreprise chargée. */
     @Override

@@ -4,6 +4,7 @@ import com.batulo.entity.Utilisateur;
 import com.batulo.enums.Role;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
@@ -38,14 +39,20 @@ public interface UtilisateurRepository extends JpaRepository<Utilisateur, Long>,
     @EntityGraph(attributePaths = "entreprise")
     Optional<Utilisateur> findFirstByEntrepriseIdAndRole(Long entrepriseId, Role role);
 
-    /** Comptes d'un rôle, avec leur entreprise (liste paginée du super admin). */
-    @EntityGraph(attributePaths = "entreprise")
-    Page<Utilisateur> findByRole(Role role, Pageable pageable);
-
     /** Admins de plusieurs entreprises en une requête (liste des abonnements). */
     List<Utilisateur> findByEntrepriseIdInAndRole(Collection<Long> entrepriseIds, Role role);
 
     long countByEntrepriseIdAndRole(Long entrepriseId, Role role);
+
+    /** Comptes d'un rôle par entreprise, en une requête : [entrepriseId, nombre] (entreprises sans compte absentes). */
+    @Query("select u.entreprise.id, count(u) from Utilisateur u where u.entreprise.id in :entrepriseIds "
+            + "and u.role = :role group by u.entreprise.id")
+    List<Object[]> compterParEntreprise(Collection<Long> entrepriseIds, Role role);
+
+    /** Liste filtrée (gestionnaires, admins), avec l'entreprise chargée dans la même requête. */
+    @Override
+    @EntityGraph(attributePaths = "entreprise")
+    Page<Utilisateur> findAll(Specification<Utilisateur> spec, Pageable pageable);
 
     /** Comptes d'un rôle dans une entreprise, actifs et désactivés, en une requête : [actif, nombre]. */
     @Query("select u.actif, count(u) from Utilisateur u where u.entreprise.id = :entrepriseId and u.role = :role "

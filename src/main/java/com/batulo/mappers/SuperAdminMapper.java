@@ -4,6 +4,8 @@ import com.batulo.service.model.AbonnementAdminModel;
 import com.batulo.service.model.AbonnementAdminResponse;
 import com.batulo.service.model.AdminDetailModel;
 import com.batulo.service.model.AdminDetailResponse;
+import com.batulo.service.model.AdminLigneModel;
+import com.batulo.service.model.AdminLigneResponse;
 import com.batulo.service.model.CreationAdminModel;
 import com.batulo.service.model.CreationAdminRequest;
 import com.batulo.service.model.ModificationAdminModel;
@@ -11,6 +13,8 @@ import com.batulo.service.model.ModificationAdminRequest;
 import com.batulo.service.model.MotDePasseTemporaireModel;
 import com.batulo.service.model.MotDePasseTemporaireResponse;
 import com.batulo.service.model.PageResponse;
+import com.batulo.service.model.TableauDeBordSuperAdminModel;
+import com.batulo.service.model.TableauDeBordSuperAdminResponse;
 import org.springframework.data.domain.Page;
 import org.springframework.stereotype.Component;
 
@@ -53,6 +57,27 @@ public class SuperAdminMapper {
                 model.adminPrenom(),
                 model.adminNom(),
                 model.adminCourriel());
+    }
+
+    public AdminLigneResponse toResponse(AdminLigneModel model) {
+        AdminLigneModel.Entreprise entreprise = model.entreprise();
+        AdminLigneModel.Admin admin = model.admin();
+        AdminLigneModel.Abonnement abonnement = model.abonnement();
+        return new AdminLigneResponse(
+                new AdminLigneResponse.Entreprise(entreprise.id(), entreprise.nom(), entreprise.actif()),
+                new AdminLigneResponse.Admin(admin.id(), admin.prenom(), admin.nom(), admin.courriel(), admin.actif(),
+                        admin.motDePasseTemporaire(), admin.motDePasseTemporaireExpireLe(), admin.dateCreation()),
+                abonnement == null ? null : new AdminLigneResponse.Abonnement(abonnement.formule(),
+                        abonnement.statut(), abonnement.dateExpiration(), abonnement.joursRestants()),
+                model.nombreGestionnaires());
+    }
+
+    public TableauDeBordSuperAdminResponse toResponse(TableauDeBordSuperAdminModel model) {
+        TableauDeBordSuperAdminModel.Entreprises e = model.entreprises();
+        return new TableauDeBordSuperAdminResponse(
+                new TableauDeBordSuperAdminResponse.Entreprises(e.total(), e.actif(), e.expireBientot(), e.expire(),
+                        e.enAttentePaiement(), e.desactive()),
+                model.demandesAugmentationEnAttente());
     }
 
     public MotDePasseTemporaireResponse toResponse(MotDePasseTemporaireModel model) {

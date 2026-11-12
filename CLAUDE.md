@@ -99,6 +99,13 @@ Plateforme SaaS de sondages (Spring Boot 3.5, Java 21, PostgreSQL 16, Liquibase)
   comme GET .../assignations), calculés par requêtes groupées (`ResumesSondages`, pas de N+1). Recherche des
   gestionnaires sans majuscules ni accents par `lower` + `translate` (pas d'extension unaccent), jokers échappés.
   GET /api/abonnements/paiements : paiements REUSSI seulement, du plus récent au plus ancien.
+- Ajouts pour l'espace super admin : GET /api/super-admin/tableau-de-bord (entreprises par statut d'abonnement
+  affiché, total des entreprises, demandes d'augmentation EN_ATTENTE ; une agrégation SQL `sum(case ...)`).
+  GET /api/super-admin/admins renvoie des lignes enrichies (entreprise, admin, abonnement avec statut affiché et
+  jours restants, nombre de gestionnaires ; requêtes groupées, pas de N+1), filtres `statut` et `recherche` (nom de
+  l'entreprise, prénom, nom, courriel ; `RechercheTexte`, partagé avec les gestionnaires) combinés par ET. Le statut
+  affiché se traduit en SQL par une seule fonction, `AbonnementSpecifications.condition`, utilisée partout. Refuser
+  une demande d'augmentation exige un message (400 REPONSE_OBLIGATOIRE) ; l'accepter, non.
 
 ## À traiter dans les étapes suivantes
 - Phase 4 : invitations nominatives (l'unicité par appareil se contourne en vidant le navigateur ou en changeant

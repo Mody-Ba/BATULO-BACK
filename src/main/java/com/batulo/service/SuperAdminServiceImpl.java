@@ -5,11 +5,14 @@ import com.batulo.entity.Entreprise;
 import com.batulo.entity.Utilisateur;
 import com.batulo.enums.Role;
 import com.batulo.enums.StatutAbonnement;
+import com.batulo.enums.StatutDemande;
 import com.batulo.exception.ActionInterditeException;
 import com.batulo.exception.CompteExistantException;
 import com.batulo.exception.ResourceNotFoundException;
 import com.batulo.repository.AbonnementRepository;
 import com.batulo.repository.AbonnementSpecifications;
+import com.batulo.repository.AdminSpecifications;
+import com.batulo.repository.DemandeAbonnementRepository;
 import com.batulo.repository.EntrepriseRepository;
 import com.batulo.repository.UtilisateurRepository;
 import com.batulo.service.email.EmailService;
@@ -18,20 +21,24 @@ import com.batulo.service.mappers.UtilisateurMapper;
 import com.batulo.service.model.AbonnementAdminModel;
 import com.batulo.service.model.AbonnementModel;
 import com.batulo.service.model.AdminDetailModel;
+import com.batulo.service.model.AdminLigneModel;
 import com.batulo.service.model.CreationAdminModel;
 import com.batulo.service.model.ModificationAdminModel;
 import com.batulo.service.model.MotDePasseTemporaireModel;
-import com.batulo.service.model.UtilisateurModel;
+import com.batulo.service.model.TableauDeBordSuperAdminModel;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -45,6 +52,7 @@ public class SuperAdminServiceImpl implements SuperAdminService {
     private final UtilisateurRepository utilisateurRepository;
     private final EntrepriseRepository entrepriseRepository;
     private final AbonnementRepository abonnementRepository;
+    private final DemandeAbonnementRepository demandeRepository;
     private final UtilisateurMapper utilisateurMapper;
     private final AbonnementMapper abonnementMapper;
     private final MotDePasseTemporaire motDePasseTemporaire;
@@ -56,6 +64,7 @@ public class SuperAdminServiceImpl implements SuperAdminService {
     public SuperAdminServiceImpl(UtilisateurRepository utilisateurRepository,
                                  EntrepriseRepository entrepriseRepository,
                                  AbonnementRepository abonnementRepository,
+                                 DemandeAbonnementRepository demandeRepository,
                                  UtilisateurMapper utilisateurMapper,
                                  AbonnementMapper abonnementMapper,
                                  MotDePasseTemporaire motDePasseTemporaire,
@@ -63,6 +72,7 @@ public class SuperAdminServiceImpl implements SuperAdminService {
         this.utilisateurRepository = utilisateurRepository;
         this.entrepriseRepository = entrepriseRepository;
         this.abonnementRepository = abonnementRepository;
+        this.demandeRepository = demandeRepository;
         this.utilisateurMapper = utilisateurMapper;
         this.abonnementMapper = abonnementMapper;
         this.motDePasseTemporaire = motDePasseTemporaire;
@@ -109,10 +119,53 @@ public class SuperAdminServiceImpl implements SuperAdminService {
     }
 
     @Override
-    public Page<UtilisateurModel> listerAdmins(int page, int taille) {
-        return utilisateurRepository.findByRole(Role.ADMIN,
-                        PageRequest.of(page, taille, Sort.by(Sort.Direction.DESC, "dateCreation", "id")))
-                .map(utilisateurMapper::toModel);
+    public Page<AdminLigneModel> listerAdmins(StatutAbonnement statut, String recherche, int page, int taille) {
+        Instant maintenant = Instant.now();
+        Specification<Utilisateur> filtre = AdminSpecifications.admins()
+                .and(AdminSpecifications.statutAbonnement(statut, maintenant, joursAlerte))
+                .and(AdminSpecifications.recherche(NormaliseurRecherche.normaliser(recherche)));
+        Page<Utilisateur> admins = utilisateurRepository.findAll(filtre,
+                PageRequest.of(page, taille, Sort.by(Sort.Direction.DESC, "dateCreation", "id")));
+
+        // Abonnements et nombres de gestionnaires de la page : une requête chacun, quelle que soit la taille.
+        List<Long> entrepriseIds = admins.map(a -> a.getEntreprise().getId()).toList();
+        Map<Long, Abonnement> abonnements = entrepriseIds.isEmpty() ? Map.of()
+                : abonnementRepository.findByEntrepriseIdIn(entrepriseIds).stream()
+                .collect(Collectors.toMap(a -> a.getEntreprise().getId(), Function.identity()));
+        Map<Long, Long> gestionnaires = new HashMap<>();
+        if (!entrepriseIds.isEmpty()) {
+            for (Object[] ligne : utilisateurRepository.compterParEntreprise(entrepriseIds, Role.GESTIONNAIRE)) {
+                gestionnaires.put((Long) ligne[0], (Long) ligne[1]);
+            }
+        }
+
+        return admins.map(admin -> {
+            Entreprise entreprise = admin.getEntreprise();
+            Abonnement abonnement = abonnements.get(entreprise.getId());
+            return new AdminLigneModel(
+                    new AdminLigneModel.Entreprise(entreprise.getId(), entreprise.getNom(), entreprise.isActif()),
+                    new AdminLigneModel.Admin(admin.getId(), admin.getPrenom(), admin.getNom(), admin.getCourriel(),
+                            admin.isActif(), admin.isMotDePasseTemporaire(), admin.getMotDePasseTemporaireExpireLe(),
+                            admin.getDateCreation()),
+                    abonnement == null ? null : new AdminLigneModel.Abonnement(abonnement.getFormule(),
+                            RegleAbonnement.statutEffectif(abonnement, maintenant, joursAlerte),
+                            abonnement.getDateExpiration(), RegleAbonnement.joursRestants(abonnement, maintenant)),
+                    gestionnaires.getOrDefault(entreprise.getId(), 0L));
+        });
+    }
+
+    @Override
+    public TableauDeBordSuperAdminModel tableauDeBord() {
+        Map<StatutAbonnement, Long> parStatut = abonnementRepository.compterParStatut(Instant.now(), joursAlerte);
+        return new TableauDeBordSuperAdminModel(
+                new TableauDeBordSuperAdminModel.Entreprises(
+                        entrepriseRepository.count(),
+                        parStatut.get(StatutAbonnement.ACTIF),
+                        parStatut.get(StatutAbonnement.EXPIRE_BIENTOT),
+                        parStatut.get(StatutAbonnement.EXPIRE),
+                        parStatut.get(StatutAbonnement.EN_ATTENTE_PAIEMENT),
+                        parStatut.get(StatutAbonnement.DESACTIVE)),
+                demandeRepository.countByStatut(StatutDemande.EN_ATTENTE));
     }
 
     @Override

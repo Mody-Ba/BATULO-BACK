@@ -98,6 +98,9 @@ public class DemandeAbonnementServiceImpl implements DemandeAbonnementService {
         if (statut == StatutDemande.EN_ATTENTE) {
             throw new RegleGestionException("STATUT_INVALIDE", "Une demande se traite (TRAITEE) ou se refuse (REFUSEE).");
         }
+        if (statut == StatutDemande.REFUSEE && (reponse == null || reponse.isBlank())) {
+            throw new RegleGestionException("REPONSE_OBLIGATOIRE", "Expliquez le refus à l'admin dans la réponse.");
+        }
         DemandeAbonnement demande = demandeRepository.findWithDetailsById(demandeId)
                 .orElseThrow(() -> new ResourceNotFoundException("DEMANDE_INTROUVABLE", "Aucune demande " + demandeId + "."));
         if (demande.getStatut() != StatutDemande.EN_ATTENTE) {
