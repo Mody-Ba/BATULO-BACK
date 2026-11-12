@@ -6,6 +6,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -23,4 +24,12 @@ public interface AssignationRepository extends JpaRepository<Assignation, Long> 
     /** Lignées assignées à un gestionnaire. */
     @Query("select a.sondage.id from Assignation a where a.gestionnaire.id = :gestionnaireId")
     List<Long> ligneesAssignees(Long gestionnaireId);
+
+    /**
+     * Gestionnaires assignés à plusieurs lignées en une requête : [ligneeId, gestionnaireId, prénom, nom, actif],
+     * triés par prénom puis nom.
+     */
+    @Query("select a.sondage.id, g.id, g.prenom, g.nom, g.actif from Assignation a join a.gestionnaire g "
+            + "where a.sondage.id in :ligneeIds order by g.prenom, g.nom, g.id")
+    List<Object[]> gestionnairesDesLignees(Collection<Long> ligneeIds);
 }

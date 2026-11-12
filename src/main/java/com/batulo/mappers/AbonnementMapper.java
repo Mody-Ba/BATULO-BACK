@@ -12,8 +12,12 @@ import com.batulo.service.model.IntentionPaiementModel;
 import com.batulo.service.model.IntentionPaiementRequest;
 import com.batulo.service.model.IntentionPaiementResponse;
 import com.batulo.service.model.IntentionStripeModel;
+import com.batulo.service.model.PageResponse;
 import com.batulo.service.model.PaiementConfirmeModel;
 import com.batulo.service.model.PaiementConfirmeResponse;
+import com.batulo.service.model.PaiementModel;
+import com.batulo.service.model.PaiementResponse;
+import org.springframework.data.domain.Page;
 import org.springframework.stereotype.Component;
 
 /**
@@ -47,6 +51,16 @@ public class AbonnementMapper {
                 model.joursRestants(),
                 model.montant(),
                 model.devise());
+    }
+
+    public PageResponse<PaiementResponse> toPaiementResponses(Page<PaiementModel> page) {
+        return new PageResponse<>(
+                page.getContent().stream().map(model -> new PaiementResponse(model.id(), model.datePaiement(),
+                        model.formule(), model.montant(), model.devise())).toList(),
+                page.getNumber(),
+                page.getSize(),
+                page.getTotalElements(),
+                page.getTotalPages());
     }
 
     public IntentionPaiementResponse toResponse(IntentionPaiementModel model) {

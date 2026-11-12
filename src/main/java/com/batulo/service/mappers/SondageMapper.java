@@ -14,6 +14,7 @@ import com.batulo.service.model.OptionModel;
 import com.batulo.service.model.QuestionModel;
 import com.batulo.service.model.SectionModel;
 import com.batulo.service.model.SondageModel;
+import com.batulo.service.model.GestionnaireAssigneModel;
 import com.batulo.service.model.SondageResumeModel;
 import com.batulo.service.model.VersionModel;
 import org.springframework.stereotype.Component;
@@ -50,7 +51,9 @@ public class SondageMapper {
     }
 
     public SondageResumeModel toResumeModel(Sondage entity, Instant maintenant, long nombreSections,
-                                            long nombreQuestions) {
+                                            long nombreQuestions, long nombreReponses, long nombreReponsesLignee,
+                                            List<GestionnaireAssigneModel> gestionnairesAssignes,
+                                            Long brouillonEnPreparationId) {
         return new SondageResumeModel(
                 entity.getId(),
                 entity.getTitre(),
@@ -64,6 +67,11 @@ public class SondageMapper {
                 auteur(entity.getCreePar()),
                 nombreSections,
                 nombreQuestions,
+                nombreReponses,
+                nombreReponsesLignee,
+                gestionnairesAssignes,
+                brouillonEnPreparationId != null,
+                brouillonEnPreparationId,
                 entity.getDateCreation(),
                 entity.getDateModification());
     }

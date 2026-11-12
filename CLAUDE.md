@@ -77,11 +77,32 @@ Plateforme SaaS de sondages (Spring Boot 3.5, Java 21, PostgreSQL 16, Liquibase)
   asynchrone. Rapports PDF (OpenPDF, police Liberation Sans embarquée, barres dessinées dans les tableaux) et XLSX
   (Résumé + une feuille par question), tableau croisé en PDF ou XLSX. Nom : titre-du-sondage_v2[_statistiques]_date.
   Le périmètre d'analyse (versions, références, filtres, critères) est partagé dans `AnalysePerimetre`.
+- Messagerie (3.4) : conversations à deux, toujours ancrées sur un admin (`conversation.admin_id`) : avec l'un de
+  ses gestionnaires, ou (`gestionnaire_id` null) avec Batulo, boîte partagée par tous les super admins. Un
+  gestionnaire ne parle qu'à son admin ; jamais entre entreprises ; conversation inaccessible : 404. Texte brut
+  (5000 car.), sans pièce jointe ni suppression ; lu/non lu par côté (`message.cote`). Notification « Nouveau
+  message » (tableau de bord, pas de courriel) au premier message non lu seulement. Abonnement EXPIRE ou
+  EN_ATTENTE_PAIEMENT : /api/messagerie/** reste ouvert, mais la conversation admin <-> gestionnaire est en
+  lecture seule (403 ABONNEMENT_EXPIRE) ; celle avec Batulo reste ouverte.
+- Envoi des statistiques (3.4, GE-06) : réservé au gestionnaire créateur ou assigné, sondage TERMINE (en lignée :
+  toutes les versions publiées), sinon 409 SONDAGE_NON_TERMINE ; autorisé abonnement expiré. Filtres enregistrés
+  (`envoi_statistique.filtres`), statistiques recalculées à l'ouverture (pas de copie figée) ; nom de l'expéditeur
+  conservé si le gestionnaire est supprimé. Message automatique (type STATISTIQUES) et notification
+  STATISTIQUES_RECUES ; l'admin a /api/statistiques-recues (+ PDF de 3.3).
+- Demande d'augmentation (3.4, AD-05, SA-07) : purement informative (RG-09, aucun effet sur l'abonnement : acceptée,
+  l'admin paie lui-même) ; une seule EN_ATTENTE par entreprise (409 DEMANDE_EN_COURS) ; postée dans la conversation
+  avec Batulo ; le super admin répond TRAITEE ou REFUSEE une seule fois (409 DEMANDE_DEJA_TRAITEE).
+- Ajouts pour le frontend : une lignée est représentée (GET /api/sondages?derniereVersion=true, tableau de bord) par
+  sa dernière version démarrée (EN_COURS ou TERMINE), sinon par sa dernière version ; `brouillonEnPreparation(Id)`
+  signale un brouillon plus récent que la ligne (une version planifiée plus récente n'est pas signalée). La liste
+  donne `nombreReponses` (version), `nombreReponsesLignee` et `gestionnairesAssignes` (null pour un gestionnaire,
+  comme GET .../assignations), calculés par requêtes groupées (`ResumesSondages`, pas de N+1). Recherche des
+  gestionnaires sans majuscules ni accents par `lower` + `translate` (pas d'extension unaccent), jokers échappés.
+  GET /api/abonnements/paiements : paiements REUSSI seulement, du plus récent au plus ancien.
 
 ## À traiter dans les étapes suivantes
 - Phase 4 : invitations nominatives (l'unicité par appareil se contourne en vidant le navigateur ou en changeant
   d'appareil : limite acceptée pour la phase 2) ; diffusion courriel, SMS, WhatsApp, intégration web, campagnes.
 - Si l'application tourne un jour sur plusieurs instances : limite de requêtes partagée (Redis ou Bucket4j).
-- Phase 3 : messagerie et envoi des statistiques d'un sondage terminé du gestionnaire à son admin (3.4).
 - Module 4.4, plus tard : logo et identité visuelle dans les rapports, comparaison de plusieurs sondages (la clé de
   question est déjà recopiée dans les copies), partage sécurisé des rapports, archivage.

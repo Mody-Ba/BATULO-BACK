@@ -50,8 +50,14 @@ public interface SondageService {
     /** Marque ou démarque un sondage comme modèle (permis quel que soit son statut). */
     SondageModel marquerModele(Long utilisateurId, Long sondageId, boolean estModele);
 
-    /** Du plus récemment modifié au plus ancien ; statut null : tous. */
-    Page<SondageResumeModel> lister(Long utilisateurId, StatutSondage statut, int page, int taille);
+    /**
+     * Du plus récemment modifié au plus ancien ; statut null : tous.
+     *
+     * @param derniereVersion true : une ligne par lignée, la dernière version démarrée (EN_COURS ou TERMINE) si
+     *                        elle existe, sinon la dernière version ; le statut filtre alors cette ligne
+     */
+    Page<SondageResumeModel> lister(Long utilisateurId, StatutSondage statut, boolean derniereVersion, int page,
+                                    int taille);
 
     SondageModel detail(Long utilisateurId, Long sondageId);
 

@@ -110,7 +110,7 @@ public class ExportController {
     }
 
     /** En-têtes (nom de fichier, type, pas de cache : ce sont des réponses) puis contenu, écrit en flux. */
-    private static void envoyer(ExportModel export, HttpServletResponse response) throws IOException {
+    static void envoyer(ExportModel export, HttpServletResponse response) throws IOException {
         String nom = export.nomFichier();
         response.setContentType(export.typeContenu());
         response.setHeader(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + nom + "\"; filename*=UTF-8''"

@@ -17,6 +17,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.Size;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -83,13 +84,20 @@ public class GestionnaireController {
 
     @GetMapping
     @PreAuthorize("hasRole('ADMIN')")
-    @Operation(summary = "Lister mes gestionnaires (AD-10)", description = "Paginé, du plus récent au plus ancien.")
+    @Operation(summary = "Lister mes gestionnaires (AD-10)",
+            description = "Paginé, du plus récent au plus ancien. Filtres facultatifs et cumulables : recherche dans "
+                    + "le prénom, le nom ou le courriel (sans tenir compte des majuscules ni des accents) et actif.")
     public PageResponse<UtilisateurResponse> lister(
             @Parameter(hidden = true) @AuthenticationPrincipal UtilisateurConnecte moi,
+            @Parameter(description = "Facultatif : texte cherché dans le prénom, le nom ou le courriel")
+            @RequestParam(required = false) @Size(max = 100, message = "recherche ne doit pas dépasser 100 caractères")
+            String recherche,
+            @Parameter(description = "Facultatif : true (actifs) ou false (désactivés)")
+            @RequestParam(required = false) Boolean actif,
             @RequestParam(defaultValue = "0") @Min(value = 0, message = "page doit être positif ou nul") int page,
             @RequestParam(defaultValue = "20") @Min(value = 1, message = "taille doit être au moins 1")
             @Max(value = 100, message = "taille ne doit pas dépasser 100") int taille) {
-        return gestionnaireMapper.toResponse(gestionnaireService.lister(moi.id(), page, taille));
+        return gestionnaireMapper.toResponse(gestionnaireService.lister(moi.id(), recherche, actif, page, taille));
     }
 
     @GetMapping("/{id}")

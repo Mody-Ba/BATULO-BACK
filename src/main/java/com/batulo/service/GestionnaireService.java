@@ -21,8 +21,13 @@ public interface GestionnaireService {
      */
     UtilisateurModel creer(Long adminId, CreationGestionnaireModel creation);
 
-    /** Gestionnaires de l'entreprise, du plus récent au plus ancien. */
-    Page<UtilisateurModel> lister(Long adminId, int page, int taille);
+    /**
+     * Gestionnaires de l'entreprise, du plus récent au plus ancien.
+     *
+     * @param recherche facultatif : prénom, nom ou courriel contenant ce texte (sans majuscules ni accents)
+     * @param actif     facultatif : actifs (true) ou désactivés (false) seulement
+     */
+    Page<UtilisateurModel> lister(Long adminId, String recherche, Boolean actif, int page, int taille);
 
     UtilisateurModel detail(Long adminId, Long gestionnaireId);
 

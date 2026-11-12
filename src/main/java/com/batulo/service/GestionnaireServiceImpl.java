@@ -4,6 +4,7 @@ import com.batulo.entity.Utilisateur;
 import com.batulo.enums.Role;
 import com.batulo.exception.CompteExistantException;
 import com.batulo.exception.ResourceNotFoundException;
+import com.batulo.repository.GestionnaireSpecifications;
 import com.batulo.repository.UtilisateurRepository;
 import com.batulo.service.email.EmailService;
 import com.batulo.service.mappers.UtilisateurMapper;
@@ -15,6 +16,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -67,9 +69,12 @@ public class GestionnaireServiceImpl implements GestionnaireService {
     }
 
     @Override
-    public Page<UtilisateurModel> lister(Long adminId, int page, int taille) {
+    public Page<UtilisateurModel> lister(Long adminId, String recherche, Boolean actif, int page, int taille) {
         Utilisateur admin = admin(adminId);
-        return utilisateurRepository.findByEntrepriseIdAndRole(admin.getEntreprise().getId(), Role.GESTIONNAIRE,
+        Specification<Utilisateur> filtre = GestionnaireSpecifications.gestionnairesDe(admin.getEntreprise().getId())
+                .and(GestionnaireSpecifications.actif(actif))
+                .and(GestionnaireSpecifications.recherche(NormaliseurRecherche.normaliser(recherche)));
+        return utilisateurRepository.findAll(filtre,
                         PageRequest.of(page, taille, Sort.by(Sort.Direction.DESC, "dateCreation", "id")))
                 .map(utilisateurMapper::toModel);
     }

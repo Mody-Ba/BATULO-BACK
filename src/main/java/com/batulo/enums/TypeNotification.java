@@ -13,5 +13,13 @@ public enum TypeNotification {
     /** Gestionnaire : un sondage lui a été assigné (tableau de bord + courriel). */
     SONDAGE_ASSIGNE,
     /** Gestionnaire : une assignation lui a été retirée (tableau de bord seulement). */
-    SONDAGE_DESASSIGNE
+    SONDAGE_DESASSIGNE,
+    /** Destinataire : premier message non lu d'une conversation. */
+    NOUVEAU_MESSAGE,
+    /** Admin : un gestionnaire lui a envoyé les statistiques d'un sondage terminé (GE-06). */
+    STATISTIQUES_RECUES,
+    /** Super admins : un admin demande une augmentation d'abonnement (AD-05, SA-07). */
+    DEMANDE_ABONNEMENT,
+    /** Admin : sa demande d'augmentation a été traitée ou refusée. */
+    DEMANDE_ABONNEMENT_TRAITEE
 }
