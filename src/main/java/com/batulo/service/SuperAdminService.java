@@ -3,10 +3,11 @@ package com.batulo.service;
 import com.batulo.enums.StatutAbonnement;
 import com.batulo.service.model.AbonnementAdminModel;
 import com.batulo.service.model.AdminDetailModel;
+import com.batulo.service.model.AdminLigneModel;
 import com.batulo.service.model.CreationAdminModel;
 import com.batulo.service.model.ModificationAdminModel;
 import com.batulo.service.model.MotDePasseTemporaireModel;
-import com.batulo.service.model.UtilisateurModel;
+import com.batulo.service.model.TableauDeBordSuperAdminModel;
 import org.springframework.data.domain.Page;
 
 /**
@@ -23,8 +24,16 @@ public interface SuperAdminService {
      */
     AdminDetailModel creerAdmin(CreationAdminModel creation);
 
-    /** Admins du plus récent au plus ancien. */
-    Page<UtilisateurModel> listerAdmins(int page, int taille);
+    /**
+     * Admins du plus récent au plus ancien, avec leur entreprise, leur abonnement et leur nombre de gestionnaires.
+     *
+     * @param statut    statut d'abonnement affiché ; null : tous
+     * @param recherche nom de l'entreprise, prénom, nom ou courriel, sans majuscules ni accents ; null : aucun filtre
+     */
+    Page<AdminLigneModel> listerAdmins(StatutAbonnement statut, String recherche, int page, int taille);
+
+    /** Entreprises par statut d'abonnement affiché et demandes d'augmentation en attente. */
+    TableauDeBordSuperAdminModel tableauDeBord();
 
     AdminDetailModel detailAdmin(Long adminId);
 

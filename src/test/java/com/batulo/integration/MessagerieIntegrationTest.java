@@ -299,7 +299,7 @@ class MessagerieIntegrationTest extends PostgresIntegrationTestBase {
                 Map.of("statut", "TRAITEE", "reponse", "Choisissez l'annuel depuis la page Abonnement."))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.statut").value("TRAITEE"))
                 .andExpect(jsonPath("$.traiteeParNom").value("Prénom Nom"));
-        patchJson(jetonSa, "/api/super-admin/demandes-abonnement/" + id, Map.of("statut", "REFUSEE"))
+        patchJson(jetonSa, "/api/super-admin/demandes-abonnement/" + id, Map.of("statut", "REFUSEE", "reponse", "Non"))
                 .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("DEMANDE_DEJA_TRAITEE"));
         assertThat(notifications(admin.getId(), "DEMANDE_ABONNEMENT_TRAITEE")).isEqualTo(1);
 

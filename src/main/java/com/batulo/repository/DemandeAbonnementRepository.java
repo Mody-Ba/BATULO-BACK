@@ -15,6 +15,8 @@ public interface DemandeAbonnementRepository extends JpaRepository<DemandeAbonne
 
     boolean existsByEntrepriseIdAndStatut(Long entrepriseId, StatutDemande statut);
 
+    long countByStatut(StatutDemande statut);
+
     @EntityGraph(attributePaths = {"entreprise", "admin", "traiteePar"})
     Page<DemandeAbonnement> findByAdminId(Long adminId, Pageable pageable);
 

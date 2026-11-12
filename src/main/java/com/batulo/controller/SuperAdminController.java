@@ -1,16 +1,16 @@
 package com.batulo.controller;
 
 import com.batulo.enums.StatutAbonnement;
-import com.batulo.mappers.AuthMapper;
 import com.batulo.mappers.SuperAdminMapper;
 import com.batulo.service.SuperAdminService;
 import com.batulo.service.model.AbonnementAdminResponse;
 import com.batulo.service.model.AdminDetailResponse;
+import com.batulo.service.model.AdminLigneResponse;
 import com.batulo.service.model.CreationAdminRequest;
 import com.batulo.service.model.ModificationAdminRequest;
 import com.batulo.service.model.MotDePasseTemporaireResponse;
 import com.batulo.service.model.PageResponse;
-import com.batulo.service.model.UtilisateurResponse;
+import com.batulo.service.model.TableauDeBordSuperAdminResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -42,13 +42,10 @@ public class SuperAdminController {
 
     private final SuperAdminService superAdminService;
     private final SuperAdminMapper superAdminMapper;
-    private final AuthMapper authMapper;
 
-    public SuperAdminController(SuperAdminService superAdminService, SuperAdminMapper superAdminMapper,
-                                AuthMapper authMapper) {
+    public SuperAdminController(SuperAdminService superAdminService, SuperAdminMapper superAdminMapper) {
         this.superAdminService = superAdminService;
         this.superAdminMapper = superAdminMapper;
-        this.authMapper = authMapper;
     }
 
     @PostMapping("/admins")
@@ -62,14 +59,33 @@ public class SuperAdminController {
         return superAdminMapper.toResponse(superAdminService.creerAdmin(superAdminMapper.toModel(request)));
     }
 
+    @GetMapping("/tableau-de-bord")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    @Operation(summary = "Tableau de bord du super admin",
+            description = "Nombre d'entreprises par statut d'abonnement affiché (recalculé à partir des dates), total "
+                    + "des entreprises et demandes d'augmentation EN_ATTENTE.")
+    public TableauDeBordSuperAdminResponse tableauDeBord() {
+        return superAdminMapper.toResponse(superAdminService.tableauDeBord());
+    }
+
     @GetMapping("/admins")
     @PreAuthorize("hasRole('SUPER_ADMIN')")
-    @Operation(summary = "Lister les admins", description = "Paginé, du plus récent au plus ancien.")
-    public PageResponse<UtilisateurResponse> listerAdmins(
+    @Operation(summary = "Lister les admins",
+            description = "Paginé, du plus récent au plus ancien. Chaque ligne donne l'entreprise, l'admin, "
+                    + "l'abonnement (formule, statut affiché, expiration, jours restants) et le nombre de gestionnaires. "
+                    + "Filtres facultatifs et combinables.")
+    public PageResponse<AdminLigneResponse> listerAdmins(
+            @Parameter(description = "Statut d'abonnement affiché : ACTIF, EXPIRE_BIENTOT, EXPIRE, "
+                    + "EN_ATTENTE_PAIEMENT, DESACTIVE")
+            @RequestParam(required = false) StatutAbonnement statut,
+            @Parameter(description = "Nom de l'entreprise, prénom, nom ou courriel de l'admin ; sans tenir compte des "
+                    + "majuscules ni des accents, % et _ cherchés tels quels")
+            @RequestParam(required = false) String recherche,
             @RequestParam(defaultValue = "0") @Min(value = 0, message = "page doit être positif ou nul") int page,
             @RequestParam(defaultValue = "20") @Min(value = 1, message = "taille doit être au moins 1")
             @Max(value = 100, message = "taille ne doit pas dépasser 100") int taille) {
-        return superAdminMapper.toResponse(superAdminService.listerAdmins(page, taille), authMapper::toResponse);
+        return superAdminMapper.toResponse(superAdminService.listerAdmins(statut, recherche, page, taille),
+                superAdminMapper::toResponse);
     }
 
     @GetMapping("/admins/{id}")

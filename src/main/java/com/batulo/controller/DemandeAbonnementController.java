@@ -84,6 +84,7 @@ public class DemandeAbonnementController {
     @PreAuthorize("hasRole('SUPER_ADMIN')")
     @Operation(summary = "Répondre à une demande (SA-07)",
             description = "TRAITEE (acceptée) ou REFUSEE, depuis EN_ATTENTE seulement (409 DEMANDE_DEJA_TRAITEE). "
+                    + "La réponse est obligatoire pour un refus (400 REPONSE_OBLIGATOIRE), facultative sinon. "
                     + "La réponse est postée dans la conversation et l'admin est notifié. Aucun effet sur l'abonnement.")
     public DemandeAbonnementResponse traiter(@Parameter(hidden = true) @AuthenticationPrincipal UtilisateurConnecte moi,
                                              @PathVariable Long id,

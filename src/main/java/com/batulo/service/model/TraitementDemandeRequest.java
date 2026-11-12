@@ -12,7 +12,7 @@ public record TraitementDemandeRequest(
         StatutDemande statut,
 
         @Size(max = 2000, message = "la réponse ne doit pas dépasser 2000 caractères")
-        @Schema(example = "D'accord : choisissez la formule annuelle depuis la page Abonnement.")
+        @Schema(description = "Obligatoire si le statut est REFUSEE", example = "D'accord : choisissez la formule annuelle depuis la page Abonnement.")
         String reponse
 ) {
 }

@@ -5,7 +5,7 @@ import java.util.Locale;
 
 /**
  * Terme d'une recherche textuelle, comparé sans tenir compte des majuscules ni des accents. La colonne est
- * normalisée en SQL par {@link com.batulo.repository.GestionnaireSpecifications} (lower + translate) : les deux
+ * normalisée en SQL par {@link com.batulo.repository.RechercheTexte} (lower + translate) : les deux
  * doivent rester cohérents.
  */
 public final class NormaliseurRecherche {
