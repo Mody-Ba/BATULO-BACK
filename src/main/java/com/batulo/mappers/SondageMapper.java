@@ -119,7 +119,7 @@ public class SondageMapper {
     public List<VersionResponse> toVersionResponses(List<VersionModel> versions) {
         return versions.stream()
                 .map(v -> new VersionResponse(v.id(), v.version(), v.titre(), v.statut(), v.publie(),
-                        v.datePublication(), v.dateFermeture(), v.dateCreation()))
+                        v.datePublication(), v.dateFermeture(), v.dateCreation(), v.nombreReponses()))
                 .toList();
     }
 

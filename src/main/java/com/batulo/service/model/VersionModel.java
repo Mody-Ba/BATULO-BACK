@@ -13,6 +13,8 @@ public record VersionModel(
         boolean publie,
         Instant datePublication,
         Instant dateFermeture,
-        Instant dateCreation
+        Instant dateCreation,
+        /** Réponses reçues par cette version (pas par toute la lignée). */
+        long nombreReponses
 ) {
 }

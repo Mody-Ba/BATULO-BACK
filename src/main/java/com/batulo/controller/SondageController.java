@@ -8,6 +8,7 @@ import com.batulo.service.model.ApercuResponse;
 import com.batulo.service.model.CreationSondageRequest;
 import com.batulo.service.model.CritereRequest;
 import com.batulo.service.model.DatesSondageRequest;
+import com.batulo.service.model.DeplacementQuestionRequest;
 import com.batulo.service.model.FormulaireResponse;
 import com.batulo.service.model.ModeleRequest;
 import com.batulo.service.model.OrdreRequest;
@@ -218,6 +219,21 @@ public class SondageController {
                                             @Valid @RequestBody QuestionRequest request) {
         return sondageMapper.toResponse(
                 sondageService.modifierQuestion(moi.id(), id, questionId, sondageMapper.toModel(request)));
+    }
+
+    @PutMapping("/{id}/questions/{questionId}/section")
+    @PreAuthorize(ROLES)
+    @Operation(summary = "Déplacer une question vers une autre section",
+            description = "Brouillon seulement (409 SONDAGE_PUBLIE), mêmes droits que la modification d'une question. "
+                    + "La section doit appartenir au même sondage (404 SECTION_INTROUVABLE) ; la même section repositionne "
+                    + "la question. Position à partir de 1, à la fin si absente ; 400 POSITION_INVALIDE hors limites, "
+                    + "400 LIMITE_ATTEINTE si la section est pleine. La question garde son id, ses options et son critère ; "
+                    + "les deux sections sont renumérotées. Renvoie le sondage complet.")
+    public SondageResponse deplacerQuestion(@Parameter(hidden = true) @AuthenticationPrincipal UtilisateurConnecte moi,
+                                            @PathVariable Long id, @PathVariable Long questionId,
+                                            @Valid @RequestBody DeplacementQuestionRequest request) {
+        return sondageMapper.toResponse(sondageService.deplacerQuestion(moi.id(), id, questionId, request.sectionId(),
+                request.position()));
     }
 
     @PutMapping("/{id}/questions/{questionId}/critere")

@@ -11,6 +11,7 @@ import com.batulo.exception.ActionInterditeException;
 import com.batulo.exception.ConflitException;
 import com.batulo.exception.RegleGestionException;
 import com.batulo.exception.ResourceNotFoundException;
+import com.batulo.repository.ReponseRepository;
 import com.batulo.repository.SondageRepository;
 import com.batulo.repository.SondageSpecifications;
 import com.batulo.service.mappers.SondageMapper;
@@ -27,6 +28,8 @@ import com.batulo.service.model.SondageResumeModel;
 import com.batulo.service.model.VersionModel;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Page;
@@ -66,17 +69,23 @@ public class SondageServiceImpl implements SondageService {
     private final SondageMapper sondageMapper;
     private final ValidateurQuestion validateurQuestion;
     private final ResumesSondages resumesSondages;
+    private final ReponseRepository reponseRepository;
+
+    @PersistenceContext
+    private EntityManager entityManager;
 
     public SondageServiceImpl(SondageRepository sondageRepository,
                               AccesSondage accesSondage,
                               SondageMapper sondageMapper,
                               ValidateurQuestion validateurQuestion,
-                              ResumesSondages resumesSondages) {
+                              ResumesSondages resumesSondages,
+                              ReponseRepository reponseRepository) {
         this.sondageRepository = sondageRepository;
         this.accesSondage = accesSondage;
         this.sondageMapper = sondageMapper;
         this.validateurQuestion = validateurQuestion;
         this.resumesSondages = resumesSondages;
+        this.reponseRepository = reponseRepository;
     }
 
     // ---------------------------------------------------------------- Sondage
@@ -296,6 +305,43 @@ public class SondageServiceImpl implements SondageService {
         section.getQuestions().addAll(ordonnees);
         numeroter(section.getQuestions(), Question::setOrdre);
         sondage.marquerModifie();
+        return enregistrer(sondage);
+    }
+
+    @Override
+    @Transactional
+    public SondageModel deplacerQuestion(Long utilisateurId, Long sondageId, Long questionId, Long sectionId,
+                                         Integer position) {
+        Sondage sondage = sondageModifiable(utilisateurId, sondageId);
+        Question question = question(sondage, questionId);
+        Section depart = question.getSection();
+        Section arrivee = section(sondage, sectionId);
+        boolean memeSection = depart == arrivee;
+        if (!memeSection && arrivee.getQuestions().size() >= QUESTIONS_MAX_PAR_SECTION) {
+            throw new RegleGestionException("LIMITE_ATTEINTE",
+                    "Une section ne peut pas avoir plus de " + QUESTIONS_MAX_PAR_SECTION + " questions.");
+        }
+        // Positions possibles : 1 à (questions de l'arrivée, sans la question déplacée) + 1.
+        int taille = arrivee.getQuestions().size() - (memeSection ? 1 : 0);
+        int rang = position == null ? taille + 1 : position;
+        if (rang < 1 || rang > taille + 1) {
+            throw new RegleGestionException("POSITION_INVALIDE",
+                    "La position doit être comprise entre 1 et " + (taille + 1) + ".");
+        }
+        // Les collections ne sont pas modifiées : avec orphanRemoval, retirer la question de sa section la ferait
+        // supprimer. On change seulement sa section (côté propriétaire de la relation) et les ordres, puis on relit.
+        List<Question> questionsDepart = new ArrayList<>(depart.getQuestions());
+        questionsDepart.remove(question);
+        List<Question> questionsArrivee = memeSection ? questionsDepart : new ArrayList<>(arrivee.getQuestions());
+        questionsArrivee.add(rang - 1, question);
+        question.setSection(arrivee);
+        numeroter(questionsDepart, Question::setOrdre);
+        numeroter(questionsArrivee, Question::setOrdre);
+        sondage.marquerModifie();
+        sondageRepository.flush();
+        entityManager.refresh(sondage);
+        log.info("Sondage {} : question {} déplacée vers la section {} (position {}) par le compte {}",
+                sondageId, questionId, sectionId, rang, utilisateurId);
         return enregistrer(sondage);
     }
 
@@ -552,8 +598,15 @@ public class SondageServiceImpl implements SondageService {
         Sondage sondage = sondageLisible(acteur, sondageId);
         Instant maintenant = Instant.now();
         // Visibilité par lignée : si l'une des versions est visible, toutes le sont.
-        return sondageRepository.findLignee(sondage.getIdLignee()).stream()
-                .map(version -> sondageMapper.toVersionModel(version, maintenant))
+        List<Sondage> lignee = sondageRepository.findLignee(sondage.getIdLignee());
+        // Réponses de toutes les versions en une requête groupée (pas de N+1).
+        Map<Long, Long> reponses = new HashMap<>();
+        for (Object[] ligne : reponseRepository.compterParSondage(lignee.stream().map(Sondage::getId).toList())) {
+            reponses.put((Long) ligne[0], (Long) ligne[1]);
+        }
+        return lignee.stream()
+                .map(version -> sondageMapper.toVersionModel(version, maintenant,
+                        reponses.getOrDefault(version.getId(), 0L)))
                 .toList();
     }
 
