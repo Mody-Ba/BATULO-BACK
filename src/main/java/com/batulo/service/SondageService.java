@@ -103,6 +103,16 @@ public interface SondageService {
     SondageModel ordonnerQuestions(Long utilisateurId, Long sondageId, Long sectionId, List<Long> ids);
 
     /**
+     * Déplace une question vers une section du même sondage (ou la repositionne dans sa section), brouillon seulement.
+     * La question garde son id, sa clé, ses options et son critère ; les deux sections sont renumérotées.
+     *
+     * @param position rang dans la section d'arrivée, à partir de 1 ; null : à la fin
+     * @throws com.batulo.exception.RegleGestionException POSITION_INVALIDE, LIMITE_ATTEINTE
+     */
+    SondageModel deplacerQuestion(Long utilisateurId, Long sondageId, Long questionId, Long sectionId,
+                                  Integer position);
+
+    /**
      * Publie un brouillon : ouverture maintenant ou planifiée, fermeture facultative. Ferme les versions
      * précédentes encore ouvertes au moment où celle-ci s'ouvre.
      *

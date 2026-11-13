@@ -76,7 +76,7 @@ public class SondageMapper {
                 entity.getDateModification());
     }
 
-    public VersionModel toVersionModel(Sondage entity, Instant maintenant) {
+    public VersionModel toVersionModel(Sondage entity, Instant maintenant, long nombreReponses) {
         return new VersionModel(
                 entity.getId(),
                 entity.getVersion(),
@@ -85,7 +85,8 @@ public class SondageMapper {
                 entity.isPublie(),
                 entity.getDatePublication(),
                 entity.getDateFermeture(),
-                entity.getDateCreation());
+                entity.getDateCreation(),
+                nombreReponses);
     }
 
     public FormulaireModel toFormulaireModel(Sondage entity, Instant maintenant, long nombreQuestions) {

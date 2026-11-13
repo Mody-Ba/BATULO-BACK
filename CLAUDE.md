@@ -106,6 +106,13 @@ Plateforme SaaS de sondages (Spring Boot 3.5, Java 21, PostgreSQL 16, Liquibase)
   l'entreprise, prénom, nom, courriel ; `RechercheTexte`, partagé avec les gestionnaires) combinés par ET. Le statut
   affiché se traduit en SQL par une seule fonction, `AbonnementSpecifications.condition`, utilisée partout. Refuser
   une demande d'augmentation exige un message (400 REPONSE_OBLIGATOIRE) ; l'accepter, non.
+- Ajouts pour l'éditeur : GET .../versions donne `nombreReponses` par version (une requête groupée). PUT
+  /api/sondages/{id}/questions/{questionId}/section `{sectionId, position?}` déplace une question vers une section du
+  même sondage (ou la repositionne dans la sienne) : brouillon seulement, mêmes droits que la modification d'une
+  question ; position à partir de 1, à la fin si absente, 400 POSITION_INVALIDE hors limites, LIMITE_ATTEINTE si la
+  section est pleine ; la question garde son id, sa clé, ses options et son critère, les deux sections sont
+  renumérotées. Avec `orphanRemoval`, une question ne se retire jamais de la collection de sa section pour la
+  déplacer (Hibernate la supprimerait) : on change `question.section` et les ordres, puis on relit le sondage.
 
 ## À traiter dans les étapes suivantes
 - Phase 4 : invitations nominatives (l'unicité par appareil se contourne en vidant le navigateur ou en changeant
