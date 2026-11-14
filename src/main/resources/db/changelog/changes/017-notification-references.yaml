@@ -1,0 +1,30 @@
+databaseChangeLog:
+  # Ajouts pour le frontend : élément concerné par une notification et conversation d'un nouveau message.
+  # Les notifications créées avant ce changeset gardent null dans les deux colonnes.
+
+  - changeSet:
+      id: 017-notification-reference-et-conversation
+      author: batulo
+      changes:
+        # Id de l'élément concerné (sondage, envoi de statistiques, demande, abonnement, message) : plusieurs tables
+        # possibles selon le type, donc sans clé étrangère.
+        - addColumn:
+            tableName: notification
+            columns:
+              - column: { name: reference_id, type: BIGINT }
+              - column: { name: conversation_id, type: BIGINT }
+        # SET NULL : supprimer une entreprise (et ses conversations) ne bloque pas les notifications des super admins.
+        - addForeignKeyConstraint:
+            baseTableName: notification
+            baseColumnNames: conversation_id
+            constraintName: fk_notification_conversation
+            referencedTableName: conversation
+            referencedColumnNames: id
+            onDelete: SET NULL
+        - createIndex:
+            tableName: notification
+            indexName: idx_notification_destinataire_lue_date
+            columns:
+              - column: { name: destinataire_id }
+              - column: { name: lue }
+              - column: { name: date_creation }

@@ -112,10 +112,19 @@ public class EnvoiStatistiqueServiceImpl implements EnvoiStatistiqueService {
         messagerie.poster(conversation, gestionnaire, CoteConversation.GESTIONNAIRE, TypeMessage.STATISTIQUES,
                 envoi.getId(), texteMessage(sondage, envoi, demande, descriptions), false);
         notificationService.notifier(admin.getId(), TypeNotification.STATISTIQUES_RECUES, "Statistiques reçues",
-                envoi.getExpediteurNom() + " vous a envoyé les statistiques du sondage « " + sondage.getTitre() + " ».");
+                envoi.getExpediteurNom() + " vous a envoyé les statistiques du sondage « " + sondage.getTitre() + " ».",
+                envoi.getId(), conversation.getId());
         log.info("Statistiques du sondage {} envoyées par le gestionnaire {} à l'admin {} (envoi {})",
                 sondageId, gestionnaireId, admin.getId(), envoi.getId());
         return toModel(envoi);
+    }
+
+    @Override
+    public EnvoiStatistiqueModel detail(Long utilisateurId, Long envoiId) {
+        // Un envoi d'un autre compte donne 404, sans révéler qu'il existe.
+        return toModel(envoiRepository.findPourParticipant(envoiId, utilisateurId)
+                .orElseThrow(() -> new ResourceNotFoundException("ENVOI_INTROUVABLE",
+                        "Aucun envoi de statistiques " + envoiId + " pour ce compte.")));
     }
 
     @Override

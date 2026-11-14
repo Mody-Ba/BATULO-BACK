@@ -37,13 +37,17 @@ public class NotificationController {
 
     @GetMapping
     @PreAuthorize("isAuthenticated()")
-    @Operation(summary = "Mes notifications", description = "Paginé, les plus récentes d'abord.")
+    @Operation(summary = "Mes notifications",
+            description = "Paginé, les plus récentes d'abord ; filtre facultatif lue (totaux de la page filtrés). "
+                    + "referenceId : élément concerné selon le type ; conversationId : conversation à ouvrir.")
     public PageResponse<NotificationResponse> lister(
             @Parameter(hidden = true) @AuthenticationPrincipal UtilisateurConnecte moi,
+            @Parameter(description = "Facultatif : true (lues) ou false (non lues) ; absent : toutes")
+            @RequestParam(required = false) Boolean lue,
             @RequestParam(defaultValue = "0") @Min(value = 0, message = "page doit être positif ou nul") int page,
             @RequestParam(defaultValue = "20") @Min(value = 1, message = "taille doit être au moins 1")
             @Max(value = 100, message = "taille ne doit pas dépasser 100") int taille) {
-        return notificationMapper.toResponse(notificationService.lister(moi.id(), page, taille));
+        return notificationMapper.toResponse(notificationService.lister(moi.id(), lue, page, taille));
     }
 
     @GetMapping("/non-lues/nombre")

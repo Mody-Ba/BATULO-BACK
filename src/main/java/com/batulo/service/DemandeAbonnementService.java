@@ -21,6 +21,13 @@ public interface DemandeAbonnementService {
     Page<DemandeAbonnementModel> lister(StatutDemande statut, int page, int taille);
 
     /**
+     * Super admin : une demande, avec l'entreprise, sa formule et le statut de son abonnement.
+     *
+     * @throws com.batulo.exception.ResourceNotFoundException DEMANDE_INTROUVABLE
+     */
+    DemandeAbonnementModel detail(Long demandeId);
+
+    /**
      * Super admin : accepte (TRAITEE) ou refuse (REFUSEE) une demande en attente, avec une réponse.
      *
      * @throws com.batulo.exception.ConflitException DEMANDE_DEJA_TRAITEE

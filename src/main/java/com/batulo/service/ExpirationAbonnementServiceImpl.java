@@ -104,11 +104,11 @@ public class ExpirationAbonnementServiceImpl implements ExpirationAbonnementServ
             admin.ifPresent(a -> {
                 notificationService.notifier(a.getId(), TypeNotification.ABONNEMENT_EXPIRE, "Abonnement expiré",
                         "Votre abonnement a expiré le " + date + ". Votre espace est en lecture seule : "
-                                + "renouvelez-le pour retrouver l'accès complet.");
+                                + "renouvelez-le pour retrouver l'accès complet.", abonnementId, null);
                 emailService.envoyerAbonnementExpire(a.getCourriel(), a.getPrenom(), entreprise, expiration);
             });
             notificationService.notifierSuperAdmins(TypeNotification.ABONNEMENT_EXPIRE, "Abonnement expiré",
-                    "L'abonnement de " + entreprise + " a expiré le " + date + ".");
+                    "L'abonnement de " + entreprise + " a expiré le " + date + ".", abonnementId, null);
             log.info("Abonnement {} expiré", abonnementId);
             return Resultat.EXPIRATION;
         }
@@ -123,12 +123,13 @@ public class ExpirationAbonnementServiceImpl implements ExpirationAbonnementServ
                 notificationService.notifier(a.getId(), TypeNotification.ABONNEMENT_EXPIRE_BIENTOT,
                         "Abonnement bientôt expiré",
                         "Votre abonnement expire dans " + jours + " jour(s), le " + date + ". Renouvelez-le pour "
-                                + "garder l'accès complet.");
+                                + "garder l'accès complet.", abonnementId, null);
                 emailService.envoyerRappelExpiration(a.getCourriel(), a.getPrenom(), entreprise, expiration, jours);
             });
             notificationService.notifierSuperAdmins(TypeNotification.ABONNEMENT_EXPIRE_BIENTOT,
                     "Abonnement bientôt expiré",
-                    "L'abonnement de " + entreprise + " expire dans " + jours + " jour(s), le " + date + ".");
+                    "L'abonnement de " + entreprise + " expire dans " + jours + " jour(s), le " + date + ".",
+                    abonnementId, null);
             log.info("Abonnement {} : rappel d'expiration envoyé ({} jour(s))", abonnementId, jours);
             return Resultat.RAPPEL;
         }

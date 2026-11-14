@@ -19,7 +19,7 @@ public class NotificationMapper {
 
     public NotificationResponse toResponse(NotificationModel model) {
         return new NotificationResponse(model.id(), model.type(), model.titre(), model.message(), model.lue(),
-                model.dateCreation());
+                model.dateCreation(), model.referenceId(), model.conversationId());
     }
 
     public PageResponse<NotificationResponse> toResponse(Page<NotificationModel> page) {
