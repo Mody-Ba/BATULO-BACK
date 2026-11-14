@@ -54,8 +54,22 @@ public class CollecteServiceImpl implements CollecteService {
     }
 
     @Override
-    public FormulairePublicModel formulaire(String jetonPublic) {
-        return sondageMapper.toFormulairePublicModel(versionOuverte(jetonPublic, Instant.now()));
+    public FormulairePublicModel formulaire(String jetonPublic, String jetonRepondant) {
+        Sondage version = versionOuverte(jetonPublic, Instant.now());
+        Boolean dejaRepondu = version.isReponseUnique() ? dejaRepondu(version, jetonRepondant) : null;
+        return sondageMapper.toFormulairePublicModel(version, dejaRepondu);
+    }
+
+    /** Même contrôle que l'envoi (lignée, jeton haché) ; un jeton absent ou mal formé n'a jamais répondu. */
+    private boolean dejaRepondu(Sondage version, String jetonRepondant) {
+        String jeton;
+        try {
+            jeton = uuid(jetonRepondant);
+        } catch (RegleGestionException e) {
+            return false;
+        }
+        return reponseRepository.existsByLigneeIdAndJetonRepondantHash(version.getRacine().getId(),
+                HachageJeton.hacher(jeton));
     }
 
     @Override

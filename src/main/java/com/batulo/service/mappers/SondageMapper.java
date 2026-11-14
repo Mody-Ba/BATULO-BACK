@@ -102,13 +102,14 @@ public class SondageMapper {
     }
 
     /** Formulaire du répondant : contenu de la version ouverte, sans aucune donnée interne. */
-    public FormulairePublicModel toFormulairePublicModel(Sondage version) {
+    public FormulairePublicModel toFormulairePublicModel(Sondage version, Boolean dejaRepondu) {
         return new FormulairePublicModel(
                 version.getTitre(),
                 version.getDescription(),
                 version.isReponseUnique(),
                 version.getDateFermeture(),
-                sections(version));
+                sections(version),
+                dejaRepondu);
     }
 
     public ApercuModel toApercuModel(Sondage entity, Instant maintenant) {

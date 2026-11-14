@@ -42,7 +42,8 @@ public class ReponseMapper {
                 .map(e -> new ValeurReponseModel(e.getKey().getId(), e.getKey().getLibelle(), e.getKey().getType(),
                         valeur(e.getKey(), e.getValue())))
                 .toList();
-        return new ReponseModel(entity.getId(), entity.getDateSoumission(), valeurs);
+        return new ReponseModel(entity.getId(), entity.getSondage().getId(), entity.getSondage().getVersion(),
+                entity.getDateSoumission(), valeurs);
     }
 
     private static JsonNode valeur(Question question, List<ReponseQuestion> lignes) {

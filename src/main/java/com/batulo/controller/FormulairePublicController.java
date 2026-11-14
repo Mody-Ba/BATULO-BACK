@@ -6,6 +6,7 @@ import com.batulo.service.model.ConfirmationReponseResponse;
 import com.batulo.service.model.FormulairePublicResponse;
 import com.batulo.service.model.SoumissionRequest;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.security.SecurityRequirements;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -14,6 +15,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
@@ -39,9 +41,14 @@ public class FormulairePublicController {
     @GetMapping
     @Operation(summary = "Formulaire à remplir",
             description = "Titre, description, sections, questions, options et configuration, sans donnée interne. "
+                    + "Sondage à réponse unique : dejaRepondu (true/false) selon l'en-tête facultatif X-Jeton-Repondant "
+                    + "(absent ou mal formé : false) ; le formulaire est renvoyé dans tous les cas. "
                     + "404 SONDAGE_INTROUVABLE, 403 SONDAGE_NON_OUVERT (ouverture planifiée), 410 SONDAGE_FERME.")
-    public FormulairePublicResponse formulaire(@PathVariable String jeton) {
-        return collecteMapper.toResponse(collecteService.formulaire(jeton));
+    public FormulairePublicResponse formulaire(
+            @PathVariable String jeton,
+            @Parameter(description = "Jeton de l'appareil (UUID) gardé par le navigateur, pour dejaRepondu")
+            @RequestHeader(value = "X-Jeton-Repondant", required = false) String jetonRepondant) {
+        return collecteMapper.toResponse(collecteService.formulaire(jeton, jetonRepondant));
     }
 
     @PostMapping("/reponses")

@@ -124,7 +124,10 @@ public class WebSecurityConfig {
         CorsConfiguration config = new CorsConfiguration();
         config.setAllowedOrigins(originesAutorisees);
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
-        config.setAllowedHeaders(List.of("Authorization", "Content-Type", "Accept"));
+        // X-Jeton-Repondant : jeton d'appareil du formulaire public (réponse unique), jamais dans l'URL.
+        config.setAllowedHeaders(List.of("Authorization", "Content-Type", "Accept", "X-Jeton-Repondant"));
+        // Le frontend lit le nom des fichiers exportés.
+        config.setExposedHeaders(List.of("Content-Disposition"));
         config.setAllowCredentials(false);
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();

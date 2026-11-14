@@ -23,6 +23,14 @@ public interface SuiviCollecteService {
 
     SuiviCollecteModel suivi(Long utilisateurId, Long sondageId);
 
-    /** Réponses à cette version, les plus récentes d'abord. */
-    Page<ReponseModel> reponses(Long utilisateurId, Long sondageId, int page, int taille);
+    /**
+     * Réponses reçues, les plus récentes d'abord : cette version, toute la lignée (lignee) ou la version N de la
+     * lignée (version). Chaque réponse indique sa version.
+     *
+     * @param version numéro dans la lignée ; null : la version demandée
+     * @throws com.batulo.exception.RegleGestionException PARAMETRE_INVALIDE si lignee et version sont combinés
+     * @throws com.batulo.exception.ResourceNotFoundException VERSION_INTROUVABLE
+     */
+    Page<ReponseModel> reponses(Long utilisateurId, Long sondageId, boolean lignee, Integer version, int page,
+                                int taille);
 }

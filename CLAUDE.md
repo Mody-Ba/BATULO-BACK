@@ -113,6 +113,13 @@ Plateforme SaaS de sondages (Spring Boot 3.5, Java 21, PostgreSQL 16, Liquibase)
   section est pleine ; la question garde son id, sa clé, ses options et son critère, les deux sections sont
   renumérotées. Avec `orphanRemoval`, une question ne se retire jamais de la collection de sa section pour la
   déplacer (Hibernate la supprimerait) : on change `question.section` et les ordres, puis on relit le sondage.
+- Ajouts pour les statistiques : CORS expose `Content-Disposition` et accepte l'en-tête `X-Jeton-Repondant`.
+  GET /api/sondages/{id}/reponses : `?lignee=true` (toutes les versions) ou `?version=N` (version N de la lignée,
+  404 VERSION_INTROUVABLE), jamais les deux (400 PARAMETRE_INVALIDE) ; chaque réponse donne `sondageId` et `version`
+  (version chargée dans la même requête). Le formulaire public a ses propres enregistrements (`*PubliqueResponse`),
+  sans réglage d'analyse ni clé. Sondage à réponse unique : `dejaRepondu` d'après l'en-tête facultatif
+  `X-Jeton-Repondant` (jamais dans l'URL), sur toute la lignée ; jeton absent ou mal formé : false (le POST garde
+  son 400) ; absent du JSON si `reponseUnique` est faux ; le formulaire est renvoyé dans tous les cas.
 
 ## À traiter dans les étapes suivantes
 - Phase 4 : invitations nominatives (l'unicité par appareil se contourne en vidant le navigateur ou en changeant
