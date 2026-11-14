@@ -2,7 +2,10 @@ package com.batulo.service;
 
 import com.batulo.entity.Sondage;
 import com.batulo.exception.ConflitException;
+import com.batulo.exception.RegleGestionException;
+import com.batulo.exception.ResourceNotFoundException;
 import com.batulo.repository.ReponseRepository;
+import com.batulo.repository.SondageRepository;
 import com.batulo.service.mappers.ReponseMapper;
 import com.batulo.service.model.LienSondageModel;
 import com.batulo.service.model.ReponseModel;
@@ -23,6 +26,7 @@ public class SuiviCollecteServiceImpl implements SuiviCollecteService {
 
     private final AccesSondage accesSondage;
     private final ReponseRepository reponseRepository;
+    private final SondageRepository sondageRepository;
     private final ReponseMapper reponseMapper;
     private final RegleCollecte regleCollecte;
     private final GenerateurQrCode generateurQrCode;
@@ -32,10 +36,12 @@ public class SuiviCollecteServiceImpl implements SuiviCollecteService {
     private String urlFormulaire;
 
     public SuiviCollecteServiceImpl(AccesSondage accesSondage, ReponseRepository reponseRepository,
+                                    SondageRepository sondageRepository,
                                     ReponseMapper reponseMapper, RegleCollecte regleCollecte,
                                     GenerateurQrCode generateurQrCode) {
         this.accesSondage = accesSondage;
         this.reponseRepository = reponseRepository;
+        this.sondageRepository = sondageRepository;
         this.reponseMapper = reponseMapper;
         this.regleCollecte = regleCollecte;
         this.generateurQrCode = generateurQrCode;
@@ -75,11 +81,27 @@ public class SuiviCollecteServiceImpl implements SuiviCollecteService {
     }
 
     @Override
-    public Page<ReponseModel> reponses(Long utilisateurId, Long sondageId, int page, int taille) {
-        Sondage version = sondageLisible(utilisateurId, sondageId);
-        return reponseRepository.findBySondageId(version.getId(),
-                        PageRequest.of(page, taille, Sort.by(Sort.Order.desc("dateSoumission"), Sort.Order.desc("id"))))
-                .map(reponseMapper::toModel);
+    public Page<ReponseModel> reponses(Long utilisateurId, Long sondageId, boolean lignee, Integer version,
+                                       int page, int taille) {
+        if (lignee && version != null) {
+            throw new RegleGestionException("PARAMETRE_INVALIDE",
+                    "Choisissez lignee=true (toutes les versions) ou version=N, pas les deux.");
+        }
+        Sondage sondage = sondageLisible(utilisateurId, sondageId);
+        PageRequest pageRequest = PageRequest.of(page, taille,
+                Sort.by(Sort.Order.desc("dateSoumission"), Sort.Order.desc("id")));
+        if (lignee) {
+            return reponseRepository.findByLigneeId(sondage.getIdLignee(), pageRequest).map(reponseMapper::toModel);
+        }
+        // Visibilité par lignée : la version N est lisible dès que l'une des versions l'est.
+        Long versionId = version == null ? sondage.getId()
+                : sondageRepository.findLignee(sondage.getIdLignee()).stream()
+                .filter(v -> v.getVersion() == version)
+                .map(Sondage::getId)
+                .findFirst()
+                .orElseThrow(() -> new ResourceNotFoundException("VERSION_INTROUVABLE",
+                        "Ce sondage n'a pas de version " + version + "."));
+        return reponseRepository.findBySondageId(versionId, pageRequest).map(reponseMapper::toModel);
     }
 
     private Sondage sondageLisible(Long utilisateurId, Long sondageId) {

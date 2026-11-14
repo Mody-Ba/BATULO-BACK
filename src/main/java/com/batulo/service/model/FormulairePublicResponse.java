@@ -1,5 +1,8 @@
 package com.batulo.service.model;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
+import io.swagger.v3.oas.annotations.media.Schema;
+
 import java.time.Instant;
 import java.util.List;
 
@@ -14,6 +17,13 @@ public record FormulairePublicResponse(
         boolean reponseUnique,
         /** Fermeture prévue ; null si aucune. */
         Instant dateFermeture,
-        List<SectionResponse> sections
+        List<SectionPubliqueResponse> sections,
+        /**
+         * Seulement si reponseUnique : true si l'appareil (en-tête X-Jeton-Repondant) a déjà répondu à l'une des
+         * versions ; false sans jeton ou avec un jeton mal formé. Absent sinon.
+         */
+        @JsonInclude(JsonInclude.Include.NON_NULL)
+        @Schema(description = "Seulement si reponseUnique : l'appareil (X-Jeton-Repondant) a déjà répondu")
+        Boolean dejaRepondu
 ) {
 }

@@ -3,6 +3,7 @@ package com.batulo.repository;
 import com.batulo.entity.Reponse;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
@@ -24,8 +25,16 @@ public interface ReponseRepository extends JpaRepository<Reponse, Long> {
     @Query("select max(r.dateSoumission) from Reponse r where r.sondage.id = :sondageId")
     Instant derniereReponse(Long sondageId);
 
-    /** Les valeurs sont chargées par lots (default_batch_fetch_size), sans pagination en mémoire. */
+    /**
+     * Réponses d'une version, avec leur version (même requête). Les valeurs sont chargées par lots
+     * (default_batch_fetch_size), sans pagination en mémoire.
+     */
+    @EntityGraph(attributePaths = "sondage")
     Page<Reponse> findBySondageId(Long sondageId, Pageable pageable);
+
+    /** Réponses de toute une lignée (toutes versions), avec leur version ; valeurs chargées par lots. */
+    @EntityGraph(attributePaths = "sondage")
+    Page<Reponse> findByLigneeId(Long ligneeId, Pageable pageable);
 
     /** Réponses de plusieurs versions en une requête : [sondageId, nombre] (absentes si aucune réponse). */
     @Query("select r.sondage.id, count(r) from Reponse r where r.sondage.id in :sondageIds group by r.sondage.id")

@@ -75,13 +75,20 @@ public class CollecteController {
 
     @GetMapping("/reponses")
     @PreAuthorize(ROLES)
-    @Operation(summary = "Réponses reçues (cette version)", description = "Paginé, les plus récentes d'abord.")
+    @Operation(summary = "Réponses reçues",
+            description = "Paginé, les plus récentes d'abord ; chaque réponse indique sa version (sondageId, version). "
+                    + "Par défaut cette version ; lignee=true : toutes les versions ; version=N : la version N de la "
+                    + "lignée (404 VERSION_INTROUVABLE). lignee et version ensemble : 400 PARAMETRE_INVALIDE.")
     public PageResponse<ReponseResponse> reponses(
             @Parameter(hidden = true) @AuthenticationPrincipal UtilisateurConnecte moi,
             @PathVariable Long id,
+            @Parameter(description = "true : toutes les versions du sondage ; false (défaut) : une version")
+            @RequestParam(defaultValue = "false") boolean lignee,
+            @Parameter(description = "Numéro de la version dans la lignée ; absent : cette version")
+            @RequestParam(required = false) @Min(value = 1, message = "version doit être au moins 1") Integer version,
             @RequestParam(defaultValue = "0") @Min(value = 0, message = "page doit être positif ou nul") int page,
             @RequestParam(defaultValue = "20") @Min(value = 1, message = "taille doit être au moins 1")
             @Max(value = 100, message = "taille ne doit pas dépasser 100") int taille) {
-        return collecteMapper.toResponse(suiviCollecteService.reponses(moi.id(), id, page, taille));
+        return collecteMapper.toResponse(suiviCollecteService.reponses(moi.id(), id, lignee, version, page, taille));
     }
 }

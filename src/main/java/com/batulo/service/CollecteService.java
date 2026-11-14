@@ -12,7 +12,11 @@ import java.time.Instant;
  */
 public interface CollecteService {
 
-    FormulairePublicModel formulaire(String jetonPublic);
+    /**
+     * @param jetonRepondant jeton de l'appareil (en-tête X-Jeton-Repondant), facultatif ; sert seulement à
+     *                       calculer dejaRepondu pour un sondage à réponse unique (absent ou mal formé : false)
+     */
+    FormulairePublicModel formulaire(String jetonPublic, String jetonRepondant);
 
     /**
      * Valide et enregistre les réponses à la version ouverte.

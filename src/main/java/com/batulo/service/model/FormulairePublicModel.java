@@ -14,6 +14,8 @@ public record FormulairePublicModel(
         boolean reponseUnique,
         /** Fermeture prévue ; null si aucune. */
         Instant dateFermeture,
-        List<SectionModel> sections
+        List<SectionModel> sections,
+        /** reponseUnique : cet appareil (jeton X-Jeton-Repondant) a déjà répondu sur la lignée ; null sinon. */
+        Boolean dejaRepondu
 ) {
 }
