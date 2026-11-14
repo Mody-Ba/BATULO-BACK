@@ -45,6 +45,17 @@ public class Notification {
     @Column(name = "date_creation", nullable = false, updatable = false)
     private Instant dateCreation;
 
+    /**
+     * Id de l'élément concerné, selon le type : abonnement, sondage (lignée), message, envoi de statistiques ou
+     * demande. Null pour les notifications antérieures à ce champ.
+     */
+    @Column(name = "reference_id")
+    private Long referenceId;
+
+    /** Conversation à ouvrir (nouveau message, statistiques reçues, demandes) ; null sinon. */
+    @Column(name = "conversation_id")
+    private Long conversationId;
+
     public Notification() {
     }
 
@@ -99,5 +110,21 @@ public class Notification {
 
     public Instant getDateCreation() {
         return dateCreation;
+    }
+
+    public Long getReferenceId() {
+        return referenceId;
+    }
+
+    public void setReferenceId(Long referenceId) {
+        this.referenceId = referenceId;
+    }
+
+    public Long getConversationId() {
+        return conversationId;
+    }
+
+    public void setConversationId(Long conversationId) {
+        this.conversationId = conversationId;
     }
 }

@@ -30,6 +30,7 @@ public record AdminLigneResponse(
             Instant dateCreation) {
     }
 
+    @Schema(name = "AbonnementLigneAdmin")
     public record Abonnement(
             @Schema(description = "Null tant qu'aucune formule n'a été payée")
             Formule formule,

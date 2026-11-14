@@ -25,6 +25,14 @@ public interface EnvoiStatistiqueService {
     /** Gestionnaire : ses envois, les plus récents d'abord. */
     Page<EnvoiStatistiqueModel> envoyees(Long gestionnaireId, int page, int taille);
 
+    /**
+     * L'envoi seul (expéditeur, commentaire, sondage, filtres, date), pour son admin destinataire ou son gestionnaire
+     * expéditeur ; ne le marque pas comme consulté.
+     *
+     * @throws com.batulo.exception.ResourceNotFoundException ENVOI_INTROUVABLE pour tout autre compte
+     */
+    EnvoiStatistiqueModel detail(Long utilisateurId, Long envoiId);
+
     /** Admin : les statistiques de l'envoi (marque l'envoi comme consulté). */
     StatistiquesModel statistiques(Long adminId, Long envoiId);
 

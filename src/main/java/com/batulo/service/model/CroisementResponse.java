@@ -2,6 +2,7 @@ package com.batulo.service.model;
 
 import com.batulo.enums.TypeQuestion;
 import com.fasterxml.jackson.annotation.JsonInclude;
+import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -32,6 +33,7 @@ public record CroisementResponse(
     }
 
     /** pourcentageLigne : part de la ligne ; pourcentageColonne : part des répondants de la colonne. */
+    @Schema(name = "CelluleCroisement", description = "Cellule du tableau croisé (distincte de la cellule de matrice)")
     public record Cellule(String colonne, long nombre, BigDecimal pourcentageLigne, BigDecimal pourcentageColonne,
                           boolean petitEffectif) {
     }

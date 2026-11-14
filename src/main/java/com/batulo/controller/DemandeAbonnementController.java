@@ -80,6 +80,14 @@ public class DemandeAbonnementController {
         return messagerieMapper.toResponse(demandeService.lister(statut, page, taille), messagerieMapper::toResponse);
     }
 
+    @GetMapping("/api/super-admin/demandes-abonnement/{id}")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    @Operation(summary = "Détail d'une demande d'abonnement (SA-07)",
+            description = "Avec l'entreprise, sa formule et le statut de son abonnement. 404 DEMANDE_INTROUVABLE.")
+    public DemandeAbonnementResponse detail(@PathVariable Long id) {
+        return messagerieMapper.toResponse(demandeService.detail(id));
+    }
+
     @PatchMapping("/api/super-admin/demandes-abonnement/{id}")
     @PreAuthorize("hasRole('SUPER_ADMIN')")
     @Operation(summary = "Répondre à une demande (SA-07)",

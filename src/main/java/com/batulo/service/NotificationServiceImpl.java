@@ -32,9 +32,11 @@ public class NotificationServiceImpl implements NotificationService {
     }
 
     @Override
-    public Page<NotificationModel> lister(Long utilisateurId, int page, int taille) {
-        return notificationRepository.findByDestinataireId(utilisateurId,
-                        PageRequest.of(page, taille, Sort.by(Sort.Direction.DESC, "dateCreation", "id")))
+    public Page<NotificationModel> lister(Long utilisateurId, Boolean lue, int page, int taille) {
+        PageRequest pageRequest = PageRequest.of(page, taille, Sort.by(Sort.Direction.DESC, "dateCreation", "id"));
+        return (lue == null
+                ? notificationRepository.findByDestinataireId(utilisateurId, pageRequest)
+                : notificationRepository.findByDestinataireIdAndLue(utilisateurId, lue, pageRequest))
                 .map(notificationMapper::toModel);
     }
 
@@ -62,24 +64,30 @@ public class NotificationServiceImpl implements NotificationService {
 
     @Override
     @Transactional
-    public void notifier(Long destinataireId, TypeNotification type, String titre, String message) {
-        creer(utilisateurRepository.getReferenceById(destinataireId), type, titre, message);
+    public void notifier(Long destinataireId, TypeNotification type, String titre, String message, Long referenceId,
+                         Long conversationId) {
+        creer(utilisateurRepository.getReferenceById(destinataireId), type, titre, message, referenceId,
+                conversationId);
     }
 
     @Override
     @Transactional
-    public void notifierSuperAdmins(TypeNotification type, String titre, String message) {
+    public void notifierSuperAdmins(TypeNotification type, String titre, String message, Long referenceId,
+                                    Long conversationId) {
         utilisateurRepository.findByRoleAndActifTrue(Role.SUPER_ADMIN)
-                .forEach(superAdmin -> creer(superAdmin, type, titre, message));
+                .forEach(superAdmin -> creer(superAdmin, type, titre, message, referenceId, conversationId));
     }
 
-    private void creer(Utilisateur destinataire, TypeNotification type, String titre, String message) {
+    private void creer(Utilisateur destinataire, TypeNotification type, String titre, String message,
+                       Long referenceId, Long conversationId) {
         Notification notification = new Notification();
         notification.setDestinataire(destinataire);
         notification.setType(type);
         notification.setTitre(titre);
         notification.setMessage(message);
         notification.setLue(false);
+        notification.setReferenceId(referenceId);
+        notification.setConversationId(conversationId);
         notificationRepository.save(notification);
     }
 }

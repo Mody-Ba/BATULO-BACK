@@ -86,7 +86,7 @@ public class InscriptionServiceImpl implements InscriptionService {
 
         notificationService.notifierSuperAdmins(TypeNotification.NOUVELLE_INSCRIPTION, "Nouvelle inscription",
                 prenom + " " + nom + " (" + courriel + ") a inscrit l'entreprise « " + entreprise.getNom()
-                        + " ». Abonnement en attente de paiement.");
+                        + " ». Abonnement en attente de paiement.", abonnement.getId(), null);
 
         log.info("Inscription : admin {} et entreprise {} créés, abonnement {} en attente de paiement",
                 admin.getId(), entreprise.getId(), abonnement.getId());

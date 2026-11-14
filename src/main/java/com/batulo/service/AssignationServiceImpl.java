@@ -90,7 +90,7 @@ public class AssignationServiceImpl implements AssignationService {
             assignationRepository.save(assignation);
 
             notificationService.notifier(gestionnaire.getId(), TypeNotification.SONDAGE_ASSIGNE, "Sondage assigné",
-                    nomAdmin + " vous a assigné le sondage « " + lignee.getTitre() + " ».");
+                    nomAdmin + " vous a assigné le sondage « " + lignee.getTitre() + " ».", lignee.getId(), null);
             emailService.envoyerAssignationSondage(gestionnaire.getCourriel(), gestionnaire.getPrenom(),
                     lignee.getTitre(), nomAdmin);
             log.info("Sondage {} assigné au gestionnaire {} par l'admin {}",
@@ -109,7 +109,7 @@ public class AssignationServiceImpl implements AssignationService {
                         "Ce sondage n'est pas assigné au gestionnaire " + gestionnaireId + "."));
         assignationRepository.delete(assignation);
         notificationService.notifier(gestionnaireId, TypeNotification.SONDAGE_DESASSIGNE, "Assignation retirée",
-                "Le sondage « " + lignee.getTitre() + " » ne vous est plus assigné.");
+                "Le sondage « " + lignee.getTitre() + " » ne vous est plus assigné.", lignee.getId(), null);
         log.info("Assignation du sondage {} au gestionnaire {} retirée par l'admin {}",
                 lignee.getId(), gestionnaireId, adminId);
     }

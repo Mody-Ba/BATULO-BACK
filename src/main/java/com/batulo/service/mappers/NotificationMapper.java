@@ -18,6 +18,8 @@ public class NotificationMapper {
                 entity.getTitre(),
                 entity.getMessage(),
                 entity.isLue(),
-                entity.getDateCreation());
+                entity.getDateCreation(),
+                entity.getReferenceId(),
+                entity.getConversationId());
     }
 }

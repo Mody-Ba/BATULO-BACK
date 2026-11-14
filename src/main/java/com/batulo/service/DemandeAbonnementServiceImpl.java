@@ -1,6 +1,7 @@
 package com.batulo.service;
 
 import com.batulo.entity.Abonnement;
+import com.batulo.entity.Conversation;
 import com.batulo.entity.DemandeAbonnement;
 import com.batulo.entity.Utilisateur;
 import com.batulo.enums.CoteConversation;
@@ -71,11 +72,13 @@ public class DemandeAbonnementServiceImpl implements DemandeAbonnementService {
         demande.setStatut(StatutDemande.EN_ATTENTE);
         demande = demandeRepository.save(demande);
 
-        messagerie.poster(messagerie.conversation(admin, null), admin, CoteConversation.ADMIN,
+        Conversation conversation = messagerie.conversation(admin, null);
+        messagerie.poster(conversation, admin, CoteConversation.ADMIN,
                 TypeMessage.DEMANDE_ABONNEMENT, demande.getId(), "Demande d'augmentation d'abonnement : formule "
                         + libelle(formuleSouhaitee) + " souhaitée.\n" + demande.getMessage(), false);
         notificationService.notifierSuperAdmins(TypeNotification.DEMANDE_ABONNEMENT, "Demande d'abonnement",
-                admin.getEntreprise().getNom() + " demande la formule " + libelle(formuleSouhaitee) + ".");
+                admin.getEntreprise().getNom() + " demande la formule " + libelle(formuleSouhaitee) + ".",
+                demande.getId(), conversation.getId());
         log.info("Demande d'abonnement {} de l'admin {} (formule {})", demande.getId(), adminId, formuleSouhaitee);
         return toModel(demande);
     }
@@ -93,6 +96,11 @@ public class DemandeAbonnementServiceImpl implements DemandeAbonnementService {
     }
 
     @Override
+    public DemandeAbonnementModel detail(Long demandeId) {
+        return toModel(demandeTrouvee(demandeId));
+    }
+
+    @Override
     @Transactional
     public DemandeAbonnementModel traiter(Long superAdminId, Long demandeId, StatutDemande statut, String reponse) {
         if (statut == StatutDemande.EN_ATTENTE) {
@@ -101,8 +109,7 @@ public class DemandeAbonnementServiceImpl implements DemandeAbonnementService {
         if (statut == StatutDemande.REFUSEE && (reponse == null || reponse.isBlank())) {
             throw new RegleGestionException("REPONSE_OBLIGATOIRE", "Expliquez le refus à l'admin dans la réponse.");
         }
-        DemandeAbonnement demande = demandeRepository.findWithDetailsById(demandeId)
-                .orElseThrow(() -> new ResourceNotFoundException("DEMANDE_INTROUVABLE", "Aucune demande " + demandeId + "."));
+        DemandeAbonnement demande = demandeTrouvee(demandeId);
         if (demande.getStatut() != StatutDemande.EN_ATTENTE) {
             throw new ConflitException("DEMANDE_DEJA_TRAITEE", "Cette demande a déjà reçu une réponse.");
         }
@@ -118,14 +125,20 @@ public class DemandeAbonnementServiceImpl implements DemandeAbonnementService {
                 ? "Demande acceptée (formule " + libelle(demande.getFormuleSouhaitee()) + ") : choisissez-la et payez-la "
                 + "depuis la page Abonnement."
                 : "Demande refusée.") + (texteReponse == null ? "" : "\n" + texteReponse);
-        messagerie.poster(messagerie.conversation(demande.getAdmin(), null), superAdmin, CoteConversation.PLATEFORME,
+        Conversation conversation = messagerie.conversation(demande.getAdmin(), null);
+        messagerie.poster(conversation, superAdmin, CoteConversation.PLATEFORME,
                 TypeMessage.REPONSE_DEMANDE, demande.getId(), contenu, false);
         notificationService.notifier(demande.getAdmin().getId(), TypeNotification.DEMANDE_ABONNEMENT_TRAITEE,
                 "Réponse à votre demande", statut == StatutDemande.TRAITEE
                         ? "Batulo a accepté votre demande : vous pouvez payer la formule depuis la page Abonnement."
-                        : "Batulo a refusé votre demande. Voir la messagerie.");
+                        : "Batulo a refusé votre demande. Voir la messagerie.", demande.getId(), conversation.getId());
         log.info("Demande d'abonnement {} : {} par le super admin {}", demandeId, statut, superAdminId);
         return toModel(demande);
+    }
+
+    private DemandeAbonnement demandeTrouvee(Long demandeId) {
+        return demandeRepository.findWithDetailsById(demandeId)
+                .orElseThrow(() -> new ResourceNotFoundException("DEMANDE_INTROUVABLE", "Aucune demande " + demandeId + "."));
     }
 
     private DemandeAbonnementModel toModel(DemandeAbonnement d) {

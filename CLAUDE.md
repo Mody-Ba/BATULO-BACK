@@ -120,6 +120,15 @@ Plateforme SaaS de sondages (Spring Boot 3.5, Java 21, PostgreSQL 16, Liquibase)
   sans réglage d'analyse ni clé. Sondage à réponse unique : `dejaRepondu` d'après l'en-tête facultatif
   `X-Jeton-Repondant` (jamais dans l'URL), sur toute la lignée ; jeton absent ou mal formé : false (le POST garde
   son 400) ; absent du JSON si `reponseUnique` est faux ; le formulaire est renvoyé dans tous les cas.
+- Ajouts pour la messagerie : GET /api/notifications `?lue=true|false` (totaux filtrés). Chaque notification porte
+  `referenceId` (sans clé étrangère) et `conversationId` (SET NULL), null pour les anciennes : inscription, paiement,
+  expiration -> abonnement ; assignation et retrait -> lignée (version 1) ; nouveau message -> message +
+  conversation ; statistiques reçues -> envoi + conversation ; demandes -> demande + conversation avec Batulo.
+  `notifier`/`notifierSuperAdmins` exigent ces deux valeurs : toute nouvelle notification doit les renseigner.
+  GET /api/super-admin/demandes-abonnement/{id} ; GET /api/envois-statistiques/{id} pour l'admin destinataire et le
+  gestionnaire expéditeur seulement (404 ENVOI_INTROUVABLE sinon), sans marquer l'envoi consulté. OpenAPI : deux
+  records imbriqués de même nom simple partagent un schéma : leur donner `@Schema(name = ...)` (CelluleCroisement,
+  AbonnementLigneAdmin), le JSON ne change pas.
 
 ## À traiter dans les étapes suivantes
 - Phase 4 : invitations nominatives (l'unicité par appareil se contourne en vidant le navigateur ou en changeant

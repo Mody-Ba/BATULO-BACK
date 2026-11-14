@@ -70,6 +70,16 @@ public class EnvoiStatistiqueController {
         return messagerieMapper.toResponse(envoiService.envoyees(moi.id(), page, taille), messagerieMapper::toResponse);
     }
 
+    @GetMapping("/api/envois-statistiques/{envoiId}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'GESTIONNAIRE')")
+    @Operation(summary = "Un envoi de statistiques",
+            description = "Expéditeur, commentaire, sondage, filtres et date. Réservé à l'admin destinataire et au "
+                    + "gestionnaire expéditeur (404 ENVOI_INTROUVABLE sinon). Ne marque pas l'envoi comme consulté.")
+    public EnvoiStatistiqueResponse detail(@Parameter(hidden = true) @AuthenticationPrincipal UtilisateurConnecte moi,
+                                           @PathVariable Long envoiId) {
+        return messagerieMapper.toResponse(envoiService.detail(moi.id(), envoiId));
+    }
+
     @GetMapping("/api/statistiques-recues")
     @PreAuthorize("hasRole('ADMIN')")
     @Operation(summary = "Statistiques reçues", description = "Envoyées par les gestionnaires, avec leur nom ; "

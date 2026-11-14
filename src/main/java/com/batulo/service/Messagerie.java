@@ -69,11 +69,13 @@ public class Messagerie {
             String texte = message.getExpediteurNom() + " vous a écrit.";
             switch (destinataire) {
                 case PLATEFORME -> notificationService.notifierSuperAdmins(TypeNotification.NOUVEAU_MESSAGE,
-                        "Nouveau message", texte);
+                        "Nouveau message", texte, message.getId(), conversation.getId());
                 case ADMIN -> notificationService.notifier(conversation.getAdmin().getId(),
-                        TypeNotification.NOUVEAU_MESSAGE, "Nouveau message", texte);
+                        TypeNotification.NOUVEAU_MESSAGE, "Nouveau message", texte, message.getId(),
+                        conversation.getId());
                 case GESTIONNAIRE -> notificationService.notifier(conversation.getGestionnaire().getId(),
-                        TypeNotification.NOUVEAU_MESSAGE, "Nouveau message", texte);
+                        TypeNotification.NOUVEAU_MESSAGE, "Nouveau message", texte, message.getId(),
+                        conversation.getId());
             }
         }
         return message;

@@ -10,8 +10,12 @@ import org.springframework.data.domain.Page;
  */
 public interface NotificationService {
 
-    /** Notifications de l'utilisateur, les plus récentes d'abord. */
-    Page<NotificationModel> lister(Long utilisateurId, int page, int taille);
+    /**
+     * Notifications de l'utilisateur, les plus récentes d'abord.
+     *
+     * @param lue null : toutes ; true : lues ; false : non lues
+     */
+    Page<NotificationModel> lister(Long utilisateurId, Boolean lue, int page, int taille);
 
     long nombreNonLues(Long utilisateurId);
 
@@ -21,9 +25,16 @@ public interface NotificationService {
     /** @return nombre de notifications passées de non lues à lues */
     int toutMarquerLu(Long utilisateurId);
 
-    /** Crée une notification pour un utilisateur (usage interne des services). */
-    void notifier(Long destinataireId, TypeNotification type, String titre, String message);
+    /**
+     * Crée une notification pour un utilisateur (usage interne des services).
+     *
+     * @param referenceId    élément concerné (voir NotificationModel.referenceId) ; null si aucun
+     * @param conversationId conversation à ouvrir ; null si aucune
+     */
+    void notifier(Long destinataireId, TypeNotification type, String titre, String message, Long referenceId,
+                  Long conversationId);
 
     /** Crée la même notification pour chaque super admin actif (usage interne des services). */
-    void notifierSuperAdmins(TypeNotification type, String titre, String message);
+    void notifierSuperAdmins(TypeNotification type, String titre, String message, Long referenceId,
+                             Long conversationId);
 }

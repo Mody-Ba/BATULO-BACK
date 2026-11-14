@@ -205,7 +205,8 @@ public class AbonnementServiceImpl implements AbonnementService {
         notificationService.notifierSuperAdmins(TypeNotification.PAIEMENT_RECU, "Paiement reçu",
                 entreprise + " a payé " + paiement.getMontant().toPlainString() + " " + paiement.getDevise()
                         + " (formule " + paiement.getFormule() + (renouvellement ? ", renouvellement" : "")
-                        + "). Abonnement valable jusqu'au " + formatDate.jour(abonnement.getDateExpiration()) + ".");
+                        + "). Abonnement valable jusqu'au " + formatDate.jour(abonnement.getDateExpiration()) + ".",
+                abonnement.getId(), null);
         utilisateurRepository.findFirstByEntrepriseIdAndRole(abonnement.getEntreprise().getId(), Role.ADMIN)
                 .ifPresent(admin -> emailService.envoyerConfirmationPaiement(admin.getCourriel(), admin.getPrenom(),
                         paiement.getFormule(), paiement.getMontant(), paiement.getDevise(),
