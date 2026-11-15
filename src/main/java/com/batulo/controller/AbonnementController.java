@@ -3,12 +3,16 @@ package com.batulo.controller;
 import com.batulo.configs.security.UtilisateurConnecte;
 import com.batulo.mappers.AbonnementMapper;
 import com.batulo.service.AbonnementService;
+import com.batulo.service.PaiementMobileService;
 import com.batulo.service.model.AbonnementResponse;
 import com.batulo.service.model.ConfirmationPaiementRequest;
 import com.batulo.service.model.FormuleResponse;
 import com.batulo.service.model.IntentionPaiementRequest;
 import com.batulo.service.model.IntentionPaiementResponse;
 import com.batulo.service.model.PageResponse;
+import com.batulo.service.model.PaiementMobileRequest;
+import com.batulo.service.model.PaiementMobileResponse;
+import com.batulo.service.model.StatutPaiementMobileResponse;
 import com.batulo.service.model.PaiementConfirmeResponse;
 import com.batulo.service.model.PaiementResponse;
 import io.swagger.v3.oas.annotations.Operation;
@@ -22,6 +26,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -44,10 +49,13 @@ public class AbonnementController {
 
     private final AbonnementService abonnementService;
     private final AbonnementMapper abonnementMapper;
+    private final PaiementMobileService paiementMobileService;
 
-    public AbonnementController(AbonnementService abonnementService, AbonnementMapper abonnementMapper) {
+    public AbonnementController(AbonnementService abonnementService, AbonnementMapper abonnementMapper,
+                                PaiementMobileService paiementMobileService) {
         this.abonnementService = abonnementService;
         this.abonnementMapper = abonnementMapper;
+        this.paiementMobileService = paiementMobileService;
     }
 
     @GetMapping("/formules")
@@ -105,5 +113,32 @@ public class AbonnementController {
             @Valid @RequestBody ConfirmationPaiementRequest request) {
         return abonnementMapper.toResponse(
                 abonnementService.confirmerPaiement(moi.entrepriseId(), abonnementMapper.toModel(request)));
+    }
+
+    @PostMapping("/paiement-mobile")
+    @PreAuthorize("hasRole('ADMIN')")
+    @ResponseStatus(HttpStatus.CREATED)
+    @Operation(summary = "Payer une formule par paiement mobile (Moosyl, en MRU)",
+            description = "Crée le paiement EN_ATTENTE et une session Moosyl : redirigez l'admin vers checkoutUrl. "
+                    + "Moosyl le renvoie ensuite sur l'URL de retour du frontend avec ?reference=. L'abonnement n'est "
+                    + "activé qu'à la confirmation de Moosyl (webhook, ou relecture par GET .../{reference}). "
+                    + "503 PAIEMENT_MOBILE_NON_CONFIGURE, 502 MOOSYL_ERREUR.")
+    public PaiementMobileResponse payerMobile(
+            @Parameter(hidden = true) @AuthenticationPrincipal UtilisateurConnecte moi,
+            @Valid @RequestBody PaiementMobileRequest request) {
+        return abonnementMapper.toResponse(
+                paiementMobileService.demarrer(moi.entrepriseId(), abonnementMapper.toModel(request)));
+    }
+
+    @GetMapping("/paiement-mobile/{reference}")
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "Statut d'un paiement mobile",
+            description = "EN_ATTENTE, REUSSI ou ECHOUE, avec l'abonnement à jour. Tant que le paiement est en "
+                    + "attente, la session est relue chez Moosyl (le webhook reste la source principale) ; un même "
+                    + "paiement n'active ou ne prolonge l'abonnement qu'une fois. 404 PAIEMENT_INTROUVABLE.")
+    public StatutPaiementMobileResponse statutMobile(
+            @Parameter(hidden = true) @AuthenticationPrincipal UtilisateurConnecte moi,
+            @PathVariable String reference) {
+        return abonnementMapper.toResponse(paiementMobileService.statut(moi.entrepriseId(), reference));
     }
 }

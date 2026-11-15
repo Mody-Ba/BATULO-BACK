@@ -1,6 +1,7 @@
 package com.batulo.entity;
 
 import com.batulo.enums.Formule;
+import com.batulo.enums.FournisseurPaiement;
 import com.batulo.enums.StatutPaiement;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -35,8 +36,21 @@ public class Paiement {
     @JoinColumn(name = "abonnement_id", nullable = false)
     private Abonnement abonnement;
 
-    @Column(name = "stripe_payment_intent_id", nullable = false, unique = true)
+    /** PaymentIntent Stripe ; null pour un paiement Moosyl. */
+    @Column(name = "stripe_payment_intent_id", unique = true)
     private String stripePaymentIntentId;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    private FournisseurPaiement fournisseur = FournisseurPaiement.STRIPE;
+
+    /** Référence Batulo (UUID) envoyée à Moosyl comme transactionId ; null pour Stripe. */
+    @Column(unique = true, length = 64)
+    private String reference;
+
+    /** Id de la session de paiement Moosyl. */
+    @Column(name = "session_externe_id", length = 100)
+    private String sessionExterneId;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
@@ -128,5 +142,29 @@ public class Paiement {
 
     public void setDatePaiement(Instant datePaiement) {
         this.datePaiement = datePaiement;
+    }
+
+    public FournisseurPaiement getFournisseur() {
+        return fournisseur;
+    }
+
+    public void setFournisseur(FournisseurPaiement fournisseur) {
+        this.fournisseur = fournisseur;
+    }
+
+    public String getReference() {
+        return reference;
+    }
+
+    public void setReference(String reference) {
+        this.reference = reference;
+    }
+
+    public String getSessionExterneId() {
+        return sessionExterneId;
+    }
+
+    public void setSessionExterneId(String sessionExterneId) {
+        this.sessionExterneId = sessionExterneId;
     }
 }

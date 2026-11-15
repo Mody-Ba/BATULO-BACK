@@ -10,6 +10,9 @@ public record FormuleModel(
         String libelle,
         BigDecimal prix,
         String devise,
-        String duree
+        String duree,
+        /** Prix en paiement mobile (Moosyl), en MRU entiers. */
+        BigDecimal prixMobile,
+        String deviseMobile
 ) {
 }

@@ -1,6 +1,7 @@
 package com.batulo.service.model;
 
 import com.batulo.enums.Formule;
+import com.batulo.enums.FournisseurPaiement;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -11,6 +12,8 @@ public record PaiementResponse(
         Instant datePaiement,
         Formule formule,
         BigDecimal montant,
-        String devise
+        String devise,
+        /** STRIPE (carte) ou MOOSYL (paiement mobile). */
+        FournisseurPaiement fournisseur
 ) {
 }

@@ -88,6 +88,8 @@ public class WebSecurityConfig {
                                 "/api/auth/mot-de-passe-oublie",
                                 "/api/auth/reinitialiser-mot-de-passe").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/abonnements/formules").permitAll()
+                        // Webhook Moosyl : sans compte, authentifié par la signature HMAC du corps (service).
+                        .requestMatchers(HttpMethod.POST, "/api/webhooks/moosyl").permitAll()
                         // Formulaire du répondant, sans compte (RE-02) ; limite de requêtes par IP.
                         .requestMatchers("/api/public/**").permitAll()
                         .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()

@@ -85,6 +85,20 @@ batulo:
     # Tâche quotidienne (rappels et expirations) : tous les jours à 8 h, heure de batulo.fuseau-horaire.
     # Elle tourne aussi une fois au démarrage.
     cron-expiration: ${ABONNEMENT_CRON:0 0 8 * * *}
+  # Paiement mobile Moosyl (Bankily, Sedad, Masrivi), en MRU entiers. Même URL en sandbox et en production :
+  # l'environnement dépend de la clé. Le webhook (POST /api/webhooks/moosyl) est la source principale du statut.
+  moosyl:
+    url-base: ${MOOSYL_BASE_URL:https://api.moosyl.com}
+    # Clé SECRÈTE (serveur seulement), envoyée telle quelle dans l'en-tête Authorization.
+    cle-api: ${MOOSYL_API_KEY:}
+    # Secret choisi à la création du webhook dans le tableau de bord Moosyl (HMAC-SHA256 du corps).
+    secret-webhook: ${MOOSYL_WEBHOOK_SECRET:}
+    # Page du frontend où Moosyl renvoie l'admin ; ?reference=... y est ajouté.
+    url-retour: ${MOOSYL_URL_RETOUR:http://localhost:4200/admin/abonnement/paiement-mobile}
+    prix-mensuel-mru: ${MOOSYL_PRIX_MENSUEL_MRU:40}
+    prix-annuel-mru: ${MOOSYL_PRIX_ANNUEL_MRU:80}
+    # Durée de validité d'une session de paiement (5 à 1440 minutes).
+    expiration-minutes: 30
   collecte:
     # Page du formulaire répondant (frontend Angular) : le jeton du sondage y est ajouté (lien et QR code).
     url-formulaire: ${PUBLIC_FORM_URL:http://localhost:4200/s}

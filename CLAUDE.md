@@ -137,6 +137,19 @@ Plateforme SaaS de sondages (Spring Boot 3.5, Java 21, PostgreSQL 16, Liquibase)
   avant DEJA_REPONDU) ; `reponse.date_consentement` = heure du serveur, null sinon. `dateConsentement` dans le détail
   des réponses ; colonne « Consentement » après « Version » dans les exports CSV/XLSX seulement si l'une des versions
   exportées l'exige (vide pour les réponses d'une version qui ne l'exigeait pas).
+- Paiement mobile Moosyl (https://docs.moosyl.com, `https://api.moosyl.com`, même URL en sandbox : l'environnement
+  dépend de la clé secrète, envoyée telle quelle dans `Authorization`, jamais journalisée). Prix en MRU entiers
+  (`batulo.moosyl.prix-*-mru`, 40/80). `paiement.fournisseur` (STRIPE/MOOSYL), `reference` (UUID = transactionId
+  Moosyl), `session_externe_id`. POST /api/abonnements/paiement-mobile crée le paiement EN_ATTENTE et la session
+  (retour `MOOSYL_URL_RETOUR?reference=`). Le webhook POST /api/webhooks/moosyl (public, hors /api/public/** et de sa
+  limite par IP ; signature `x-webhook-signature` = sha256= HMAC-SHA256 du corps brut, 401 sinon) est la source
+  principale : `completed` active (montant vérifié), `failed`/`cancelled` -> ECHOUE (un nouvel essai réussi active
+  encore), le reste -> 200 sans effet. GET .../paiement-mobile/{reference} relit la session
+  (`GET /checkout-session/public/{id}`, absente de la documentation mais vérifiée sur le sandbox : sans clé,
+  `data.status` open/completed/expired/cancelled ; échec = on attend le webhook) tant
+  qu'il est EN_ATTENTE, hors transaction. Toute activation (Stripe compris) passe par `ActivationPaiement`, sous
+  verrou du paiement : un paiement déjà REUSSI ne prolonge jamais deux fois. Route de dev POST
+  /api/dev/paiements/moosyl/webhook : webhook signé envoyé en HTTP au backend local (tests sans tunnel).
 
 ## À traiter dans les étapes suivantes
 - Phase 4 : invitations nominatives (l'unicité par appareil se contourne en vidant le navigateur ou en changeant

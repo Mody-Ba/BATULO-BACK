@@ -32,6 +32,6 @@ public class AbonnementMapper {
 
     public PaiementModel toModel(Paiement entity) {
         return new PaiementModel(entity.getId(), entity.getDatePaiement(), entity.getFormule(), entity.getMontant(),
-                entity.getDevise());
+                entity.getDevise(), entity.getFournisseur());
     }
 }
