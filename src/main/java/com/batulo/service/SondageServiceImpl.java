@@ -185,8 +185,29 @@ public class SondageServiceImpl implements SondageService {
         if (info.reponseUnique() != null) {
             sondage.setReponseUnique(info.reponseUnique());
         }
+        appliquerPageAccueil(sondage, info);
         sondage.marquerModifie();
         return enregistrer(sondage);
+    }
+
+    /** Page d'accueil : null = inchangé, texte vide = effacé ; un consentement exigé a toujours son texte. */
+    private static void appliquerPageAccueil(Sondage sondage, SondageInfoModel info) {
+        if (info.objetEnquete() != null) {
+            sondage.setObjetEnquete(texteFacultatif(info.objetEnquete()));
+        }
+        if (info.texteConfidentialite() != null) {
+            sondage.setTexteConfidentialite(texteFacultatif(info.texteConfidentialite()));
+        }
+        if (info.consentementRequis() != null) {
+            sondage.setConsentementRequis(info.consentementRequis());
+        }
+        if (info.texteConsentement() != null) {
+            sondage.setTexteConsentement(texteFacultatif(info.texteConsentement()));
+        }
+        if (sondage.isConsentementRequis() && sondage.getTexteConsentement() == null) {
+            throw new RegleGestionException("TEXTE_CONSENTEMENT_REQUIS",
+                    "Le consentement est exigé : indiquez le texte de la case à cocher (texteConsentement).");
+        }
     }
 
     @Override
@@ -621,6 +642,10 @@ public class SondageServiceImpl implements SondageService {
         brouillon.setSondageOrigine(source);
         brouillon.setDescription(source.getDescription());
         brouillon.setReponseUnique(source.isReponseUnique());
+        brouillon.setObjetEnquete(source.getObjetEnquete());
+        brouillon.setTexteConfidentialite(source.getTexteConfidentialite());
+        brouillon.setConsentementRequis(source.isConsentementRequis());
+        brouillon.setTexteConsentement(source.getTexteConsentement());
         CopieSondage.copierContenu(source, brouillon);
         return brouillon;
     }

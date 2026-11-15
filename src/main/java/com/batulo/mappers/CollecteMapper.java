@@ -32,14 +32,15 @@ import java.time.Instant;
 public class CollecteMapper {
 
     public SoumissionModel toModel(SoumissionRequest req) {
-        return new SoumissionModel(req.jetonRepondant(), req.reponses().stream()
+        return new SoumissionModel(req.jetonRepondant(), req.consentement(), req.reponses().stream()
                 .map(r -> new SoumissionModel.ValeurSoumise(r.questionId(), r.valeur()))
                 .toList());
     }
 
     public FormulairePublicResponse toResponse(FormulairePublicModel model) {
         return new FormulairePublicResponse(model.titre(), model.description(), model.reponseUnique(),
-                model.dateFermeture(), model.sections().stream().map(this::toResponse).toList(), model.dejaRepondu());
+                model.dateFermeture(), model.objetEnquete(), model.texteConfidentialite(), model.consentementRequis(),
+                model.texteConsentement(), model.sections().stream().map(this::toResponse).toList(), model.dejaRepondu());
     }
 
     public ConfirmationReponseResponse toConfirmation(Instant dateSoumission) {
@@ -58,7 +59,8 @@ public class CollecteMapper {
     public PageResponse<ReponseResponse> toResponse(Page<ReponseModel> page) {
         return new PageResponse<>(
                 page.getContent().stream()
-                        .map(r -> new ReponseResponse(r.id(), r.sondageId(), r.version(), r.dateSoumission(), r.valeurs().stream()
+                        .map(r -> new ReponseResponse(r.id(), r.sondageId(), r.version(), r.dateSoumission(),
+                                r.dateConsentement(), r.valeurs().stream()
                                 .map(v -> new ValeurReponseResponse(v.questionId(), v.libelle(), v.type(), v.valeur()))
                                 .toList()))
                         .toList(),

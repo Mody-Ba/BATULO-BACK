@@ -61,7 +61,8 @@ public class SondageMapper {
     }
 
     public SondageInfoModel toModel(SondageRequest req) {
-        return new SondageInfoModel(req.titre(), req.description(), req.reponseUnique());
+        return new SondageInfoModel(req.titre(), req.description(), req.reponseUnique(), req.objetEnquete(),
+                req.texteConfidentialite(), req.consentementRequis(), req.texteConsentement());
     }
 
     public SectionInfoModel toModel(SectionRequest req) {
@@ -100,6 +101,10 @@ public class SondageMapper {
                 model.sondageOrigineId(),
                 model.estModele(),
                 model.reponseUnique(),
+                model.objetEnquete(),
+                model.texteConfidentialite(),
+                model.consentementRequis(),
+                model.texteConsentement(),
                 toResponse(model.creePar()),
                 model.dateCreation(),
                 model.dateModification(),
@@ -113,7 +118,8 @@ public class SondageMapper {
 
     public ApercuResponse toResponse(ApercuModel model) {
         return new ApercuResponse(model.id(), model.titre(), model.description(), model.version(), model.statut(),
-                model.sections().stream().map(this::toResponse).toList());
+                model.objetEnquete(), model.texteConfidentialite(), model.consentementRequis(),
+                model.texteConsentement(), model.sections().stream().map(this::toResponse).toList());
     }
 
     public List<VersionResponse> toVersionResponses(List<VersionModel> versions) {

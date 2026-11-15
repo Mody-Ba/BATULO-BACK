@@ -44,6 +44,10 @@ public class SondageMapper {
                 origine(entity),
                 entity.isEstModele(),
                 entity.isReponseUnique(),
+                entity.getObjetEnquete(),
+                entity.getTexteConfidentialite(),
+                entity.isConsentementRequis(),
+                entity.getTexteConsentement(),
                 auteur(entity.getCreePar()),
                 entity.getDateCreation(),
                 entity.getDateModification(),
@@ -108,6 +112,10 @@ public class SondageMapper {
                 version.getDescription(),
                 version.isReponseUnique(),
                 version.getDateFermeture(),
+                version.getObjetEnquete(),
+                version.getTexteConfidentialite(),
+                version.isConsentementRequis(),
+                version.getTexteConsentement(),
                 sections(version),
                 dejaRepondu);
     }
@@ -119,6 +127,10 @@ public class SondageMapper {
                 entity.getDescription(),
                 entity.getVersion(),
                 RegleSondage.statut(entity, maintenant),
+                entity.getObjetEnquete(),
+                entity.getTexteConfidentialite(),
+                entity.isConsentementRequis(),
+                entity.getTexteConsentement(),
                 sections(entity));
     }
 

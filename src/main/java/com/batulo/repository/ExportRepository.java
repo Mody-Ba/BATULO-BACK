@@ -36,7 +36,8 @@ public class ExportRepository {
      * Une ligne SQL : une valeur d'une réponse (ou une réponse sans valeur retenue : cle null).
      * Les colonnes valeur_* suivent le rangement de reponse_question.
      */
-    public record LigneBrute(long reponseId, Instant dateSoumission, int version, String cle, String valeurOption,
+    public record LigneBrute(long reponseId, Instant dateSoumission, Instant dateConsentement, int version, String cle,
+                             String valeurOption,
                              BigDecimal valeurNumerique, String valeurTexte, LocalDate valeurDate,
                              Boolean valeurBooleenne, String valeurJson) {
     }
@@ -45,7 +46,8 @@ public class ExportRepository {
     public void parcourir(Filtre filtre, Collection<Long> questions, Consumer<LigneBrute> traitement) {
         MapSqlParameterSource p = new MapSqlParameterSource("questions", questions.isEmpty() ? List.of(-1L) : questions);
         jdbc.query("select r.id, r.date_soumission, so.version, q.cle, o.valeur, rq.valeur_numerique, rq.valeur_texte, "
-                + "rq.valeur_date, rq.valeur_booleenne, cast(rq.valeur_json as varchar) from reponse r "
+                + "rq.valeur_date, rq.valeur_booleenne, cast(rq.valeur_json as varchar), r.date_consentement "
+                + "from reponse r "
                 + "join sondage so on so.id = r.sondage_id "
                 + "left join reponse_question rq on rq.reponse_id = r.id and rq.question_id in (:questions) "
                 + "left join question q on q.id = rq.question_id "
@@ -53,7 +55,9 @@ public class ExportRepository {
                 + "where " + StatistiqueRepository.conditions(filtre, p) + " order by r.id, rq.id", p, rs -> {
             Timestamp date = rs.getTimestamp(2);
             Object booleen = rs.getObject(9);
-            traitement.accept(new LigneBrute(rs.getLong(1), date.toInstant(), rs.getInt(3), rs.getString(4),
+            Timestamp consentement = rs.getTimestamp(11);
+            traitement.accept(new LigneBrute(rs.getLong(1), date.toInstant(),
+                    consentement == null ? null : consentement.toInstant(), rs.getInt(3), rs.getString(4),
                     rs.getString(5), rs.getBigDecimal(6), rs.getString(7), rs.getObject(8, LocalDate.class),
                     booleen == null ? null : (Boolean) booleen, rs.getString(10)));
         });

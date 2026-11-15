@@ -4,6 +4,11 @@ public record SondageInfoModel(
         String titre,
         String description,
         /** Null : inchangé. */
-        Boolean reponseUnique
+        Boolean reponseUnique,
+        /** Champs de la page d'accueil : null = inchangé, texte vide = effacé. */
+        String objetEnquete,
+        String texteConfidentialite,
+        Boolean consentementRequis,
+        String texteConsentement
 ) {
 }

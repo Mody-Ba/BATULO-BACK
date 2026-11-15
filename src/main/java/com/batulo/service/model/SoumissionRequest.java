@@ -14,6 +14,10 @@ public record SoumissionRequest(
                 + "réponse par appareil", example = "3f6c2a1e-8b1d-4c3e-9a77-2f0e5b4d9c11")
         String jetonRepondant,
 
+        @Schema(description = "Case de consentement cochée ; obligatoire (true) si le sondage exige le consentement "
+                + "(400 CONSENTEMENT_REQUIS), ignoré sinon", example = "true")
+        Boolean consentement,
+
         @NotNull(message = "la liste des réponses est obligatoire")
         @Size(max = 5000, message = "trop de réponses")
         List<@Valid @NotNull(message = "réponse vide") ReponseQuestionRequest> reponses

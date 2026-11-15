@@ -129,6 +129,14 @@ Plateforme SaaS de sondages (Spring Boot 3.5, Java 21, PostgreSQL 16, Liquibase)
   gestionnaire expéditeur seulement (404 ENVOI_INTROUVABLE sinon), sans marquer l'envoi consulté. OpenAPI : deux
   records imbriqués de même nom simple partagent un schéma : leur donner `@Schema(name = ...)` (CelluleCroisement,
   AbonnementLigneAdmin), le JSON ne change pas.
+- Page d'accueil d'un sondage : `objetEnquete`, `texteConfidentialite`, `consentementRequis` (false par défaut),
+  `texteConsentement` (obligatoire si consentement exigé : 400 TEXTE_CONSENTEMENT_REQUIS). Modifiés par PUT
+  /api/sondages/{id} dans le brouillon seulement : champ absent = inchangé, "" efface. Recopiés comme `reponseUnique`
+  (versions, duplications, réutilisations) ; renvoyés par le sondage, l'aperçu et le formulaire public. Si la version
+  EN_COURS exige le consentement, chaque envoi doit porter `consentement: true` (400 CONSENTEMENT_REQUIS, contrôlé
+  avant DEJA_REPONDU) ; `reponse.date_consentement` = heure du serveur, null sinon. `dateConsentement` dans le détail
+  des réponses ; colonne « Consentement » après « Version » dans les exports CSV/XLSX seulement si l'une des versions
+  exportées l'exige (vide pour les réponses d'une version qui ne l'exigeait pas).
 
 ## À traiter dans les étapes suivantes
 - Phase 4 : invitations nominatives (l'unicité par appareil se contourne en vidant le navigateur ou en changeant
