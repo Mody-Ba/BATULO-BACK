@@ -15,21 +15,34 @@ spring:
     host: localhost
     port: 2525
 
+# Toutes les valeurs que .env.properties ou une variable d'environnement pourraient changer sont fixées ici :
+# les tests ne dépendent pas de la configuration locale du développeur.
 batulo:
+  fuseau-horaire: America/Toronto
   jwt:
     secret: secret-de-test-batulo-au-moins-32-octets-0123456789
+    duree-acces-minutes: 15
+    duree-rafraichissement-jours: 7
+  courriel:
+    expediteur: Batulo <no-reply@batulo.local>
   stripe:
     cle-secrete: ""
     cle-publique: ""
+    secret-webhook: ""
   cors:
     origines: http://localhost:4200
   collecte:
+    url-formulaire: http://localhost:4200/s
     # Les tests envoient beaucoup de requêtes publiques : limite relevée (un test dédié la vérifie).
     limite-lecture-par-minute: 100000
     limite-envoi-par-minute: 100000
+    faire-confiance-proxy: false
   abonnement:
+    devise: cad
     # Pas de passage planifié pendant les tests (le 31 février n'existe pas).
     cron-expiration: "0 0 0 31 2 *"
+  mot-de-passe:
+    url-reinitialisation: http://localhost:4200/reinitialiser-mot-de-passe
 
 # Le super admin de .env.properties n'est pas créé : chaque test crée ses propres comptes.
 SUPER_ADMIN_EMAIL: ""

@@ -33,3 +33,5 @@ databaseChangeLog:
       file: db/changelog/changes/016-messagerie.yaml
   - include:
       file: db/changelog/changes/017-notification-references.yaml
+  - include:
+      file: db/changelog/changes/018-sondage-accueil.yaml

@@ -93,6 +93,21 @@ public class Sondage {
     @Column(name = "reponse_unique", nullable = false)
     private boolean reponseUnique = true;
 
+    // Page d'accueil affichée au répondant avant le questionnaire ; figée à la publication comme le reste.
+    @Column(name = "objet_enquete", columnDefinition = "TEXT")
+    private String objetEnquete;
+
+    @Column(name = "texte_confidentialite", columnDefinition = "TEXT")
+    private String texteConfidentialite;
+
+    /** true : le répondant doit cocher la case de consentement pour envoyer ses réponses. */
+    @Column(name = "consentement_requis", nullable = false)
+    private boolean consentementRequis;
+
+    /** Texte de la case de consentement ; obligatoire si consentementRequis. */
+    @Column(name = "texte_consentement", columnDefinition = "TEXT")
+    private String texteConsentement;
+
     @OneToMany(mappedBy = "sondage", cascade = CascadeType.ALL, orphanRemoval = true)
     @OrderBy("ordre ASC")
     private List<Section> sections = new ArrayList<>();
@@ -249,5 +264,37 @@ public class Sondage {
 
     public List<Section> getSections() {
         return sections;
+    }
+
+    public String getObjetEnquete() {
+        return objetEnquete;
+    }
+
+    public void setObjetEnquete(String objetEnquete) {
+        this.objetEnquete = objetEnquete;
+    }
+
+    public String getTexteConfidentialite() {
+        return texteConfidentialite;
+    }
+
+    public void setTexteConfidentialite(String texteConfidentialite) {
+        this.texteConfidentialite = texteConfidentialite;
+    }
+
+    public boolean isConsentementRequis() {
+        return consentementRequis;
+    }
+
+    public void setConsentementRequis(boolean consentementRequis) {
+        this.consentementRequis = consentementRequis;
+    }
+
+    public String getTexteConsentement() {
+        return texteConsentement;
+    }
+
+    public void setTexteConsentement(String texteConsentement) {
+        this.texteConsentement = texteConsentement;
     }
 }

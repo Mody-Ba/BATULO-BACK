@@ -18,6 +18,26 @@ public record SondageRequest(
         @Schema(description = "true (défaut) : une seule réponse par appareil (sondage en ligne) ; false : collecte "
                 + "terrain, plusieurs réponses depuis le même appareil. Modifiable dans le brouillon, figé à la publication.",
                 example = "true")
-        Boolean reponseUnique
+        Boolean reponseUnique,
+
+        // Page d'accueil : absent (null) = inchangé ; "" efface le texte.
+        @Size(max = 5000, message = "l'objet de l'enquête ne doit pas dépasser 5000 caractères")
+        @Schema(description = "Page d'accueil : objet de l'enquête. Absent : inchangé ; \"\" l'efface.",
+                example = "Mieux connaître les besoins des producteurs de la région.")
+        String objetEnquete,
+
+        @Size(max = 10000, message = "le texte de confidentialité ne doit pas dépasser 10000 caractères")
+        @Schema(description = "Page d'accueil : confidentialité des réponses. Absent : inchangé ; \"\" l'efface.",
+                example = "Vos réponses sont anonymes et ne servent qu'à cette étude.")
+        String texteConfidentialite,
+
+        @Schema(description = "true : le répondant doit cocher la case de consentement. Absent : inchangé.",
+                example = "true")
+        Boolean consentementRequis,
+
+        @Size(max = 2000, message = "le texte de consentement ne doit pas dépasser 2000 caractères")
+        @Schema(description = "Texte de la case, obligatoire si consentementRequis (400 TEXTE_CONSENTEMENT_REQUIS). "
+                + "Absent : inchangé ; \"\" l'efface.", example = "J'accepte de participer à cette enquête.")
+        String texteConsentement
 ) {
 }

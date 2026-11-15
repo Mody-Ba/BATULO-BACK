@@ -75,8 +75,19 @@ public class CollecteServiceImpl implements CollecteService {
     @Override
     @Transactional
     public Instant soumettre(String jetonPublic, SoumissionModel soumission) {
-        Sondage version = versionOuverte(jetonPublic, Instant.now());
+        Instant maintenant = Instant.now();
+        Sondage version = versionOuverte(jetonPublic, maintenant);
         Sondage racine = version.getRacine();
+
+        // Consentement exigé par la version ouverte : la case doit être cochée à chaque envoi.
+        Instant dateConsentement = null;
+        if (version.isConsentementRequis()) {
+            if (!Boolean.TRUE.equals(soumission.consentement())) {
+                throw new RegleGestionException("CONSENTEMENT_REQUIS",
+                        "Cochez la case de consentement pour envoyer vos réponses.");
+            }
+            dateConsentement = maintenant;
+        }
 
         String jetonRepondantHash = null;
         if (version.isReponseUnique()) {
@@ -96,6 +107,7 @@ public class CollecteServiceImpl implements CollecteService {
         reponse.setSondage(version);
         reponse.setLignee(racine);
         reponse.setJetonRepondantHash(jetonRepondantHash);
+        reponse.setDateConsentement(dateConsentement);
         for (ReponseQuestion ligne : lignes) {
             ligne.setReponse(reponse);
             reponse.getValeurs().add(ligne);

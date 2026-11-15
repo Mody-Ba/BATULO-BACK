@@ -43,6 +43,10 @@ public class Reponse {
     @Column(name = "jeton_repondant_hash", length = 64)
     private String jetonRepondantHash;
 
+    /** Heure (serveur) du consentement, si la version l'exigeait ; null sinon. */
+    @Column(name = "date_consentement")
+    private Instant dateConsentement;
+
     @OneToMany(mappedBy = "reponse", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<ReponseQuestion> valeurs = new ArrayList<>();
 
@@ -95,5 +99,13 @@ public class Reponse {
 
     public List<ReponseQuestion> getValeurs() {
         return valeurs;
+    }
+
+    public Instant getDateConsentement() {
+        return dateConsentement;
+    }
+
+    public void setDateConsentement(Instant dateConsentement) {
+        this.dateConsentement = dateConsentement;
     }
 }

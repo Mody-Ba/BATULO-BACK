@@ -11,6 +11,8 @@ public record ReponseResponse(
         /** Numéro de cette version dans la lignée. */
         int version,
         Instant dateSoumission,
+        /** Heure du consentement (case cochée), si la version l'exigeait ; null sinon. */
+        Instant dateConsentement,
         List<ValeurReponseResponse> valeurs
 ) {
 }

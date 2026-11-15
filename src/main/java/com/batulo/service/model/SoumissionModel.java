@@ -6,6 +6,8 @@ import java.util.List;
 
 public record SoumissionModel(
         String jetonRepondant,
+        /** Case de consentement cochée (null : non envoyée). */
+        Boolean consentement,
         List<ValeurSoumise> reponses
 ) {
     public record ValeurSoumise(Long questionId, JsonNode valeur) {

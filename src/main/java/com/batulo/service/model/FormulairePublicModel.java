@@ -14,6 +14,14 @@ public record FormulairePublicModel(
         boolean reponseUnique,
         /** Fermeture prévue ; null si aucune. */
         Instant dateFermeture,
+        /** Page d'accueil : objet de l'enquête ; null si aucun. */
+        String objetEnquete,
+        /** Page d'accueil : texte sur la confidentialité des réponses ; null si aucun. */
+        String texteConfidentialite,
+        /** true : le répondant doit cocher la case de consentement pour envoyer ses réponses. */
+        boolean consentementRequis,
+        /** Texte de la case de consentement (renseigné si consentementRequis). */
+        String texteConsentement,
         List<SectionModel> sections,
         /** reponseUnique : cet appareil (jeton X-Jeton-Repondant) a déjà répondu sur la lignée ; null sinon. */
         Boolean dejaRepondu

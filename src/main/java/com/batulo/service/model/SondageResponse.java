@@ -23,6 +23,14 @@ public record SondageResponse(
         boolean estModele,
         /** true : une seule réponse par appareil ; false : collecte terrain. */
         boolean reponseUnique,
+        /** Page d'accueil : objet de l'enquête ; null si aucun. */
+        String objetEnquete,
+        /** Page d'accueil : texte sur la confidentialité des réponses ; null si aucun. */
+        String texteConfidentialite,
+        /** true : le répondant doit cocher la case de consentement pour envoyer ses réponses. */
+        boolean consentementRequis,
+        /** Texte de la case de consentement (renseigné si consentementRequis). */
+        String texteConsentement,
         AuteurResponse creePar,
         Instant dateCreation,
         Instant dateModification,

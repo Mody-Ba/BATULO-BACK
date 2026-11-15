@@ -1,0 +1,30 @@
+databaseChangeLog:
+  # Page d'accueil configurable par sondage (objet, confidentialité, consentement) et date du consentement d'une
+  # réponse. Les sondages existants restent sans consentement requis.
+
+  - changeSet:
+      id: 018-sondage-page-accueil
+      author: batulo
+      changes:
+        - addColumn:
+            tableName: sondage
+            columns:
+              - column: { name: objet_enquete, type: TEXT }
+              - column: { name: texte_confidentialite, type: TEXT }
+              - column:
+                  name: consentement_requis
+                  type: BOOLEAN
+                  defaultValueBoolean: false
+                  constraints: { nullable: false }
+              # Obligatoire si consentement_requis (contrôlé par le serveur à la modification du brouillon).
+              - column: { name: texte_consentement, type: TEXT }
+
+  - changeSet:
+      id: 018-reponse-date-consentement
+      author: batulo
+      changes:
+        # Heure du serveur à l'envoi, si la version exigeait le consentement ; null sinon.
+        - addColumn:
+            tableName: reponse
+            columns:
+              - column: { name: date_consentement, type: TIMESTAMP WITH TIME ZONE }

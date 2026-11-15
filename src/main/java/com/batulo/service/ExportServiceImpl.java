@@ -102,6 +102,12 @@ public class ExportServiceImpl implements ExportService {
 
         // Tout ce dont l'écriture a besoin est copié ici, dans la transaction : aucune entité n'en sort.
         List<String> entetes = new ArrayList<>(List.of("Id", "Date", "Version"));
+        // Colonne présente seulement si l'une des versions exportées exige le consentement : les exports des
+        // autres sondages gardent leurs colonnes (scripts Python/R).
+        boolean avecConsentement = perimetre.versions().stream().anyMatch(Sondage::isConsentementRequis);
+        if (avecConsentement) {
+            entetes.add("Consentement");
+        }
         List<Colonne> colonnes = new ArrayList<>();
         Set<Long> questions = new LinkedHashSet<>();
         for (Map.Entry<String, Reference> e : perimetre.references().entrySet()) {
@@ -134,7 +140,7 @@ public class ExportServiceImpl implements ExportService {
             try (EcrivainTableau ecrivain = format == FormatExport.CSV
                     ? new EcrivainCsv(flux, separateurDecimal) : new EcrivainXlsx(flux, "Réponses")) {
                 ecrivain.entetes(entetesUniques);
-                Assembleur assembleur = new Assembleur(colonnes, valeurs, fuseau, ecrivain);
+                Assembleur assembleur = new Assembleur(colonnes, avecConsentement, valeurs, fuseau, ecrivain);
                 lectureSeule.executeWithoutResult(statut ->
                         exportRepository.parcourir(filtre, questions, assembleur::ajouter));
                 assembleur.terminer();
@@ -152,18 +158,22 @@ public class ExportServiceImpl implements ExportService {
     private final class Assembleur {
 
         private final List<Colonne> colonnes;
+        private final boolean avecConsentement;
         private final ValeursExport valeurs;
         private final ZoneId fuseau;
         private final EcrivainTableau ecrivain;
         private Long reponseId;
         private Instant date;
+        private Instant dateConsentement;
         private int version;
         private final Map<String, List<LigneBrute>> parCle = new HashMap<>();
         private final Map<String, JsonNode> jsonParCle = new HashMap<>();
         private long lignes;
 
-        Assembleur(List<Colonne> colonnes, ValeursExport valeurs, ZoneId fuseau, EcrivainTableau ecrivain) {
+        Assembleur(List<Colonne> colonnes, boolean avecConsentement, ValeursExport valeurs, ZoneId fuseau,
+                   EcrivainTableau ecrivain) {
             this.colonnes = colonnes;
+            this.avecConsentement = avecConsentement;
             this.valeurs = valeurs;
             this.fuseau = fuseau;
             this.ecrivain = ecrivain;
@@ -175,6 +185,7 @@ public class ExportServiceImpl implements ExportService {
             }
             reponseId = ligne.reponseId();
             date = ligne.dateSoumission();
+            dateConsentement = ligne.dateConsentement();
             version = ligne.version();
             if (ligne.cle() != null) {
                 parCle.computeIfAbsent(ligne.cle(), c -> new ArrayList<>()).add(ligne);
@@ -188,10 +199,14 @@ public class ExportServiceImpl implements ExportService {
         }
 
         private void ecrire() {
-            List<Object> cellules = new ArrayList<>(colonnes.size() + 3);
+            List<Object> cellules = new ArrayList<>(colonnes.size() + 4);
             cellules.add(reponseId);
             cellules.add(LocalDateTime.ofInstant(date, fuseau));
             cellules.add(version);
+            if (avecConsentement) {
+                // Vide pour une réponse d'une version qui n'exigeait pas le consentement.
+                cellules.add(dateConsentement == null ? null : LocalDateTime.ofInstant(dateConsentement, fuseau));
+            }
             for (Colonne colonne : colonnes) {
                 cellules.add(valeur(colonne, parCle.getOrDefault(colonne.cle(), List.of())));
             }
