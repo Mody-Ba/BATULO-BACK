@@ -1,0 +1,28 @@
+databaseChangeLog:
+  # Paiement mobile Moosyl (Bankily, Sedad, Masrivi...) à côté de Stripe. Les paiements existants restent STRIPE.
+
+  - changeSet:
+      id: 019-paiement-fournisseur-et-reference
+      author: batulo
+      changes:
+        - addColumn:
+            tableName: paiement
+            columns:
+              - column:
+                  name: fournisseur
+                  type: VARCHAR(20)
+                  defaultValue: STRIPE
+                  constraints: { nullable: false }
+              # Référence Batulo (UUID) envoyée à Moosyl comme transactionId ; null pour Stripe.
+              - column: { name: reference, type: VARCHAR(64) }
+              # Id de la session de paiement Moosyl (relecture du statut).
+              - column: { name: session_externe_id, type: VARCHAR(100) }
+        - addUniqueConstraint:
+            tableName: paiement
+            columnNames: reference
+            constraintName: uk_paiement_reference
+        # Un paiement Moosyl n'a pas de PaymentIntent Stripe (l'unicité reste pour les paiements Stripe).
+        - dropNotNullConstraint:
+            tableName: paiement
+            columnName: stripe_payment_intent_id
+            columnDataType: VARCHAR(255)

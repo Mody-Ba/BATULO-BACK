@@ -41,6 +41,14 @@ batulo:
     devise: cad
     # Pas de passage planifié pendant les tests (le 31 février n'existe pas).
     cron-expiration: "0 0 0 31 2 *"
+  moosyl:
+    url-base: http://localhost:1
+    cle-api: cle-moosyl-de-test
+    secret-webhook: secret-webhook-moosyl-de-test
+    url-retour: http://localhost:4200/admin/abonnement/paiement-mobile
+    prix-mensuel-mru: 40
+    prix-annuel-mru: 80
+    expiration-minutes: 30
   mot-de-passe:
     url-reinitialisation: http://localhost:4200/reinitialiser-mot-de-passe
 

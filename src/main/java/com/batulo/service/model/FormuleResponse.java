@@ -14,6 +14,10 @@ public record FormuleResponse(
         @Schema(example = "CAD")
         String devise,
         @Schema(example = "1 mois")
-        String duree
+        String duree,
+        @Schema(description = "Prix en paiement mobile (Moosyl : Bankily, Sedad, Masrivi...)", example = "40")
+        BigDecimal prixMobile,
+        @Schema(example = "MRU")
+        String deviseMobile
 ) {
 }

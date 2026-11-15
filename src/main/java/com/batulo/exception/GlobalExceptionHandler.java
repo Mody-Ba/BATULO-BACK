@@ -92,6 +92,16 @@ public class GlobalExceptionHandler {
         return reponse(HttpStatus.BAD_GATEWAY, StripeIndisponibleException.CODE, ex.getMessage());
     }
 
+    @ExceptionHandler(MoosylNonConfigureException.class)
+    public ResponseEntity<ErrorResponse> handleMoosylNonConfigure(MoosylNonConfigureException ex) {
+        return reponse(HttpStatus.SERVICE_UNAVAILABLE, MoosylNonConfigureException.CODE, ex.getMessage());
+    }
+
+    @ExceptionHandler(MoosylIndisponibleException.class)
+    public ResponseEntity<ErrorResponse> handleMoosylIndisponible(MoosylIndisponibleException ex) {
+        return reponse(HttpStatus.BAD_GATEWAY, MoosylIndisponibleException.CODE, ex.getMessage());
+    }
+
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ErrorResponse> handleValidation(MethodArgumentNotValidException ex) {
         // Seuls le champ et le message de la contrainte sont renvoyés, jamais la valeur rejetée

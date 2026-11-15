@@ -3,15 +3,11 @@ package com.batulo.service;
 import com.batulo.entity.Abonnement;
 import com.batulo.entity.Paiement;
 import com.batulo.enums.Formule;
-import com.batulo.enums.Role;
 import com.batulo.enums.StatutPaiement;
-import com.batulo.enums.TypeNotification;
 import com.batulo.exception.RegleGestionException;
 import com.batulo.exception.ResourceNotFoundException;
 import com.batulo.repository.AbonnementRepository;
 import com.batulo.repository.PaiementRepository;
-import com.batulo.repository.UtilisateurRepository;
-import com.batulo.service.email.EmailService;
 import com.batulo.service.mappers.AbonnementMapper;
 import com.batulo.service.model.AbonnementModel;
 import com.batulo.service.model.ConfirmationPaiementModel;
@@ -57,10 +53,7 @@ public class AbonnementServiceImpl implements AbonnementService {
     private final PaiementRepository paiementRepository;
     private final AbonnementMapper abonnementMapper;
     private final PaiementService paiementService;
-    private final UtilisateurRepository utilisateurRepository;
-    private final NotificationService notificationService;
-    private final EmailService emailService;
-    private final FormatDate formatDate;
+    private final ActivationPaiement activationPaiement;
 
     @Value("${batulo.abonnement.devise}")
     private String devise;
@@ -74,29 +67,30 @@ public class AbonnementServiceImpl implements AbonnementService {
     @Value("${batulo.abonnement.jours-alerte-expiration}")
     private int joursAlerte;
 
+    @Value("${batulo.moosyl.prix-mensuel-mru}")
+    private long prixMensuelMru;
+
+    @Value("${batulo.moosyl.prix-annuel-mru}")
+    private long prixAnnuelMru;
+
     public AbonnementServiceImpl(AbonnementRepository abonnementRepository,
                                  PaiementRepository paiementRepository,
                                  AbonnementMapper abonnementMapper,
                                  PaiementService paiementService,
-                                 UtilisateurRepository utilisateurRepository,
-                                 NotificationService notificationService,
-                                 EmailService emailService,
-                                 FormatDate formatDate) {
+                                 ActivationPaiement activationPaiement) {
         this.abonnementRepository = abonnementRepository;
         this.paiementRepository = paiementRepository;
         this.abonnementMapper = abonnementMapper;
         this.paiementService = paiementService;
-        this.utilisateurRepository = utilisateurRepository;
-        this.notificationService = notificationService;
-        this.emailService = emailService;
-        this.formatDate = formatDate;
+        this.activationPaiement = activationPaiement;
     }
 
     @Override
     public List<FormuleModel> formules() {
         return Arrays.stream(Formule.values())
                 .map(formule -> new FormuleModel(formule, libelle(formule), montant(prixCentimes(formule)),
-                        deviseAffichee(), duree(formule)))
+                        deviseAffichee(), duree(formule), BigDecimal.valueOf(prixMobileMru(formule)),
+                        PaiementMobileServiceImpl.DEVISE))
                 .toList();
     }
 
@@ -176,41 +170,8 @@ public class AbonnementServiceImpl implements AbonnementService {
                             + "L'abonnement n'est pas modifié.");
         }
 
-        // Renouvellement : l'entreprise avait déjà payé une période (en cours ou expirée).
-        boolean renouvellement = abonnement.getDateExpiration() != null;
-        Instant debut = RegleAbonnement.debutNouvellePeriode(abonnement, maintenant);
-        if (debut.equals(maintenant)) {
-            abonnement.setDateDebut(maintenant);
-        }
-        abonnement.setDateExpiration(RegleAbonnement.ajouterDuree(paiement.getFormule(), debut));
-        abonnement.setFormule(paiement.getFormule());
-        abonnement.setMontant(paiement.getMontant());
-        abonnement.setDevise(paiement.getDevise());
-        abonnement.setNotif7jEnvoyee(false);
-        abonnement.setNotifExpirationEnvoyee(false);
-        abonnement.setStatut(RegleAbonnement.statutEffectif(abonnement, maintenant, joursAlerte));
-
-        paiement.setStatut(StatutPaiement.REUSSI);
-        paiement.setDatePaiement(maintenant);
-
-        avertirPaiement(abonnement, paiement, renouvellement);
-        log.info("Paiement {} confirmé : abonnement {} {} jusqu'au {}",
-                paymentIntentId, abonnement.getId(), abonnement.getStatut(), abonnement.getDateExpiration());
+        activationPaiement.activer(paiement, maintenant, "confirmation Stripe " + paymentIntentId);
         return new PaiementConfirmeModel(versModele(abonnement, maintenant), false);
-    }
-
-    /** Courriel de confirmation à l'admin et notification aux super admins (envoyés après validation). */
-    private void avertirPaiement(Abonnement abonnement, Paiement paiement, boolean renouvellement) {
-        String entreprise = abonnement.getEntreprise().getNom();
-        notificationService.notifierSuperAdmins(TypeNotification.PAIEMENT_RECU, "Paiement reçu",
-                entreprise + " a payé " + paiement.getMontant().toPlainString() + " " + paiement.getDevise()
-                        + " (formule " + paiement.getFormule() + (renouvellement ? ", renouvellement" : "")
-                        + "). Abonnement valable jusqu'au " + formatDate.jour(abonnement.getDateExpiration()) + ".",
-                abonnement.getId(), null);
-        utilisateurRepository.findFirstByEntrepriseIdAndRole(abonnement.getEntreprise().getId(), Role.ADMIN)
-                .ifPresent(admin -> emailService.envoyerConfirmationPaiement(admin.getCourriel(), admin.getPrenom(),
-                        paiement.getFormule(), paiement.getMontant(), paiement.getDevise(),
-                        abonnement.getDateExpiration(), renouvellement));
     }
 
     /** Le PaymentIntent doit être celui créé pour cette entreprise, avec le montant et la devise attendus. */
@@ -243,6 +204,13 @@ public class AbonnementServiceImpl implements AbonnementService {
         return switch (formule) {
             case MENSUEL -> prixMensuelCentimes;
             case ANNUEL -> prixAnnuelCentimes;
+        };
+    }
+
+    private long prixMobileMru(Formule formule) {
+        return switch (formule) {
+            case MENSUEL -> prixMensuelMru;
+            case ANNUEL -> prixAnnuelMru;
         };
     }
 
