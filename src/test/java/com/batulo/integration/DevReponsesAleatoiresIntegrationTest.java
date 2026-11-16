@@ -68,6 +68,49 @@ class DevReponsesAleatoiresIntegrationTest extends PostgresIntegrationTestBase {
         }
     }
 
+    @Test
+    void respecteLesConditionsDAffichage() throws Exception {
+        adminActif("awa@test.com");
+        String jeton = jeton("awa@test.com");
+        long id = lire(postAvec(jeton, "/api/sondages", Map.of("titre", "Ménages"))).get("id").asLong();
+        long s1 = lire(postAvec(jeton, "/api/sondages/" + id + "/sections", Map.of("titre", "Famille")))
+                .at("/sections/0/id").asLong();
+        long s2 = lire(postAvec(jeton, "/api/sondages/" + id + "/sections", Map.of("titre", "Enfants")))
+                .at("/sections/1/id").asLong();
+        postAvec(jeton, "/api/sondages/" + id + "/sections/" + s1 + "/questions",
+                StatistiqueIntegrationTest.q("Enfants ?", "OUI_NON", true, null)).andExpect(status().isCreated());
+        postAvec(jeton, "/api/sondages/" + id + "/sections/" + s1 + "/questions",
+                StatistiqueIntegrationTest.q("Combien ?", "NUMERIQUE", true, Map.of("min", 1, "max", 9)))
+                .andExpect(status().isCreated());
+        JsonNode sondage = lire(postAvec(jeton, "/api/sondages/" + id + "/sections/" + s2 + "/questions",
+                StatistiqueIntegrationTest.q("École", "OUI_NON", true, null)));
+        long enfants = sondage.at("/sections/0/questions/0/id").asLong();
+        long combien = sondage.at("/sections/0/questions/1/id").asLong();
+        long ecole = sondage.at("/sections/1/questions/0/id").asLong();
+        Map<String, Object> siEnfants = Map.of("regles", List.of(Map.of("questionId", enfants, "operateur", "EGAL",
+                "valeur", true)));
+        putAvec(jeton, "/api/sondages/" + id + "/questions/" + combien + "/condition", siEnfants)
+                .andExpect(status().isOk());
+        putAvec(jeton, "/api/sondages/" + id + "/sections/" + s2 + "/condition", siEnfants).andExpect(status().isOk());
+        postAvec(jeton, "/api/sondages/" + id + "/publier", Map.of()).andExpect(status().isOk());
+
+        postAvec(jeton, "/api/dev/sondages/" + id + "/reponses-aleatoires?nombre=60", Map.of())
+                .andExpect(status().isCreated());
+
+        long oui = jdbcTemplate.queryForObject("select count(*) from reponse_question where question_id = ? "
+                + "and valeur_booleenne = true", Long.class, enfants);
+        // Masquées quand Enfants = Non : jamais de réponse, toujours enregistrées comme masquées.
+        for (long cible : List.of(combien, ecole)) {
+            assertThat(jdbcTemplate.queryForObject("select count(*) from reponse_question where question_id = ?",
+                    Long.class, cible)).isEqualTo(oui);
+            assertThat(jdbcTemplate.queryForObject("select count(*) from reponse_question_masquee where question_id = ?",
+                    Long.class, cible)).isEqualTo(60 - oui);
+        }
+        JsonNode stats = lire(getAvec(jeton, "/api/sondages/" + id + "/statistiques").andExpect(status().isOk()));
+        assertThat(stats.at("/questions/1/vues").asLong()).isEqualTo(oui);
+        assertThat(stats.at("/questions/1/sansReponse").asLong()).isZero();
+    }
+
     private JsonNode lire(ResultActions resultat) throws Exception {
         return objectMapper.readTree(resultat.andReturn().getResponse().getContentAsString());
     }

@@ -1,7 +1,9 @@
 package com.batulo.entity;
 
 import jakarta.persistence.CascadeType;
+import jakarta.persistence.CollectionTable;
 import jakarta.persistence.Column;
+import jakarta.persistence.ElementCollection;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
@@ -15,7 +17,9 @@ import jakarta.persistence.Table;
 
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 /** Réponse d'un répondant à une version d'un sondage (RE-02). Anonyme : aucune adresse IP n'est conservée. */
 @Entity
@@ -49,6 +53,12 @@ public class Reponse {
 
     @OneToMany(mappedBy = "reponse", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<ReponseQuestion> valeurs = new ArrayList<>();
+
+    /** Questions masquées par une condition d'affichage (ids) : les statistiques en déduisent qui les a vues. */
+    @ElementCollection
+    @CollectionTable(name = "reponse_question_masquee", joinColumns = @JoinColumn(name = "reponse_id"))
+    @Column(name = "question_id", nullable = false)
+    private Set<Long> questionsMasquees = new HashSet<>();
 
     public Reponse() {
     }
@@ -107,5 +117,9 @@ public class Reponse {
 
     public void setDateConsentement(Instant dateConsentement) {
         this.dateConsentement = dateConsentement;
+    }
+
+    public Set<Long> getQuestionsMasquees() {
+        return questionsMasquees;
     }
 }

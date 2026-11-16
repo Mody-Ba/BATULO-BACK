@@ -8,6 +8,8 @@ public record SectionPubliqueResponse(
         String titre,
         String description,
         int ordre,
+        /** Condition d'affichage ; null : toujours affichée. Masquée, la section masque toutes ses questions. */
+        ConditionResponse condition,
         List<QuestionPubliqueResponse> questions
 ) {
 }

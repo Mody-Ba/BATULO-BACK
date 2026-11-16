@@ -123,6 +123,21 @@ public class StatistiqueRepository {
         return resultat;
     }
 
+    /**
+     * Réponses pour lesquelles une condition d'affichage a masqué la question, par clé de question :
+     * « vues » = réponses aux versions qui contiennent la question - masquées.
+     */
+    public Map<String, Long> masquees(Filtre filtre, Collection<Long> questions) {
+        MapSqlParameterSource p = parametres(questions);
+        Map<String, Long> resultat = new HashMap<>();
+        jdbc.query("select q.cle, count(distinct m.reponse_id) from reponse_question_masquee m "
+                + "join reponse r on r.id = m.reponse_id join question q on q.id = m.question_id where "
+                + conditions(filtre, p) + " and m.question_id in (:questions) group by q.cle", p, rs -> {
+            resultat.put(rs.getString(1), rs.getLong(2));
+        });
+        return resultat;
+    }
+
     /** CHOIX_UNIQUE et CHOIX_MULTIPLE : réponses par valeur d'option (identique d'une version à l'autre). */
     public List<Option> options(Filtre filtre, Collection<Long> questions) {
         MapSqlParameterSource p = parametres(questions);

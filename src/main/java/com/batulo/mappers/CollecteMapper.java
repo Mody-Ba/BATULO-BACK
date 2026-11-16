@@ -31,6 +31,13 @@ import java.time.Instant;
 @Component("apiCollecteMapper")
 public class CollecteMapper {
 
+    /** Conversion des conditions d'affichage, la même que pour l'éditeur et l'aperçu. */
+    private final SondageMapper sondageMapper;
+
+    public CollecteMapper(SondageMapper sondageMapper) {
+        this.sondageMapper = sondageMapper;
+    }
+
     public SoumissionModel toModel(SoumissionRequest req) {
         return new SoumissionModel(req.jetonRepondant(), req.consentement(), req.reponses().stream()
                 .map(r -> new SoumissionModel.ValeurSoumise(r.questionId(), r.valeur()))
@@ -72,13 +79,14 @@ public class CollecteMapper {
 
     private SectionPubliqueResponse toResponse(SectionModel model) {
         return new SectionPubliqueResponse(model.id(), model.titre(), model.description(), model.ordre(),
-                model.questions().stream().map(this::toResponse).toList());
+                sondageMapper.toResponse(model.condition()), model.questions().stream().map(this::toResponse).toList());
     }
 
     /** Réglages d'analyse internes (critère, découpage) : jamais montrés au répondant. */
     private QuestionPubliqueResponse toResponse(QuestionModel model) {
         return new QuestionPubliqueResponse(model.id(), model.libelle(), model.aide(), model.type(), model.obligatoire(),
-                model.ordre(), model.configuration(), model.options().stream().map(this::toResponse).toList());
+                model.ordre(), model.configuration(), model.options().stream().map(this::toResponse).toList(),
+                sondageMapper.toResponse(model.condition()));
     }
 
     private OptionPubliqueResponse toResponse(OptionModel model) {

@@ -150,9 +150,30 @@ Plateforme SaaS de sondages (Spring Boot 3.5, Java 21, PostgreSQL 16, Liquibase)
   qu'il est EN_ATTENTE, hors transaction. Toute activation (Stripe compris) passe par `ActivationPaiement`, sous
   verrou du paiement : un paiement déjà REUSSI ne prolonge jamais deux fois. Route de dev POST
   /api/dev/paiements/moosyl/webhook : webhook signé envoyé en HTTP au backend local (tests sans tunnel).
+- Questions conditionnelles (phase 4, étape 1) : une question ou une section a une condition d'affichage facultative
+  (`condition_affichage`, JSONB : `{combinaison ET|OU, regles: [{question: cle, operateur, valeur}]}`) ; section
+  masquée = toutes ses questions masquées. L'API désigne la source par `questionId` (requête et réponses ; le
+  formulaire public n'expose jamais la clé), la base par sa `cle` : les copies (versions, duplications,
+  réutilisations) recopient le JSON tel quel et les références suivent. Opérateurs par type de source
+  (`OperateurCondition.permis`) : CHOIX_UNIQUE EGAL/DIFFERENT/PARMI ; CHOIX_MULTIPLE CONTIENT/PARMI (au moins une) ;
+  OUI_NON EGAL/DIFFERENT ; NUMERIQUE, ECHELLE, DATE EGAL/DIFFERENT/SUPERIEUR/INFERIEUR (stricts)/ENTRE [min, max]
+  (bornes comprises) ; tous REPONDUE/NON_REPONDUE. Valeurs d'options par leur valeur, jamais le libellé. Source sans
+  réponse ou masquée : seule NON_REPONDUE est vraie (DIFFERENT compris). Routes PUT/DELETE
+  .../questions/{id}/condition et .../sections/{id}/condition, brouillon seulement (gelées à la publication) ; 1 à 10
+  règles. Source placée AVANT (section précédente, ou plus haut dans la même section ; section : section précédente),
+  ce qui exclut les cycles. `ValidateurConditions` : 400 CONDITION_INVALIDE en posant la condition ; 409
+  CONDITION_DEPENDANTE (refus, jamais de retrait automatique) si une suppression (question, section), une
+  réorganisation, un déplacement, un changement de type ou le retrait d'une option casserait une condition ;
+  revérifié à la publication. `EvaluateurConditions` (classe pure, seul évaluateur) parcourt le formulaire dans
+  l'ordre : à l'envoi, `ValidateurReponse` recalcule la visibilité (jamais confiance au front), n'exige une question
+  obligatoire que visible, ignore (sans la valider) la réponse d'une question masquée ; la route de dev respecte les
+  conditions. Pas de brouillon ni de reprise de réponse aujourd'hui : l'évaluateur est prévu pour. Les questions
+  masquées d'une réponse vont dans `reponse_question_masquee` : statistiques `vues` = réponses aux versions de la
+  question - masquées (SQL), `sansReponse` = vues - répondants, `conditionnelle` ; « Vue par » dans les rapports PDF
+  et XLSX ; cellule vide dans les exports bruts. Anciennes réponses : aucune ligne masquée, donc toutes « vues ».
 
 ## À traiter dans les étapes suivantes
-- Phase 4 : invitations nominatives (l'unicité par appareil se contourne en vidant le navigateur ou en changeant
+- Phase 4 : brouillon et reprise d'une réponse (réutiliser `EvaluateurConditions.Parcours`) ; invitations nominatives (l'unicité par appareil se contourne en vidant le navigateur ou en changeant
   d'appareil : limite acceptée pour la phase 2) ; diffusion courriel, SMS, WhatsApp, intégration web, campagnes.
 - Si l'application tourne un jour sur plusieurs instances : limite de requêtes partagée (Redis ou Bucket4j).
 - Module 4.4, plus tard : logo et identité visuelle dans les rapports, comparaison de plusieurs sondages (la clé de

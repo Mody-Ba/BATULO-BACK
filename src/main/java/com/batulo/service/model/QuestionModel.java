@@ -16,6 +16,8 @@ public record QuestionModel(
         List<OptionModel> options,
         boolean estCritere,
         /** Null si ce n'est pas un critère, ou s'il n'a pas de découpage. */
-        JsonNode critereConfig
+        JsonNode critereConfig,
+        /** Condition d'affichage ; null : toujours affichée (si sa section l'est). */
+        ConditionModel condition
 ) {
 }

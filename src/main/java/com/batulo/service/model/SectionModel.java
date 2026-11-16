@@ -7,6 +7,8 @@ public record SectionModel(
         String titre,
         String description,
         int ordre,
+        /** Condition d'affichage ; null : toujours affichée. */
+        ConditionModel condition,
         List<QuestionModel> questions
 ) {
 }

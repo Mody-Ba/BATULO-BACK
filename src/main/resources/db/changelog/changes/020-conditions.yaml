@@ -1,0 +1,54 @@
+databaseChangeLog:
+  # Phase 4, étape 1 : questions conditionnelles (logique d'affichage).
+  # Condition : {"combinaison": "ET"|"OU", "regles": [{"question": "<cle>", "operateur": "EGAL", "valeur": ...}]}.
+  # La source est désignée par sa clé stable (question.cle) : les copies et les versions gardent leurs références.
+  - property: { name: type.json, value: JSONB, dbms: postgresql }
+  - property: { name: type.json, value: JSON, dbms: h2 }
+
+  - changeSet:
+      id: 020-conditions-affichage
+      author: batulo
+      changes:
+        - addColumn:
+            tableName: question
+            columns:
+              - column: { name: condition_affichage, type: "${type.json}" }
+        - addColumn:
+            tableName: section
+            columns:
+              # Section masquée : toutes ses questions le sont.
+              - column: { name: condition_affichage, type: "${type.json}" }
+
+  - changeSet:
+      id: 020-creer-table-reponse-question-masquee
+      author: batulo
+      changes:
+        # Questions masquées par une condition pour une réponse : « vues » = réponses - masquées (statistiques en SQL).
+        - createTable:
+            tableName: reponse_question_masquee
+            columns:
+              - column:
+                  name: reponse_id
+                  type: BIGINT
+                  constraints:
+                    nullable: false
+                    primaryKey: true
+                    primaryKeyName: pk_reponse_question_masquee
+                    foreignKeyName: fk_reponse_masquee_reponse
+                    references: reponse(id)
+                    deleteCascade: true
+              - column:
+                  name: question_id
+                  type: BIGINT
+                  constraints:
+                    nullable: false
+                    primaryKey: true
+                    primaryKeyName: pk_reponse_question_masquee
+                    foreignKeyName: fk_reponse_masquee_question
+                    references: question(id)
+                    deleteCascade: true
+        - createIndex:
+            tableName: reponse_question_masquee
+            indexName: idx_reponse_masquee_question
+            columns:
+              - column: { name: question_id }

@@ -3,6 +3,7 @@ package com.batulo.service;
 import com.batulo.enums.StatutSondage;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.batulo.service.model.ApercuModel;
+import com.batulo.service.model.ConditionModel;
 import com.batulo.service.model.CreationSondageModel;
 import com.batulo.service.model.DatesSondageModel;
 import com.batulo.service.model.FormulaireModel;
@@ -95,6 +96,17 @@ public interface SondageService {
      */
     SondageModel definirCritere(Long utilisateurId, Long sondageId, Long questionId, boolean estCritere,
                                 JsonNode critereConfig);
+
+    /**
+     * Pose, remplace ou retire (condition null) la condition d'affichage d'une question. Brouillon seulement.
+     *
+     * @throws com.batulo.exception.RegleGestionException CONDITION_INVALIDE (source placée après, opérateur ou valeur
+     *                                                    incohérents)
+     */
+    SondageModel definirConditionQuestion(Long utilisateurId, Long sondageId, Long questionId, ConditionModel condition);
+
+    /** Comme {@link #definirConditionQuestion}, pour une section : ses sources sont dans les sections précédentes. */
+    SondageModel definirConditionSection(Long utilisateurId, Long sondageId, Long sectionId, ConditionModel condition);
 
     /** Supprime la question, puis renumérote les questions de sa section. */
     SondageModel supprimerQuestion(Long utilisateurId, Long sondageId, Long questionId);

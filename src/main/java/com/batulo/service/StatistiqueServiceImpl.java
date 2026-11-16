@@ -91,8 +91,11 @@ public class StatistiqueServiceImpl implements StatistiqueService {
                 idsParType.computeIfAbsent(r.question.getType(), t -> new LinkedHashSet<>()).addAll(r.ids));
 
         Calculs calculs = new Calculs(filtre, idsParType, references, granulariteDate);
+        Set<Long> toutes = idsParType.values().stream().flatMap(Set::stream).collect(Collectors.toSet());
+        Map<String, Long> masquees = toutes.isEmpty() ? Map.of() : statistiqueRepository.masquees(filtre, toutes);
         List<QuestionStat> questions = references.entrySet().stream()
-                .map(e -> calculs.question(e.getKey(), e.getValue(), sansReponseBase(e.getValue(), reponsesParVersion)))
+                .map(e -> calculs.question(e.getKey(), e.getValue(), sansReponseBase(e.getValue(), reponsesParVersion),
+                        masquees.getOrDefault(e.getKey(), 0L)))
                 .toList();
 
         return new StatistiquesModel(sondage.getId(), sondage.getTitre(), lignee,
@@ -237,7 +240,7 @@ public class StatistiqueServiceImpl implements StatistiqueService {
         return nombre < effectifMinimum;
     }
 
-    /** Réponses aux versions qui contiennent la question : base de « sansReponse ». */
+    /** Réponses aux versions qui contiennent la question : base de « vues » et de « sansReponse ». */
     private static long sansReponseBase(Reference reference, Map<Long, Long> reponsesParVersion) {
         return reference.versions.stream().mapToLong(v -> reponsesParVersion.getOrDefault(v, 0L)).sum();
     }
@@ -296,9 +299,13 @@ public class StatistiqueServiceImpl implements StatistiqueService {
                     i -> statistiqueRepository.premiersTextes(filtre, i, TEXTES_PAR_PAGE)), StatistiqueRepository.Texte::cle);
         }
 
-        QuestionStat question(String cle, Reference reference, long reponsesAuxVersions) {
+        /** @param masquees réponses pour lesquelles une condition d'affichage a masqué la question */
+        QuestionStat question(String cle, Reference reference, long reponsesAuxVersions, long masquees) {
             Question question = reference.question;
             long nombre = repondants.getOrDefault(cle, 0L);
+            long vues = Math.max(0, reponsesAuxVersions - masquees);
+            boolean conditionnelle = masquees > 0 || question.getCondition() != null
+                    || question.getSection().getCondition() != null;
             List<OptionStat> optionStats = null;
             Numerique numerique = null;
             Dates dates = null;
@@ -317,7 +324,7 @@ public class StatistiqueServiceImpl implements StatistiqueService {
                         0, TEXTES_PAR_PAGE, nombre, (int) ((nombre + TEXTES_PAR_PAGE - 1) / TEXTES_PAR_PAGE));
             }
             return new QuestionStat(question.getId(), cle, reference.section, question.getLibelle(), question.getType(),
-                    nombre, Math.max(0, reponsesAuxVersions - nombre), petit(nombre), optionStats, numerique, dates,
+                    nombre, Math.max(0, vues - nombre), conditionnelle, vues, petit(nombre), optionStats, numerique, dates,
                     classement, matrice, pageTextes);
         }
 

@@ -4,6 +4,7 @@ import com.batulo.entity.OptionQuestion;
 import com.batulo.entity.Question;
 import com.batulo.entity.Section;
 import com.batulo.entity.Sondage;
+import com.fasterxml.jackson.databind.JsonNode;
 
 /**
  * Copie profonde du contenu d'un sondage (sections > questions > options) dans un autre, pour la duplication et
@@ -22,6 +23,9 @@ final class CopieSondage {
             section.setTitre(sectionSource.getTitre());
             section.setDescription(sectionSource.getDescription());
             section.setOrdre(sectionSource.getOrdre());
+            // Conditions : les sources sont désignées par leur clé, recopiée telle quelle, donc les références
+            // suivent les nouvelles questions sans traduction.
+            section.setCondition(copie(sectionSource.getCondition()));
             for (Question questionSource : sectionSource.getQuestions()) {
                 Question question = new Question();
                 question.setSection(section);
@@ -34,8 +38,8 @@ final class CopieSondage {
                 question.setOrdre(questionSource.getOrdre());
                 question.setConfiguration(questionSource.getConfiguration().deepCopy());
                 question.setEstCritere(questionSource.isEstCritere());
-                question.setCritereConfig(questionSource.getCritereConfig() == null ? null
-                        : questionSource.getCritereConfig().deepCopy());
+                question.setCritereConfig(copie(questionSource.getCritereConfig()));
+                question.setCondition(copie(questionSource.getCondition()));
                 for (OptionQuestion optionSource : questionSource.getOptions()) {
                     OptionQuestion option = new OptionQuestion();
                     option.setQuestion(question);
@@ -48,5 +52,9 @@ final class CopieSondage {
             }
             cible.getSections().add(section);
         }
+    }
+
+    private static JsonNode copie(JsonNode json) {
+        return json == null ? null : json.deepCopy();
     }
 }

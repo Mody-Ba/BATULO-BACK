@@ -101,17 +101,18 @@ public class CollecteServiceImpl implements CollecteService {
         List<Question> questions = version.getSections().stream()
                 .flatMap(section -> section.getQuestions().stream())
                 .toList();
-        List<ReponseQuestion> lignes = validateurReponse.valider(questions, soumission.reponses());
+        ValidateurReponse.Resultat resultat = validateurReponse.valider(questions, soumission.reponses());
 
         Reponse reponse = new Reponse();
         reponse.setSondage(version);
         reponse.setLignee(racine);
         reponse.setJetonRepondantHash(jetonRepondantHash);
         reponse.setDateConsentement(dateConsentement);
-        for (ReponseQuestion ligne : lignes) {
+        for (ReponseQuestion ligne : resultat.lignes()) {
             ligne.setReponse(reponse);
             reponse.getValeurs().add(ligne);
         }
+        reponse.getQuestionsMasquees().addAll(resultat.questionsMasquees());
         // Flush ici : un envoi simultané du même appareil heurte la contrainte unique (409 DEJA_REPONDU).
         reponse = reponseRepository.saveAndFlush(reponse);
         log.info("Réponse {} enregistrée pour le sondage {} (version {})",
