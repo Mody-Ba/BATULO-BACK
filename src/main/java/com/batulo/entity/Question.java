@@ -76,6 +76,14 @@ public class Question {
     @Column(name = "critere_config")
     private JsonNode critereConfig;
 
+    /**
+     * Condition d'affichage : {"combinaison": "ET"|"OU", "regles": [{"question": cle, "operateur", "valeur"}]} ;
+     * null : toujours affichée. Les sources sont placées avant la question (voir ValidateurConditions).
+     */
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "condition_affichage")
+    private JsonNode condition;
+
     @OneToMany(mappedBy = "question", cascade = CascadeType.ALL, orphanRemoval = true)
     @OrderBy("ordre ASC")
     private List<OptionQuestion> options = new ArrayList<>();
@@ -104,6 +112,14 @@ public class Question {
 
     public void setCritereConfig(JsonNode critereConfig) {
         this.critereConfig = critereConfig;
+    }
+
+    public JsonNode getCondition() {
+        return condition;
+    }
+
+    public void setCondition(JsonNode condition) {
+        this.condition = condition;
     }
 
     public String getCle() {

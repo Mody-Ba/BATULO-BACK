@@ -5,22 +5,27 @@ import com.batulo.entity.Question;
 import com.batulo.entity.Section;
 import com.batulo.entity.Sondage;
 import com.batulo.entity.Utilisateur;
+import com.batulo.service.ConditionAffichage;
 import com.batulo.service.RegleSondage;
 import com.batulo.service.model.ApercuModel;
 import com.batulo.service.model.AuteurModel;
+import com.batulo.service.model.ConditionModel;
 import com.batulo.service.model.FormulaireModel;
 import com.batulo.service.model.FormulairePublicModel;
+import com.batulo.service.model.GestionnaireAssigneModel;
 import com.batulo.service.model.OptionModel;
 import com.batulo.service.model.QuestionModel;
 import com.batulo.service.model.SectionModel;
 import com.batulo.service.model.SondageModel;
-import com.batulo.service.model.GestionnaireAssigneModel;
 import com.batulo.service.model.SondageResumeModel;
 import com.batulo.service.model.VersionModel;
+import com.fasterxml.jackson.databind.JsonNode;
 import org.springframework.stereotype.Component;
 
 import java.time.Instant;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Mapper DB : convertit uniquement les entités du sondage (Sondage, Section, Question, OptionQuestion)
@@ -135,23 +140,35 @@ public class SondageMapper {
     }
 
     private List<SectionModel> sections(Sondage entity) {
-        return entity.getSections().stream().map(this::toModel).toList();
+        // Les règles désignent leur source par sa clé : on la traduit en id de question de cette version.
+        Map<String, Long> ids = new HashMap<>();
+        entity.getSections().forEach(s -> s.getQuestions().forEach(q -> ids.put(q.getCle(), q.getId())));
+        return entity.getSections().stream().map(s -> toModel(s, ids)).toList();
+    }
+
+    private static ConditionModel condition(JsonNode json, Map<String, Long> ids) {
+        ConditionAffichage condition = ConditionAffichage.lire(json);
+        return condition == null ? null : new ConditionModel(condition.combinaison(), condition.regles().stream()
+                .map(r -> new ConditionModel.Regle(ids.get(r.cle()), r.operateur(),
+                        r.valeur() == null ? null : r.valeur().deepCopy()))
+                .toList());
     }
 
     private static Long origine(Sondage entity) {
         return entity.getSondageOrigine() == null ? null : entity.getSondageOrigine().getId();
     }
 
-    private SectionModel toModel(Section entity) {
+    private SectionModel toModel(Section entity, Map<String, Long> ids) {
         return new SectionModel(
                 entity.getId(),
                 entity.getTitre(),
                 entity.getDescription(),
                 entity.getOrdre(),
-                entity.getQuestions().stream().map(this::toModel).toList());
+                condition(entity.getCondition(), ids),
+                entity.getQuestions().stream().map(q -> toModel(q, ids)).toList());
     }
 
-    private QuestionModel toModel(Question entity) {
+    private QuestionModel toModel(Question entity, Map<String, Long> ids) {
         return new QuestionModel(
                 entity.getId(),
                 entity.getLibelle(),
@@ -162,7 +179,8 @@ public class SondageMapper {
                 entity.getConfiguration().deepCopy(),
                 entity.getOptions().stream().map(this::toModel).toList(),
                 entity.isEstCritere(),
-                entity.getCritereConfig() == null ? null : entity.getCritereConfig().deepCopy());
+                entity.getCritereConfig() == null ? null : entity.getCritereConfig().deepCopy(),
+                condition(entity.getCondition(), ids));
     }
 
     private OptionModel toModel(OptionQuestion entity) {

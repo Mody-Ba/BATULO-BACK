@@ -37,3 +37,5 @@ databaseChangeLog:
       file: db/changelog/changes/018-sondage-accueil.yaml
   - include:
       file: db/changelog/changes/019-paiement-mobile.yaml
+  - include:
+      file: db/changelog/changes/020-conditions.yaml

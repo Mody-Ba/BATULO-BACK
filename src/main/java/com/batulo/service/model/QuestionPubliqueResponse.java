@@ -18,6 +18,11 @@ public record QuestionPubliqueResponse(
         int ordre,
         /** Configuration d'affichage propre au type (ECHELLE {min,max}, MATRICE {lignes,colonnes}...). */
         JsonNode configuration,
-        List<OptionPubliqueResponse> options
+        List<OptionPubliqueResponse> options,
+        /**
+         * Condition d'affichage, pour masquer et afficher en direct ; null : toujours affichée. Le serveur recalcule
+         * la visibilité à l'envoi : une réponse à une question masquée est ignorée.
+         */
+        ConditionResponse condition
 ) {
 }

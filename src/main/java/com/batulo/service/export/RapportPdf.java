@@ -171,7 +171,8 @@ public class RapportPdf {
         entete.setKeepTogether(true);
         document.add(entete);
         document.add(new Paragraph(q.section() + " · " + libelleType(q.type()) + " · " + q.nombreRepondants()
-                + " répondant(s) · " + q.sansReponse() + " sans réponse", discret));
+                + " répondant(s) · " + q.sansReponse() + " sans réponse"
+                + (q.conditionnelle() ? " · question conditionnelle, vue par " + q.vues() : ""), discret));
         if (q.petitEffectif()) {
             document.add(new Paragraph("Petit effectif : moins de " + infos.effectifMinimum()
                     + " répondants, à interpréter avec prudence.", alerte));

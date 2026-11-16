@@ -15,6 +15,8 @@ public record QuestionResponse(
         int ordre,
         JsonNode configuration,
         List<OptionResponse> options,
+        /** Condition d'affichage ; null : toujours affichée (si sa section l'est). */
+        ConditionResponse condition,
         /** Absent du formulaire public (réglage d'analyse interne). */
         @JsonInclude(JsonInclude.Include.NON_NULL)
         Boolean estCritere,

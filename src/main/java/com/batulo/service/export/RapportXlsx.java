@@ -49,7 +49,8 @@ public class RapportXlsx {
             texte(resume, ligne++, "Attention", "Petit effectif : moins de " + infos.effectifMinimum() + " réponses.");
         }
         ligne++;
-        titres(resume, ligne++, "N°", "Question", "Section", "Type", "Répondants", "Sans réponse", "Petit effectif");
+        titres(resume, ligne++, "N°", "Question", "Section", "Type", "Répondants", "Sans réponse", "Petit effectif",
+                "Vue par");
         int numero = 0;
         for (QuestionStat q : stats.questions()) {
             numero++;
@@ -61,8 +62,10 @@ public class RapportXlsx {
             nombre(row, 4, q.nombreRepondants());
             nombre(row, 5, q.sansReponse());
             row.createCell(6).setCellValue(q.petitEffectif() ? "Oui" : "Non");
+            // Question conditionnelle : répondants pour lesquels elle était affichée.
+            nombre(row, 7, q.vues());
         }
-        largeurs(resume, 0, 6, 40, 20, 16, 12, 12, 14);
+        largeurs(resume, 0, 6, 40, 20, 16, 12, 12, 14, 10);
 
         numero = 0;
         for (QuestionStat q : stats.questions()) {
@@ -131,6 +134,9 @@ public class RapportXlsx {
         texte(feuille, ligne++, "Type", RapportPdf.libelleType(q.type()));
         valeur(feuille, ligne++, "Répondants", q.nombreRepondants());
         valeur(feuille, ligne++, "Sans réponse", q.sansReponse());
+        if (q.conditionnelle()) {
+            valeur(feuille, ligne++, "Vue par (question conditionnelle)", q.vues());
+        }
         if (q.petitEffectif()) {
             texte(feuille, ligne++, "Attention", "Petit effectif : à interpréter avec prudence.");
         }

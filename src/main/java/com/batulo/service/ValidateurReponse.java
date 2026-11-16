@@ -19,6 +19,7 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -39,10 +40,19 @@ public class ValidateurReponse {
     }
 
     /**
-     * @param questions toutes les questions de la version, dans l'ordre du formulaire
-     * @return les lignes à enregistrer (aucune pour une question facultative sans réponse)
+     * @param lignes            lignes à enregistrer (aucune pour une question facultative sans réponse ou masquée)
+     * @param questionsMasquees ids des questions masquées par une condition d'affichage
      */
-    public List<ReponseQuestion> valider(List<Question> questions, List<ValeurSoumise> reponses) {
+    public record Resultat(List<ReponseQuestion> lignes, Set<Long> questionsMasquees) {
+    }
+
+    /**
+     * La visibilité est recalculée ici ({@link EvaluateurConditions}), sans jamais faire confiance au frontend : une
+     * question masquée (ou dans une section masquée) n'est pas exigée, et sa réponse éventuelle est ignorée.
+     *
+     * @param questions toutes les questions de la version, dans l'ordre du formulaire
+     */
+    public Resultat valider(List<Question> questions, List<ValeurSoumise> reponses) {
         Map<Long, Question> parId = new LinkedHashMap<>();
         questions.forEach(q -> parId.put(q.getId(), q));
 
@@ -59,7 +69,13 @@ public class ValidateurReponse {
         }
 
         List<ReponseQuestion> lignes = new ArrayList<>();
+        Set<Long> masquees = new LinkedHashSet<>();
+        EvaluateurConditions.Parcours parcours = EvaluateurConditions.parcours();
         for (Question question : parId.values()) {
+            if (!parcours.visible(question)) {
+                masquees.add(question.getId());
+                continue;
+            }
             JsonNode valeur = valeurs.get(question.getId());
             try {
                 List<ReponseQuestion> converties = estVide(valeur) ? List.of() : convertir(question, valeur);
@@ -67,6 +83,9 @@ public class ValidateurReponse {
                     throw new IllegalArgumentException("Cette question est obligatoire.");
                 }
                 lignes.addAll(converties);
+                if (!converties.isEmpty()) {
+                    parcours.repondre(question, valeur);
+                }
             } catch (IllegalArgumentException e) {
                 erreurs.add(new ErreurQuestion(question.getId(), e.getMessage()));
             }
@@ -74,7 +93,7 @@ public class ValidateurReponse {
         if (!erreurs.isEmpty()) {
             throw new ReponsesInvalidesException(erreurs);
         }
-        return lignes;
+        return new Resultat(lignes, masquees);
     }
 
     /** Absente, null, texte vide, liste ou objet vide : pas de réponse. */

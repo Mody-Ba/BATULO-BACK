@@ -16,6 +16,7 @@ import com.batulo.repository.SondageRepository;
 import com.batulo.repository.SondageSpecifications;
 import com.batulo.service.mappers.SondageMapper;
 import com.batulo.service.model.ApercuModel;
+import com.batulo.service.model.ConditionModel;
 import com.batulo.service.model.CreationSondageModel;
 import com.batulo.service.model.FormulaireModel;
 import com.batulo.service.model.DatesSondageModel;
@@ -70,6 +71,7 @@ public class SondageServiceImpl implements SondageService {
     private final ValidateurQuestion validateurQuestion;
     private final ResumesSondages resumesSondages;
     private final ReponseRepository reponseRepository;
+    private final ValidateurConditions validateurConditions;
 
     @PersistenceContext
     private EntityManager entityManager;
@@ -79,13 +81,15 @@ public class SondageServiceImpl implements SondageService {
                               SondageMapper sondageMapper,
                               ValidateurQuestion validateurQuestion,
                               ResumesSondages resumesSondages,
-                              ReponseRepository reponseRepository) {
+                              ReponseRepository reponseRepository,
+                              ValidateurConditions validateurConditions) {
         this.sondageRepository = sondageRepository;
         this.accesSondage = accesSondage;
         this.sondageMapper = sondageMapper;
         this.validateurQuestion = validateurQuestion;
         this.resumesSondages = resumesSondages;
         this.reponseRepository = reponseRepository;
+        this.validateurConditions = validateurConditions;
     }
 
     // ---------------------------------------------------------------- Sondage
@@ -257,7 +261,9 @@ public class SondageServiceImpl implements SondageService {
     @Transactional
     public SondageModel supprimerSection(Long utilisateurId, Long sondageId, Long sectionId) {
         Sondage sondage = sondageModifiable(utilisateurId, sondageId);
-        sondage.getSections().remove(section(sondage, sectionId));
+        Section section = section(sondage, sectionId);
+        validateurConditions.verifierRetrait(sondage, section, section.getQuestions());
+        sondage.getSections().remove(section);
         numeroter(sondage.getSections(), Section::setOrdre);
         sondage.marquerModifie();
         return enregistrer(sondage);
@@ -271,6 +277,7 @@ public class SondageServiceImpl implements SondageService {
         sondage.getSections().clear();
         sondage.getSections().addAll(ordonnees);
         numeroter(sondage.getSections(), Section::setOrdre);
+        validateurConditions.verifier(sondage);
         sondage.marquerModifie();
         return enregistrer(sondage);
     }
@@ -300,6 +307,8 @@ public class SondageServiceImpl implements SondageService {
     public SondageModel modifierQuestion(Long utilisateurId, Long sondageId, Long questionId, QuestionInfoModel info) {
         Sondage sondage = sondageModifiable(utilisateurId, sondageId);
         appliquer(question(sondage, questionId), info);
+        // Type ou options changés : une condition qui s'appuie sur cette question doit rester valable.
+        validateurConditions.verifier(sondage);
         sondage.marquerModifie();
         return enregistrer(sondage);
     }
@@ -309,6 +318,7 @@ public class SondageServiceImpl implements SondageService {
     public SondageModel supprimerQuestion(Long utilisateurId, Long sondageId, Long questionId) {
         Sondage sondage = sondageModifiable(utilisateurId, sondageId);
         Question question = question(sondage, questionId);
+        validateurConditions.verifierRetrait(sondage, null, List.of(question));
         Section section = question.getSection();
         section.getQuestions().remove(question);
         numeroter(section.getQuestions(), Question::setOrdre);
@@ -325,6 +335,7 @@ public class SondageServiceImpl implements SondageService {
         section.getQuestions().clear();
         section.getQuestions().addAll(ordonnees);
         numeroter(section.getQuestions(), Question::setOrdre);
+        validateurConditions.verifier(sondage);
         sondage.marquerModifie();
         return enregistrer(sondage);
     }
@@ -361,6 +372,8 @@ public class SondageServiceImpl implements SondageService {
         sondage.marquerModifie();
         sondageRepository.flush();
         entityManager.refresh(sondage);
+        // Une source doit rester avant ses cibles : sinon 409 et la transaction est annulée (déplacement compris).
+        validateurConditions.verifier(sondage);
         log.info("Sondage {} : question {} déplacée vers la section {} (position {}) par le compte {}",
                 sondageId, questionId, sectionId, rang, utilisateurId);
         return enregistrer(sondage);
@@ -491,6 +504,34 @@ public class SondageServiceImpl implements SondageService {
         return enregistrer(sondage);
     }
 
+    // ---------------------------------------------------------------- Conditions d'affichage
+
+    @Override
+    @Transactional
+    public SondageModel definirConditionQuestion(Long utilisateurId, Long sondageId, Long questionId,
+                                                 ConditionModel condition) {
+        Sondage sondage = sondageModifiable(utilisateurId, sondageId);
+        Question question = question(sondage, questionId);
+        question.setCondition(condition == null ? null : validateurConditions.pourQuestion(sondage, question, condition));
+        sondage.marquerModifie();
+        log.info("Sondage {} : condition d'affichage de la question {} {} par le compte {}", sondageId, questionId,
+                condition == null ? "retirée" : "définie", utilisateurId);
+        return enregistrer(sondage);
+    }
+
+    @Override
+    @Transactional
+    public SondageModel definirConditionSection(Long utilisateurId, Long sondageId, Long sectionId,
+                                                ConditionModel condition) {
+        Sondage sondage = sondageModifiable(utilisateurId, sondageId);
+        Section section = section(sondage, sectionId);
+        section.setCondition(condition == null ? null : validateurConditions.pourSection(sondage, section, condition));
+        sondage.marquerModifie();
+        log.info("Sondage {} : condition d'affichage de la section {} {} par le compte {}", sondageId, sectionId,
+                condition == null ? "retirée" : "définie", utilisateurId);
+        return enregistrer(sondage);
+    }
+
     // ---------------------------------------------------------------- Publication, versions, copie
 
     @Override
@@ -501,6 +542,7 @@ public class SondageServiceImpl implements SondageService {
             throw new ConflitException("SONDAGE_PUBLIE", "Ce sondage est déjà publié.");
         }
         verifierComplet(sondage);
+        validateurConditions.verifier(sondage);
         Instant maintenant = Instant.now();
         Instant ouverture = dates.datePublication() == null || dates.datePublication().isBefore(maintenant)
                 ? maintenant : dates.datePublication();

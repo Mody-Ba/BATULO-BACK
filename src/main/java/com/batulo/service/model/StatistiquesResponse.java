@@ -38,7 +38,12 @@ public record QuestionStat(
             String libelle,
             TypeQuestion type,
             long nombreRepondants,
+            /** Répondants qui ont vu la question mais n'y ont pas répondu (vues - nombreRepondants). */
             long sansReponse,
+            /** true : la question (ou sa section) a une condition d'affichage, ou a été masquée pour une réponse. */
+            boolean conditionnelle,
+            /** Réponses pour lesquelles la question était affichée : toutes, sauf celles où une condition l'a masquée. */
+            long vues,
             boolean petitEffectif,
             /** CHOIX_UNIQUE, CHOIX_MULTIPLE, OUI_NON. */
             List<OptionStat> options,

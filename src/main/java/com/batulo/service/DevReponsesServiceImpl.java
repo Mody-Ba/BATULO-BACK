@@ -70,21 +70,28 @@ public class DevReponsesServiceImpl implements DevReponsesService {
         List<Question> questions = sondage.getSections().stream().flatMap(s -> s.getQuestions().stream()).toList();
         List<Reponse> reponses = new ArrayList<>();
         for (int i = 0; i < nombre; i++) {
+            // Conditions d'affichage respectées : on parcourt le formulaire comme un répondant, une question masquée
+            // (ou dans une section masquée) ne reçoit pas de réponse.
             List<ValeurSoumise> valeurs = new ArrayList<>();
+            EvaluateurConditions.Parcours parcours = EvaluateurConditions.parcours();
             for (Question question : questions) {
                 // Facultative : répondue 8 fois sur 10.
-                if (question.isObligatoire() || aleatoire.nextInt(10) < 8) {
-                    valeurs.add(new ValeurSoumise(question.getId(), valeur(question)));
+                if (parcours.visible(question) && (question.isObligatoire() || aleatoire.nextInt(10) < 8)) {
+                    JsonNode valeur = valeur(question);
+                    valeurs.add(new ValeurSoumise(question.getId(), valeur));
+                    parcours.repondre(question, valeur);
                 }
             }
             Reponse reponse = new Reponse();
             reponse.setSondage(sondage);
             reponse.setLignee(sondage.getRacine());
             reponse.setDateSoumission(maintenant.minusSeconds(aleatoire.nextLong(ETALEMENT.toSeconds())));
-            for (ReponseQuestion ligne : validateurReponse.valider(questions, valeurs)) {
+            ValidateurReponse.Resultat resultat = validateurReponse.valider(questions, valeurs);
+            for (ReponseQuestion ligne : resultat.lignes()) {
                 ligne.setReponse(reponse);
                 reponse.getValeurs().add(ligne);
             }
+            reponse.getQuestionsMasquees().addAll(resultat.questionsMasquees());
             reponses.add(reponse);
         }
         reponseRepository.saveAll(reponses);

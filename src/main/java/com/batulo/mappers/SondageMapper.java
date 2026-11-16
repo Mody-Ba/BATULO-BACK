@@ -1,15 +1,20 @@
 package com.batulo.mappers;
 
+import com.batulo.enums.CombinaisonCondition;
 import com.batulo.service.model.ApercuModel;
 import com.batulo.service.model.ApercuResponse;
 import com.batulo.service.model.AuteurModel;
+import com.batulo.service.model.AuteurResponse;
+import com.batulo.service.model.ConditionModel;
+import com.batulo.service.model.ConditionRequest;
+import com.batulo.service.model.ConditionResponse;
 import com.batulo.service.model.CreationSondageModel;
 import com.batulo.service.model.CreationSondageRequest;
-import com.batulo.service.model.FormulaireModel;
-import com.batulo.service.model.FormulaireResponse;
-import com.batulo.service.model.AuteurResponse;
 import com.batulo.service.model.DatesSondageModel;
 import com.batulo.service.model.DatesSondageRequest;
+import com.batulo.service.model.FormulaireModel;
+import com.batulo.service.model.FormulaireResponse;
+import com.batulo.service.model.GestionnaireAssigneResponse;
 import com.batulo.service.model.OptionInfoModel;
 import com.batulo.service.model.OptionModel;
 import com.batulo.service.model.OptionRequest;
@@ -19,6 +24,7 @@ import com.batulo.service.model.QuestionInfoModel;
 import com.batulo.service.model.QuestionModel;
 import com.batulo.service.model.QuestionRequest;
 import com.batulo.service.model.QuestionResponse;
+import com.batulo.service.model.RegleConditionResponse;
 import com.batulo.service.model.SectionInfoModel;
 import com.batulo.service.model.SectionModel;
 import com.batulo.service.model.SectionRequest;
@@ -27,7 +33,6 @@ import com.batulo.service.model.SondageInfoModel;
 import com.batulo.service.model.SondageModel;
 import com.batulo.service.model.SondageRequest;
 import com.batulo.service.model.SondageResponse;
-import com.batulo.service.model.GestionnaireAssigneResponse;
 import com.batulo.service.model.SondageResumeModel;
 import com.batulo.service.model.SondageResumeResponse;
 import com.batulo.service.model.VersionModel;
@@ -164,13 +169,27 @@ public class SondageMapper {
 
     private SectionResponse toResponse(SectionModel model) {
         return new SectionResponse(model.id(), model.titre(), model.description(), model.ordre(),
-                model.questions().stream().map(this::toResponse).toList());
+                toResponse(model.condition()), model.questions().stream().map(this::toResponse).toList());
     }
 
     private QuestionResponse toResponse(QuestionModel model) {
         return new QuestionResponse(model.id(), model.libelle(), model.aide(), model.type(), model.obligatoire(),
                 model.ordre(), model.configuration(), model.options().stream().map(this::toResponse).toList(),
-                model.estCritere(), model.critereConfig());
+                toResponse(model.condition()), model.estCritere(), model.critereConfig());
+    }
+
+    public ConditionModel toModel(ConditionRequest req) {
+        return new ConditionModel(req.combinaison() == null ? CombinaisonCondition.ET : req.combinaison(),
+                req.regles().stream()
+                        .map(r -> new ConditionModel.Regle(r.questionId(), r.operateur(), r.valeur()))
+                        .toList());
+    }
+
+    /** Partagé avec le formulaire public (CollecteMapper) : aucune donnée interne. */
+    public ConditionResponse toResponse(ConditionModel model) {
+        return model == null ? null : new ConditionResponse(model.combinaison(), model.regles().stream()
+                .map(r -> new RegleConditionResponse(r.questionId(), r.operateur(), r.valeur()))
+                .toList());
     }
 
     private OptionResponse toResponse(OptionModel model) {

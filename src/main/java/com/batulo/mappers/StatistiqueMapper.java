@@ -37,7 +37,7 @@ public class StatistiqueMapper {
 
     private StatistiquesResponse.QuestionStat question(StatistiquesModel.QuestionStat q) {
         return new StatistiquesResponse.QuestionStat(q.questionId(), q.cle(), q.section(), q.libelle(), q.type(),
-                q.nombreRepondants(), q.sansReponse(), q.petitEffectif(),
+                q.nombreRepondants(), q.sansReponse(), q.conditionnelle(), q.vues(), q.petitEffectif(),
                 q.options() == null ? null : q.options().stream()
                         .map(o -> new StatistiquesResponse.OptionStat(o.valeur(), o.libelle(), o.nombre(), o.pourcentage()))
                         .toList(),
