@@ -41,23 +41,27 @@ public class CollecteServiceImpl implements CollecteService {
     private final ValidateurReponse validateurReponse;
     private final RegleCollecte regleCollecte;
     private final FormatDate formatDate;
+    private final Personnalisations personnalisations;
 
     public CollecteServiceImpl(SondageRepository sondageRepository, ReponseRepository reponseRepository,
                                SondageMapper sondageMapper, ValidateurReponse validateurReponse,
-                               RegleCollecte regleCollecte, FormatDate formatDate) {
+                               RegleCollecte regleCollecte, FormatDate formatDate,
+                               Personnalisations personnalisations) {
         this.sondageRepository = sondageRepository;
         this.reponseRepository = reponseRepository;
         this.sondageMapper = sondageMapper;
         this.validateurReponse = validateurReponse;
         this.regleCollecte = regleCollecte;
         this.formatDate = formatDate;
+        this.personnalisations = personnalisations;
     }
 
     @Override
     public FormulairePublicModel formulaire(String jetonPublic, String jetonRepondant) {
         Sondage version = versionOuverte(jetonPublic, Instant.now());
         Boolean dejaRepondu = version.isReponseUnique() ? dejaRepondu(version, jetonRepondant) : null;
-        return sondageMapper.toFormulairePublicModel(version, dejaRepondu);
+        return sondageMapper.toFormulairePublicModel(version, dejaRepondu,
+                personnalisations.apparence(version.getEntreprise()));
     }
 
     /** Même contrôle que l'envoi (lignée, jeton haché) ; un jeton absent ou mal formé n'a jamais répondu. */

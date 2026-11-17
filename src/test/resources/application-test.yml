@@ -18,6 +18,10 @@ spring:
 # Toutes les valeurs que .env.properties ou une variable d'environnement pourraient changer sont fixées ici :
 # les tests ne dépendent pas de la configuration locale du développeur.
 batulo:
+  # URL absolue du logo dans le formulaire public.
+  url-base: http://localhost:8080
+  personnalisation:
+    couleur-defaut: "#005CBB"
   fuseau-horaire: America/Toronto
   jwt:
     secret: secret-de-test-batulo-au-moins-32-octets-0123456789

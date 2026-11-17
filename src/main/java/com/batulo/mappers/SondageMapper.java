@@ -49,6 +49,12 @@ import java.util.List;
 @Component("apiSondageMapper")
 public class SondageMapper {
 
+    private final PersonnalisationMapper personnalisationMapper;
+
+    public SondageMapper(PersonnalisationMapper personnalisationMapper) {
+        this.personnalisationMapper = personnalisationMapper;
+    }
+
     public CreationSondageModel toModel(CreationSondageRequest req) {
         return new CreationSondageModel(req.titre(), req.description(), req.sondageSourceId(), req.reponseUnique());
     }
@@ -124,7 +130,8 @@ public class SondageMapper {
     public ApercuResponse toResponse(ApercuModel model) {
         return new ApercuResponse(model.id(), model.titre(), model.description(), model.version(), model.statut(),
                 model.objetEnquete(), model.texteConfidentialite(), model.consentementRequis(),
-                model.texteConsentement(), model.sections().stream().map(this::toResponse).toList());
+                model.texteConsentement(), personnalisationMapper.toResponse(model.apparence()),
+                model.sections().stream().map(this::toResponse).toList());
     }
 
     public List<VersionResponse> toVersionResponses(List<VersionModel> versions) {

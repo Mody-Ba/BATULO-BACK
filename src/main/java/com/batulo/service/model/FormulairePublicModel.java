@@ -22,6 +22,8 @@ public record FormulairePublicModel(
         boolean consentementRequis,
         /** Texte de la case de consentement (renseigné si consentementRequis). */
         String texteConsentement,
+        /** Apparence à l'image de l'entreprise (nom affiché, logo, couleurs) ; rien d'autre sur l'entreprise. */
+        ApparenceModel apparence,
         List<SectionModel> sections,
         /** reponseUnique : cet appareil (jeton X-Jeton-Repondant) a déjà répondu sur la lignée ; null sinon. */
         Boolean dejaRepondu

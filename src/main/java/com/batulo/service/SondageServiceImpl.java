@@ -72,6 +72,7 @@ public class SondageServiceImpl implements SondageService {
     private final ResumesSondages resumesSondages;
     private final ReponseRepository reponseRepository;
     private final ValidateurConditions validateurConditions;
+    private final Personnalisations personnalisations;
 
     @PersistenceContext
     private EntityManager entityManager;
@@ -82,7 +83,8 @@ public class SondageServiceImpl implements SondageService {
                               ValidateurQuestion validateurQuestion,
                               ResumesSondages resumesSondages,
                               ReponseRepository reponseRepository,
-                              ValidateurConditions validateurConditions) {
+                              ValidateurConditions validateurConditions,
+                              Personnalisations personnalisations) {
         this.sondageRepository = sondageRepository;
         this.accesSondage = accesSondage;
         this.sondageMapper = sondageMapper;
@@ -90,6 +92,7 @@ public class SondageServiceImpl implements SondageService {
         this.resumesSondages = resumesSondages;
         this.reponseRepository = reponseRepository;
         this.validateurConditions = validateurConditions;
+        this.personnalisations = personnalisations;
     }
 
     // ---------------------------------------------------------------- Sondage
@@ -607,7 +610,8 @@ public class SondageServiceImpl implements SondageService {
 
     @Override
     public ApercuModel apercu(Long utilisateurId, Long sondageId) {
-        return sondageMapper.toApercuModel(sondageLisible(acteur(utilisateurId), sondageId), Instant.now());
+        Sondage sondage = sondageLisible(acteur(utilisateurId), sondageId);
+        return sondageMapper.toApercuModel(sondage, Instant.now(), personnalisations.apparence(sondage.getEntreprise()));
     }
 
     @Override

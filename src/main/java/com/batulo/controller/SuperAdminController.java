@@ -91,7 +91,8 @@ public class SuperAdminController {
     @GetMapping("/admins/{id}")
     @PreAuthorize("hasRole('SUPER_ADMIN')")
     @Operation(summary = "Détail d'un admin (SA-03)",
-            description = "L'admin, l'abonnement de son entreprise et son nombre de gestionnaires. "
+            description = "L'admin, l'abonnement de son entreprise, son nombre de gestionnaires et la personnalisation "
+                    + "de l'entreprise (logo, couleur, nom affiché ; lecture seule). "
                     + "404 si l'id ne désigne pas un admin, 403 pour le super admin.")
     public AdminDetailResponse detail(@PathVariable Long id) {
         return superAdminMapper.toResponse(superAdminService.detailAdmin(id));

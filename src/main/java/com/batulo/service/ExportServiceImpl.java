@@ -1,5 +1,6 @@
 package com.batulo.service;
 
+import com.batulo.entity.Entreprise;
 import com.batulo.entity.Sondage;
 import com.batulo.enums.FormatExport;
 import com.batulo.enums.GranulariteDate;
@@ -70,11 +71,13 @@ public class ExportServiceImpl implements ExportService {
     private final ObjectMapper objectMapper;
     private final TransactionTemplate lectureSeule;
     private final int effectifMinimum;
+    private final Personnalisations personnalisations;
 
     public ExportServiceImpl(AnalysePerimetre analyse, AccesSondage accesSondage, StatistiqueService statistiqueService,
                              ExportRepository exportRepository, ObjectMapper objectMapper,
                              PlatformTransactionManager transactionManager,
-                             @Value("${batulo.statistiques.effectif-minimum:5}") int effectifMinimum) {
+                             @Value("${batulo.statistiques.effectif-minimum:5}") int effectifMinimum,
+                             Personnalisations personnalisations) {
         this.analyse = analyse;
         this.accesSondage = accesSondage;
         this.statistiqueService = statistiqueService;
@@ -83,6 +86,7 @@ public class ExportServiceImpl implements ExportService {
         this.lectureSeule = new TransactionTemplate(transactionManager);
         this.lectureSeule.setReadOnly(true);
         this.effectifMinimum = effectifMinimum;
+        this.personnalisations = personnalisations;
     }
 
     // ---------------------------------------------------------------- Réponses brutes
@@ -319,8 +323,11 @@ public class ExportServiceImpl implements ExportService {
                 .map(c -> c.libelle() + " : " + c.valeurs().stream().map(CritereModel.ValeurCritere::libelle)
                         .collect(Collectors.joining(", ")))
                 .toList();
-        return new InfosRapport(sondage.getTitre(), sondage.getEntreprise().getNom(), perimetre, periode, texteCriteres,
-                GENERE_LE.format(LocalDateTime.now(analyse.fuseau())), effectifMinimum);
+        Entreprise entreprise = sondage.getEntreprise();
+        byte[] logo = personnalisations.logoPourRapport(entreprise);
+        return new InfosRapport(sondage.getTitre(), personnalisations.nomEffectif(entreprise), perimetre, periode,
+                texteCriteres, GENERE_LE.format(LocalDateTime.now(analyse.fuseau())), effectifMinimum, logo,
+                logo != null || entreprise.getNomAffiche() != null);
     }
 
     /** « titre-du-sondage_v2_statistiques_2026-11-08.pdf » : sans accents, minuscules, tirets, 60 caractères au plus. */

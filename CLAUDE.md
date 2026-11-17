@@ -171,10 +171,26 @@ Plateforme SaaS de sondages (Spring Boot 3.5, Java 21, PostgreSQL 16, Liquibase)
   masquées d'une réponse vont dans `reponse_question_masquee` : statistiques `vues` = réponses aux versions de la
   question - masquées (SQL), `sansReponse` = vues - répondants, `conditionnelle` ; « Vue par » dans les rapports PDF
   et XLSX ; cellule vide dans les exports bruts. Anciennes réponses : aucune ligne masquée, donc toutes « vues ».
+- Personnalisation de l'entreprise (phase 4, étape 2) : `entreprise.nom_affiche` et `couleur_principale` (#RRGGBB
+  en majuscules), logo dans la table `entreprise_logo` (une ligne par entreprise, BYTEA en base pour Cloud Run, jamais
+  chargé avec l'entreprise). Lecture GET /api/entreprise/personnalisation (admin et gestionnaires) ; écriture ADMIN
+  seulement : PUT /api/admin/personnalisation (absent = inchangé, "" efface ; 400 COULEUR_INVALIDE), PUT
+  /api/admin/personnalisation/logo (multipart, champ `fichier`), DELETE .../logo. Aucune route ne prend d'id
+  d'entreprise. Logo : PNG ou JPEG seulement (WebP plus tard : le JDK ne le lit pas, pas de dépendance ajoutée), type
+  reconnu aux premiers octets (extension et Content-Type ignorés : 400 LOGO_FORMAT_INVALIDE), dimensions lues dans
+  l'en-tête avant décodage (2000 x 2000 max : LOGO_DIMENSIONS), image décodée une fois (LOGO_ILLISIBLE), 1 Mo
+  (`spring.servlet.multipart` et `batulo.personnalisation.logo-taille-max` : 413 FICHIER_TROP_GROS). Route publique
+  GET /api/public/logos/{jeton} (jeton UUID régénéré à chaque remplacement : ancienne URL 404 ; Cache-Control un an
+  immutable, nosniff, CSP default-src 'none' ; reste sous la limite par IP). Couleur par défaut
+  `batulo.personnalisation.couleur-defaut` = #005CBB (primaire du thème du front, azure ton 40) ; `couleurTexte`
+  #FFFFFF ou #000000 selon le meilleur contraste WCAG (`ContrasteCouleur`). Le formulaire public et l'aperçu ont
+  `apparence` {nomAffiche, logoUrl absolue, couleurPrincipale, couleurTexte} et rien d'autre sur l'entreprise.
+  Rapports PDF : logo et nom affiché sur la page de titre et dans l'en-tête des pages (« Batulo » sans nom affiché ni
+  logo) ; « Entreprise » = nom affiché. Fiche super admin (GET /api/super-admin/admins/{id}) : `personnalisation`.
 
 ## À traiter dans les étapes suivantes
 - Phase 4 : brouillon et reprise d'une réponse (réutiliser `EvaluateurConditions.Parcours`) ; invitations nominatives (l'unicité par appareil se contourne en vidant le navigateur ou en changeant
   d'appareil : limite acceptée pour la phase 2) ; diffusion courriel, SMS, WhatsApp, intégration web, campagnes.
 - Si l'application tourne un jour sur plusieurs instances : limite de requêtes partagée (Redis ou Bucket4j).
-- Module 4.4, plus tard : logo et identité visuelle dans les rapports, comparaison de plusieurs sondages (la clé de
+- Module 4.4, plus tard : logo dans les rapports XLSX (PDF fait), logo WebP, comparaison de plusieurs sondages (la clé de
   question est déjà recopiée dans les copies), partage sécurisé des rapports, archivage.

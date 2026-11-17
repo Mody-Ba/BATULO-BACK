@@ -4,6 +4,8 @@ package com.batulo.service.model;
 public record AdminDetailModel(
         UtilisateurModel admin,
         AbonnementModel abonnement,
-        long nombreGestionnaires
+        long nombreGestionnaires,
+        /** Apparence de l'entreprise (logo, couleur, nom affiché), en lecture seule pour le super admin. */
+        PersonnalisationModel personnalisation
 ) {
 }

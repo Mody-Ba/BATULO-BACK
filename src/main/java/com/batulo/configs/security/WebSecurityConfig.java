@@ -104,6 +104,7 @@ public class WebSecurityConfig {
                         .requestMatchers("/api/statistiques-recues/**").hasRole("ADMIN")
                         .requestMatchers("/api/dev/sondages/**").hasAnyRole("ADMIN", "GESTIONNAIRE")
                         .requestMatchers("/api/sondages/**").hasAnyRole("ADMIN", "GESTIONNAIRE")
+                        .requestMatchers("/api/entreprise/**").hasAnyRole("ADMIN", "GESTIONNAIRE")
                         .anyRequest().authenticated());
 
         http.addFilterBefore(authTokenFilter, UsernamePasswordAuthenticationFilter.class);

@@ -14,6 +14,9 @@ import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
+import org.springframework.web.multipart.MultipartException;
+import org.springframework.web.multipart.support.MissingServletRequestPartException;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.HandlerMethodValidationException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
@@ -54,6 +57,26 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(RegleGestionException.class)
     public ResponseEntity<ErrorResponse> handleRegleGestion(RegleGestionException ex) {
         return reponse(HttpStatus.BAD_REQUEST, ex.getCode(), ex.getMessage());
+    }
+
+    /** Logo trop gros : contrôle du service, ou limite multipart de application.yml (fichier refusé avant lecture). */
+    @ExceptionHandler({FichierTropGrosException.class, MaxUploadSizeExceededException.class})
+    public ResponseEntity<ErrorResponse> handleFichierTropGros(Exception ex) {
+        String message = ex instanceof FichierTropGrosException ? ex.getMessage()
+                : "Le fichier dépasse la taille permise (1 Mo).";
+        return reponse(HttpStatus.PAYLOAD_TOO_LARGE, "FICHIER_TROP_GROS", message);
+    }
+
+    @ExceptionHandler(MissingServletRequestPartException.class)
+    public ResponseEntity<ErrorResponse> handlePartieManquante(MissingServletRequestPartException ex) {
+        return reponse(HttpStatus.BAD_REQUEST, "FICHIER_MANQUANT",
+                "Envoyez le fichier dans le champ « " + ex.getRequestPartName() + " » (multipart/form-data).");
+    }
+
+    @ExceptionHandler(MultipartException.class)
+    public ResponseEntity<ErrorResponse> handleMultipart(MultipartException ex) {
+        return reponse(HttpStatus.BAD_REQUEST, "FICHIER_MANQUANT",
+                "Envoyez le fichier en multipart/form-data, dans le champ « fichier ».");
     }
 
     @ExceptionHandler(NonAuthentifieException.class)

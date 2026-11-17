@@ -22,6 +22,8 @@ public record ApercuResponse(
         boolean consentementRequis,
         /** Texte de la case de consentement (renseigné si consentementRequis). */
         String texteConsentement,
+        /** Apparence à l'image de l'entreprise (nom affiché, logo, couleurs) ; rien d'autre sur l'entreprise. */
+        ApparenceResponse apparence,
         List<SectionResponse> sections
 ) {
 }

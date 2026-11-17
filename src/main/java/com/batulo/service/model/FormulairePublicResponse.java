@@ -25,6 +25,8 @@ public record FormulairePublicResponse(
         boolean consentementRequis,
         /** Texte de la case de consentement (renseigné si consentementRequis). */
         String texteConsentement,
+        /** Apparence à l'image de l'entreprise (nom affiché, logo, couleurs) ; rien d'autre sur l'entreprise. */
+        ApparenceResponse apparence,
         List<SectionPubliqueResponse> sections,
         /**
          * Seulement si reponseUnique : true si l'appareil (en-tête X-Jeton-Repondant) a déjà répondu à l'une des
