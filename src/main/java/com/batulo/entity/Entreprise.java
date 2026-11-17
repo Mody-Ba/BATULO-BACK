@@ -28,6 +28,14 @@ public class Entreprise {
     @Column(nullable = false)
     private boolean actif = true;
 
+    /** Couleur principale des formulaires, #RRGGBB en majuscules ; null : couleur Batulo par défaut. */
+    @Column(name = "couleur_principale", length = 7)
+    private String couleurPrincipale;
+
+    /** Nom montré aux répondants et dans les rapports ; null : le nom de l'entreprise. */
+    @Column(name = "nom_affiche", length = 150)
+    private String nomAffiche;
+
     @Column(name = "date_creation", nullable = false, updatable = false)
     private Instant dateCreation;
 
@@ -74,5 +82,21 @@ public class Entreprise {
 
     public Instant getDateModification() {
         return dateModification;
+    }
+
+    public String getCouleurPrincipale() {
+        return couleurPrincipale;
+    }
+
+    public void setCouleurPrincipale(String couleurPrincipale) {
+        this.couleurPrincipale = couleurPrincipale;
+    }
+
+    public String getNomAffiche() {
+        return nomAffiche;
+    }
+
+    public void setNomAffiche(String nomAffiche) {
+        this.nomAffiche = nomAffiche;
     }
 }

@@ -8,6 +8,7 @@ import com.batulo.entity.Utilisateur;
 import com.batulo.service.ConditionAffichage;
 import com.batulo.service.RegleSondage;
 import com.batulo.service.model.ApercuModel;
+import com.batulo.service.model.ApparenceModel;
 import com.batulo.service.model.AuteurModel;
 import com.batulo.service.model.ConditionModel;
 import com.batulo.service.model.FormulaireModel;
@@ -111,7 +112,7 @@ public class SondageMapper {
     }
 
     /** Formulaire du répondant : contenu de la version ouverte, sans aucune donnée interne. */
-    public FormulairePublicModel toFormulairePublicModel(Sondage version, Boolean dejaRepondu) {
+    public FormulairePublicModel toFormulairePublicModel(Sondage version, Boolean dejaRepondu, ApparenceModel apparence) {
         return new FormulairePublicModel(
                 version.getTitre(),
                 version.getDescription(),
@@ -121,11 +122,12 @@ public class SondageMapper {
                 version.getTexteConfidentialite(),
                 version.isConsentementRequis(),
                 version.getTexteConsentement(),
+                apparence,
                 sections(version),
                 dejaRepondu);
     }
 
-    public ApercuModel toApercuModel(Sondage entity, Instant maintenant) {
+    public ApercuModel toApercuModel(Sondage entity, Instant maintenant, ApparenceModel apparence) {
         return new ApercuModel(
                 entity.getId(),
                 entity.getTitre(),
@@ -136,6 +138,7 @@ public class SondageMapper {
                 entity.getTexteConfidentialite(),
                 entity.isConsentementRequis(),
                 entity.getTexteConsentement(),
+                apparence,
                 sections(entity));
     }
 

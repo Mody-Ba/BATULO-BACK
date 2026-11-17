@@ -33,9 +33,11 @@ public class CollecteMapper {
 
     /** Conversion des conditions d'affichage, la même que pour l'éditeur et l'aperçu. */
     private final SondageMapper sondageMapper;
+    private final PersonnalisationMapper personnalisationMapper;
 
-    public CollecteMapper(SondageMapper sondageMapper) {
+    public CollecteMapper(SondageMapper sondageMapper, PersonnalisationMapper personnalisationMapper) {
         this.sondageMapper = sondageMapper;
+        this.personnalisationMapper = personnalisationMapper;
     }
 
     public SoumissionModel toModel(SoumissionRequest req) {
@@ -47,7 +49,7 @@ public class CollecteMapper {
     public FormulairePublicResponse toResponse(FormulairePublicModel model) {
         return new FormulairePublicResponse(model.titre(), model.description(), model.reponseUnique(),
                 model.dateFermeture(), model.objetEnquete(), model.texteConfidentialite(), model.consentementRequis(),
-                model.texteConsentement(), model.sections().stream().map(this::toResponse).toList(), model.dejaRepondu());
+                model.texteConsentement(), personnalisationMapper.toResponse(model.apparence()), model.sections().stream().map(this::toResponse).toList(), model.dejaRepondu());
     }
 
     public ConfirmationReponseResponse toConfirmation(Instant dateSoumission) {

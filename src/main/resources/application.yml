@@ -25,6 +25,11 @@ spring:
         # Charge les collections par lots (sections, questions, options d'un sondage) : peu de requêtes,
         # sans produit cartésien.
         default_batch_fetch_size: 100
+  # Envoi du logo (multipart) : refusé avant lecture au-delà de ces tailles (413 FICHIER_TROP_GROS).
+  servlet:
+    multipart:
+      max-file-size: 1MB
+      max-request-size: 2MB
   liquibase:
     change-log: classpath:db/changelog/db.changelog-master.yaml
   mail:
@@ -107,6 +112,13 @@ batulo:
     limite-envoi-par-minute: ${PUBLIC_RATE_POST:20}
     # true seulement derrière un proxy de confiance (l'adresse vient alors de X-Forwarded-For).
     faire-confiance-proxy: ${TRUST_PROXY:false}
+  # Apparence des formulaires (phase 4, étape 2).
+  personnalisation:
+    # Couleur principale par défaut des formulaires : celle du thème du front (azure, ton 40).
+    couleur-defaut: ${BATULO_COULEUR_DEFAUT:#005CBB}
+    # Logo : PNG ou JPEG, au plus 1 Mo (aligné sur spring.servlet.multipart.max-file-size) et 2000 x 2000 pixels.
+    logo-taille-max: 1048576
+    logo-dimension-max: 2000
   statistiques:
     # En dessous de ce nombre de répondants, un groupe est signalé « petitEffectif » (prudence avant de conclure).
     effectif-minimum: 5

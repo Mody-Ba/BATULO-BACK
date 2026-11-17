@@ -57,6 +57,7 @@ public class SuperAdminServiceImpl implements SuperAdminService {
     private final AbonnementMapper abonnementMapper;
     private final MotDePasseTemporaire motDePasseTemporaire;
     private final EmailService emailService;
+    private final Personnalisations personnalisations;
 
     @Value("${batulo.abonnement.jours-alerte-expiration}")
     private int joursAlerte;
@@ -68,7 +69,8 @@ public class SuperAdminServiceImpl implements SuperAdminService {
                                  UtilisateurMapper utilisateurMapper,
                                  AbonnementMapper abonnementMapper,
                                  MotDePasseTemporaire motDePasseTemporaire,
-                                 EmailService emailService) {
+                                 EmailService emailService,
+                                 Personnalisations personnalisations) {
         this.utilisateurRepository = utilisateurRepository;
         this.entrepriseRepository = entrepriseRepository;
         this.abonnementRepository = abonnementRepository;
@@ -77,6 +79,7 @@ public class SuperAdminServiceImpl implements SuperAdminService {
         this.abonnementMapper = abonnementMapper;
         this.motDePasseTemporaire = motDePasseTemporaire;
         this.emailService = emailService;
+        this.personnalisations = personnalisations;
     }
 
     @Override
@@ -115,7 +118,8 @@ public class SuperAdminServiceImpl implements SuperAdminService {
         emailService.envoyerMotDePasseTemporaire(courriel, prenom, motDePasse, admin.getMotDePasseTemporaireExpireLe());
         log.info("Super admin : admin {} et entreprise {} créés, abonnement {} en attente de paiement",
                 admin.getId(), entreprise.getId(), abonnement.getId());
-        return new AdminDetailModel(utilisateurMapper.toModel(admin), versModele(abonnement, Instant.now()), 0);
+        return new AdminDetailModel(utilisateurMapper.toModel(admin), versModele(abonnement, Instant.now()), 0,
+                personnalisations.de(entreprise));
     }
 
     @Override
@@ -278,7 +282,8 @@ public class SuperAdminServiceImpl implements SuperAdminService {
                 .map(a -> versModele(a, Instant.now()))
                 .orElse(null);
         long gestionnaires = utilisateurRepository.countByEntrepriseIdAndRole(entrepriseId, Role.GESTIONNAIRE);
-        return new AdminDetailModel(utilisateurMapper.toModel(admin), abonnement, gestionnaires);
+        return new AdminDetailModel(utilisateurMapper.toModel(admin), abonnement, gestionnaires,
+                personnalisations.de(admin.getEntreprise()));
     }
 
     private AbonnementModel versModele(Abonnement abonnement, Instant maintenant) {

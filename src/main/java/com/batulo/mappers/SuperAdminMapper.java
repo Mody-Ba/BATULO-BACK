@@ -29,10 +29,13 @@ public class SuperAdminMapper {
 
     private final AuthMapper authMapper;
     private final AbonnementMapper abonnementMapper;
+    private final PersonnalisationMapper personnalisationMapper;
 
-    public SuperAdminMapper(AuthMapper authMapper, AbonnementMapper abonnementMapper) {
+    public SuperAdminMapper(AuthMapper authMapper, AbonnementMapper abonnementMapper,
+                            PersonnalisationMapper personnalisationMapper) {
         this.authMapper = authMapper;
         this.abonnementMapper = abonnementMapper;
+        this.personnalisationMapper = personnalisationMapper;
     }
 
     public CreationAdminModel toModel(CreationAdminRequest req) {
@@ -47,7 +50,8 @@ public class SuperAdminMapper {
         return new AdminDetailResponse(
                 authMapper.toResponse(model.admin()),
                 model.abonnement() == null ? null : abonnementMapper.toResponse(model.abonnement()),
-                model.nombreGestionnaires());
+                model.nombreGestionnaires(),
+                personnalisationMapper.toResponse(model.personnalisation()));
     }
 
     public AbonnementAdminResponse toResponse(AbonnementAdminModel model) {

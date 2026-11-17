@@ -1,0 +1,44 @@
+databaseChangeLog:
+  # Phase 4, étape 2 : personnalisation de l'entreprise (logo, couleur, nom affiché sur les formulaires).
+  - property: { name: type.binaire, value: BYTEA, dbms: postgresql }
+  - property: { name: type.binaire, value: VARBINARY, dbms: h2 }
+
+  - changeSet:
+      id: 021-entreprise-personnalisation
+      author: batulo
+      changes:
+        - addColumn:
+            tableName: entreprise
+            columns:
+              # #RRGGBB en majuscules ; null : couleur Batulo par défaut (batulo.personnalisation.couleur-defaut).
+              - column: { name: couleur_principale, type: VARCHAR(7) }
+              # Nom montré aux répondants et dans les rapports ; null : nom de l'entreprise.
+              - column: { name: nom_affiche, type: VARCHAR(150) }
+
+  - changeSet:
+      id: 021-creer-table-entreprise-logo
+      author: batulo
+      changes:
+        # Table à part : charger une entreprise ne charge jamais l'image. Stockée en base (pas de disque : Cloud Run).
+        - createTable:
+            tableName: entreprise_logo
+            columns:
+              - column:
+                  name: entreprise_id
+                  type: BIGINT
+                  constraints:
+                    primaryKey: true
+                    primaryKeyName: pk_entreprise_logo
+                    nullable: false
+                    foreignKeyName: fk_entreprise_logo_entreprise
+                    references: entreprise(id)
+                    deleteCascade: true
+              # Identifiant public non devinable, régénéré à chaque remplacement (URL versionnée, cache immuable).
+              - column: { name: jeton, type: VARCHAR(36), constraints: { nullable: false, unique: true, uniqueConstraintName: uk_entreprise_logo_jeton } }
+              # image/png ou image/jpeg, déterminé par les premiers octets du fichier.
+              - column: { name: type_mime, type: VARCHAR(20), constraints: { nullable: false } }
+              - column: { name: taille, type: INT, constraints: { nullable: false } }
+              - column: { name: largeur, type: INT, constraints: { nullable: false } }
+              - column: { name: hauteur, type: INT, constraints: { nullable: false } }
+              - column: { name: contenu, type: "${type.binaire}", constraints: { nullable: false } }
+              - column: { name: date_modification, type: TIMESTAMP WITH TIME ZONE, constraints: { nullable: false } }

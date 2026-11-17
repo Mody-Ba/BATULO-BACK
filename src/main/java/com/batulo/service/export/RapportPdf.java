@@ -8,6 +8,7 @@ import com.lowagie.text.Document;
 import com.lowagie.text.DocumentException;
 import com.lowagie.text.Element;
 import com.lowagie.text.Font;
+import com.lowagie.text.Image;
 import com.lowagie.text.PageSize;
 import com.lowagie.text.Paragraph;
 import com.lowagie.text.Phrase;
@@ -57,11 +58,30 @@ public class RapportPdf {
     private final Font discret = new Font(NORMAL, 8.5f, Font.NORMAL, GRIS_TEXTE);
     private final Font alerte = new Font(NORMAL, 8.5f, Font.NORMAL, ORANGE);
 
+    /** Hauteur du logo dans l'en-tête des pages, et sa largeur maximale. */
+    private static final float LOGO_ENTETE_HAUTEUR = 16;
+    private static final float LOGO_ENTETE_LARGEUR_MAX = 80;
+
     private final InfosRapport infos;
+    /** Logo de l'entreprise (PNG ou JPEG, contrôlé à l'envoi) ; null s'il n'y en a pas ou s'il est illisible. */
+    private final Image logo;
     private PdfWriter ecrivain;
 
     public RapportPdf(InfosRapport infos) {
         this.infos = infos;
+        this.logo = chargerLogo(infos.logo());
+    }
+
+    /** Un logo illisible ne doit jamais empêcher le rapport : il est alors simplement omis. */
+    private static Image chargerLogo(byte[] octets) {
+        if (octets == null) {
+            return null;
+        }
+        try {
+            return Image.getInstance(octets);
+        } catch (IOException | RuntimeException e) {
+            return null;
+        }
     }
 
     public void statistiques(StatistiquesModel stats, OutputStream flux) {
@@ -123,8 +143,20 @@ public class RapportPdf {
     private void pageDeTitre(Document document, String nature, long reponses, boolean petitEffectif)
             throws DocumentException {
         Paragraph espace = new Paragraph(" ");
-        espace.setSpacingBefore(120);
+        espace.setSpacingBefore(logo == null && !infos.personnalise() ? 120 : 40);
         document.add(espace);
+        if (logo != null) {
+            Image grand = Image.getInstance(logo);
+            grand.scaleToFit(180, 80);
+            grand.setAlignment(Element.ALIGN_LEFT);
+            document.add(grand);
+        }
+        if (infos.personnalise()) {
+            Paragraph entreprise = new Paragraph(infos.entreprise(), texteGras);
+            entreprise.setSpacingBefore(6);
+            entreprise.setSpacingAfter(40);
+            document.add(entreprise);
+        }
         document.add(new Paragraph(nature, sousTitre));
         Paragraph nom = new Paragraph(infos.titre(), titre);
         nom.setSpacingAfter(24);
@@ -372,10 +404,23 @@ public class RapportPdf {
         public void onEndPage(PdfWriter writer, Document document) {
             PdfContentByte cb = writer.getDirectContent();
             Rectangle page = document.getPageSize();
+            float xTexte = document.left();
+            if (logo != null) {
+                float largeur = Math.min(LOGO_ENTETE_LARGEUR_MAX,
+                        LOGO_ENTETE_HAUTEUR * logo.getWidth() / Math.max(1, logo.getHeight()));
+                float hauteur = largeur * logo.getHeight() / Math.max(1, logo.getWidth());
+                try {
+                    cb.addImage(logo, largeur, 0, 0, hauteur, document.left(), page.getTop() - 34);
+                } catch (DocumentException e) {
+                    throw new IllegalStateException("Logo impossible à placer dans l'en-tête", e);
+                }
+                xTexte += largeur + 6;
+            }
+            String auteur = infos.personnalise() ? infos.entreprise() : "Batulo";
             cb.beginText();
             cb.setFontAndSize(NORMAL, 8);
             cb.setColorFill(GRIS_TEXTE);
-            cb.showTextAligned(Element.ALIGN_LEFT, "Batulo · " + infos.titre(), document.left(), page.getTop() - 30, 0);
+            cb.showTextAligned(Element.ALIGN_LEFT, auteur + " · " + infos.titre(), xTexte, page.getTop() - 30, 0);
             String pageX = "Page " + writer.getPageNumber() + " / ";
             float x = document.right() - 40;
             cb.showTextAligned(Element.ALIGN_RIGHT, pageX, x, 25, 0);
