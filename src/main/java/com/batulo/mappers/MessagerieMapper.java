@@ -1,5 +1,6 @@
 package com.batulo.mappers;
 
+import com.batulo.service.Langues;
 import com.batulo.service.model.ConversationModel;
 import com.batulo.service.model.ConversationResponse;
 import com.batulo.service.model.DemandeAbonnementModel;
@@ -47,7 +48,7 @@ public class MessagerieMapper {
 
     public EnvoiStatistiqueDemandeModel toModel(EnvoiStatistiqueRequest r) {
         return new EnvoiStatistiqueDemandeModel(r.commentaire(), Boolean.TRUE.equals(r.lignee()), r.du(), r.au(),
-                statistiqueMapper.toCriteres(r.critere()), r.granulariteDate());
+                statistiqueMapper.toCriteres(r.critere()), r.granulariteDate(), Langues.lire(r.langueReponse()));
     }
 
     public EnvoiStatistiqueResponse toResponse(EnvoiStatistiqueModel m) {

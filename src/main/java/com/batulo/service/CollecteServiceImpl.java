@@ -4,6 +4,7 @@ import com.batulo.entity.Question;
 import com.batulo.entity.Reponse;
 import com.batulo.entity.ReponseQuestion;
 import com.batulo.entity.Sondage;
+import com.batulo.enums.Langue;
 import com.batulo.enums.StatutSondage;
 import com.batulo.exception.ActionInterditeException;
 import com.batulo.exception.ConflitException;
@@ -26,6 +27,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Service
 @Transactional(readOnly = true)
@@ -57,11 +59,11 @@ public class CollecteServiceImpl implements CollecteService {
     }
 
     @Override
-    public FormulairePublicModel formulaire(String jetonPublic, String jetonRepondant) {
+    public FormulairePublicModel formulaire(String jetonPublic, String jetonRepondant, Langue langue) {
         Sondage version = versionOuverte(jetonPublic, Instant.now());
         Boolean dejaRepondu = version.isReponseUnique() ? dejaRepondu(version, jetonRepondant) : null;
         return sondageMapper.toFormulairePublicModel(version, dejaRepondu,
-                personnalisations.apparence(version.getEntreprise()));
+                personnalisations.apparence(version.getEntreprise()), langue);
     }
 
     /** Même contrôle que l'envoi (lignée, jeton haché) ; un jeton absent ou mal formé n'a jamais répondu. */
@@ -93,6 +95,15 @@ public class CollecteServiceImpl implements CollecteService {
             dateConsentement = maintenant;
         }
 
+        // Langue du répondant : l'une de celles de la version ouverte (contrôlée avant DEJA_REPONDU, comme le
+        // consentement). Elle ne sert qu'à l'analyse : validation et conditions passent par les valeurs stables.
+        Langue langue = soumission.langue() == null ? version.getLanguePrincipale() : soumission.langue();
+        if (!version.getLanguesDisponibles().contains(langue)) {
+            throw new RegleGestionException(Langues.CODE_INVALIDE, "Ce sondage n'est pas proposé en « " + langue
+                    + " » (langues : " + version.getLanguesDisponibles().stream().map(Langue::getCode)
+                    .collect(Collectors.joining(", ")) + ").");
+        }
+
         String jetonRepondantHash = null;
         if (version.isReponseUnique()) {
             String jetonRepondant = uuid(soumission.jetonRepondant());
@@ -112,6 +123,7 @@ public class CollecteServiceImpl implements CollecteService {
         reponse.setLignee(racine);
         reponse.setJetonRepondantHash(jetonRepondantHash);
         reponse.setDateConsentement(dateConsentement);
+        reponse.setLangue(langue);
         for (ReponseQuestion ligne : resultat.lignes()) {
             ligne.setReponse(reponse);
             reponse.getValeurs().add(ligne);
@@ -119,8 +131,8 @@ public class CollecteServiceImpl implements CollecteService {
         reponse.getQuestionsMasquees().addAll(resultat.questionsMasquees());
         // Flush ici : un envoi simultané du même appareil heurte la contrainte unique (409 DEJA_REPONDU).
         reponse = reponseRepository.saveAndFlush(reponse);
-        log.info("Réponse {} enregistrée pour le sondage {} (version {})",
-                reponse.getId(), version.getId(), version.getVersion());
+        log.info("Réponse {} enregistrée pour le sondage {} (version {}, langue {})",
+                reponse.getId(), version.getId(), version.getVersion(), langue);
         return reponse.getDateSoumission();
     }
 

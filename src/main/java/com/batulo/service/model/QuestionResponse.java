@@ -21,6 +21,12 @@ public record QuestionResponse(
         @JsonInclude(JsonInclude.Include.NON_NULL)
         Boolean estCritere,
         @JsonInclude(JsonInclude.Include.NON_NULL)
-        JsonNode critereConfig
+        JsonNode critereConfig,
+        /**
+         * MATRICE (formulaire public et aperçu) : libellés à afficher, au même rang que configuration.lignes et
+         * configuration.colonnes, qui restent les valeurs à envoyer ({"ligne": "colonne"} en langue principale).
+         */
+        @JsonInclude(JsonInclude.Include.NON_NULL)
+        LibellesMatriceResponse libellesMatrice
 ) {
 }

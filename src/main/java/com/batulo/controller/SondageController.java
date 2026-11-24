@@ -1,12 +1,13 @@
 package com.batulo.controller;
 
 import com.batulo.configs.security.UtilisateurConnecte;
+import com.batulo.enums.Langue;
 import com.batulo.enums.StatutSondage;
 import com.batulo.mappers.SondageMapper;
 import com.batulo.service.SondageService;
 import com.batulo.service.model.ApercuResponse;
-import com.batulo.service.model.CreationSondageRequest;
 import com.batulo.service.model.ConditionRequest;
+import com.batulo.service.model.CreationSondageRequest;
 import com.batulo.service.model.CritereRequest;
 import com.batulo.service.model.DatesSondageRequest;
 import com.batulo.service.model.DeplacementQuestionRequest;
@@ -345,10 +346,13 @@ public class SondageController {
     @GetMapping("/{id}/apercu")
     @PreAuthorize(ROLES)
     @Operation(summary = "Prévisualiser", description = "Le formulaire tel que le verra le répondant, sans les "
-            + "informations internes. Fonctionne aussi pour un brouillon.")
+            + "informations internes. Fonctionne aussi pour un brouillon. ?langue=fr|en|ar : langue proposée par le "
+            + "sondage, sinon la langue principale (texte principal pour un texte non traduit).")
     public ApercuResponse apercu(@Parameter(hidden = true) @AuthenticationPrincipal UtilisateurConnecte moi,
-                                 @PathVariable Long id) {
-        return sondageMapper.toResponse(sondageService.apercu(moi.id(), id));
+                                 @PathVariable Long id,
+                                 @Parameter(description = "Langue d'affichage (fr, en, ar)")
+                                 @RequestParam(required = false) String langue) {
+        return sondageMapper.toResponse(sondageService.apercu(moi.id(), id, Langue.parCode(langue).orElse(null)));
     }
 
     @PostMapping("/{id}/dupliquer")

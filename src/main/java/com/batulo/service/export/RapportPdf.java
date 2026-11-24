@@ -2,8 +2,8 @@ package com.batulo.service.export;
 
 import com.batulo.enums.TypeQuestion;
 import com.batulo.service.model.CroisementModel;
-import com.batulo.service.model.StatistiquesModel;
 import com.batulo.service.model.StatistiquesModel.QuestionStat;
+import com.batulo.service.model.StatistiquesModel;
 import com.lowagie.text.Document;
 import com.lowagie.text.DocumentException;
 import com.lowagie.text.Element;
@@ -14,6 +14,8 @@ import com.lowagie.text.Paragraph;
 import com.lowagie.text.Phrase;
 import com.lowagie.text.Rectangle;
 import com.lowagie.text.pdf.BaseFont;
+import com.lowagie.text.pdf.ColumnText;
+import com.lowagie.text.pdf.FontSelector;
 import com.lowagie.text.pdf.PdfContentByte;
 import com.lowagie.text.pdf.PdfPCell;
 import com.lowagie.text.pdf.PdfPCellEvent;
@@ -36,7 +38,9 @@ import java.util.Objects;
 /**
  * Rapport PDF (module 4.4) construit à partir des statistiques déjà calculées : page de titre, puis une section par
  * question avec son tableau et un graphique en barres dessiné directement dans le tableau (vectoriel, net à
- * l'impression). Police libre embarquée (Liberation Sans) : tous les caractères des réponses s'affichent.
+ * l'impression). Polices libres embarquées : Liberation Sans, et Noto Sans Arabic (licence OFL, fichier joint) pour
+ * l'arabe, choisies caractère par caractère. Un texte qui contient de l'arabe est écrit de droite à gauche dans une
+ * cellule (OpenPDF lie alors les lettres selon leur position) ; les autres textes restent de gauche à droite.
  */
 public class RapportPdf {
 
@@ -50,6 +54,8 @@ public class RapportPdf {
 
     private static final BaseFont NORMAL = police("liberation/LiberationSans-Regular.ttf");
     private static final BaseFont GRAS = police("liberation/LiberationSans-Bold.ttf");
+    private static final BaseFont ARABE = police("polices/noto/NotoSansArabic-Regular.ttf");
+    private static final BaseFont ARABE_GRAS = police("polices/noto/NotoSansArabic-Bold.ttf");
 
     private final Font titre = new Font(GRAS, 22, Font.NORMAL, BLEU);
     private final Font sousTitre = new Font(GRAS, 13, Font.NORMAL, BLEU);
@@ -104,9 +110,9 @@ public class RapportPdf {
     public void croisement(CroisementModel tableau, OutputStream flux) {
         Document document = ouvrir(PageSize.A4.rotate(), flux);
         try {
-            document.add(new Paragraph(infos.titre(), titre));
-            document.add(new Paragraph("Tableau croisé : « " + tableau.question().libelle() + " » par « "
-                    + tableau.par().libelle() + " »", sousTitre));
+            document.add(bloc(infos.titre(), titre, 0, 0, 0));
+            document.add(bloc("Tableau croisé : « " + tableau.question().libelle() + " » par « "
+                    + tableau.par().libelle() + " »", sousTitre, 0, 0, 0));
             document.add(new Paragraph(" "));
             document.add(tableauInfos(null, false));
             document.add(new Paragraph(" "));
@@ -152,15 +158,10 @@ public class RapportPdf {
             document.add(grand);
         }
         if (infos.personnalise()) {
-            Paragraph entreprise = new Paragraph(infos.entreprise(), texteGras);
-            entreprise.setSpacingBefore(6);
-            entreprise.setSpacingAfter(40);
-            document.add(entreprise);
+            document.add(bloc(infos.entreprise(), texteGras, 6, 40, 0));
         }
         document.add(new Paragraph(nature, sousTitre));
-        Paragraph nom = new Paragraph(infos.titre(), titre);
-        nom.setSpacingAfter(24);
-        document.add(nom);
+        document.add(bloc(infos.titre(), titre, 0, 24, 0));
         document.add(tableauInfos(reponses, petitEffectif));
     }
 
@@ -182,10 +183,10 @@ public class RapportPdf {
     }
 
     private void ligneInfo(PdfPTable table, String libelle, String valeur) {
-        PdfPCell gauche = new PdfPCell(new Phrase(libelle, texteGras));
+        PdfPCell gauche = sens(new PdfPCell(phrase(libelle, texteGras)), libelle);
         gauche.setBorder(Rectangle.NO_BORDER);
         gauche.setPaddingBottom(5);
-        PdfPCell droite = new PdfPCell(new Phrase(valeur, texte));
+        PdfPCell droite = sens(new PdfPCell(phrase(valeur, texte)), valeur);
         droite.setBorder(Rectangle.NO_BORDER);
         droite.setPaddingBottom(5);
         table.addCell(gauche);
@@ -198,13 +199,17 @@ public class RapportPdf {
         if (ecrivain.getVerticalPosition(true) - document.bottom() < HAUTEUR_MIN_QUESTION) {
             document.newPage();
         }
-        Paragraph entete = new Paragraph(numero + ". " + q.libelle(), sousTitre);
-        entete.setSpacingBefore(14);
-        entete.setKeepTogether(true);
-        document.add(entete);
-        document.add(new Paragraph(q.section() + " · " + libelleType(q.type()) + " · " + q.nombreRepondants()
+        document.add(bloc(numero + ". " + q.libelle(), sousTitre, 14, 0, 0));
+        String details = libelleType(q.type()) + " · " + q.nombreRepondants()
                 + " répondant(s) · " + q.sansReponse() + " sans réponse"
-                + (q.conditionnelle() ? " · question conditionnelle, vue par " + q.vues() : ""), discret));
+                + (q.conditionnelle() ? " · question conditionnelle, vue par " + q.vues() : "");
+        if (contientArabe(q.section())) {
+            // Section en arabe sur sa propre ligne (de droite à gauche), les détails en français dessous.
+            document.add(bloc(q.section(), discret, 0, 0, 0));
+            document.add(new Paragraph(details, discret));
+        } else {
+            document.add(new Paragraph(q.section() + " · " + details, discret));
+        }
         if (q.petitEffectif()) {
             document.add(new Paragraph("Petit effectif : moins de " + infos.effectifMinimum()
                     + " répondants, à interpréter avec prudence.", alerte));
@@ -264,10 +269,7 @@ public class RapportPdf {
             document.add(new Paragraph(q.textes().totalElements() + " réponse(s) libre(s)"
                     + (q.textes().totalElements() > TEXTES_MAX ? ", les " + TEXTES_MAX + " plus récentes :" : " :"), texte));
             for (StatistiquesModel.Texte t : q.textes().contenu().stream().limit(TEXTES_MAX).toList()) {
-                Paragraph ligne = new Paragraph("« " + t.texte() + " »", texte);
-                ligne.setIndentationLeft(12);
-                ligne.setSpacingBefore(2);
-                document.add(ligne);
+                document.add(bloc("« " + t.texte() + " »", texte, 2, 0, 12));
             }
         }
     }
@@ -279,11 +281,11 @@ public class RapportPdf {
             largeurs[i] = 1.4f;
         }
         List<String> entetes = new ArrayList<>(List.of("Ligne"));
-        entetes.addAll(m.colonnes());
+        entetes.addAll(m.libellesColonnes());
         entetes.add("Réponses");
         PdfPTable table = table(largeurs, entetes.toArray(String[]::new));
         for (StatistiquesModel.LigneMatrice ligne : m.lignes()) {
-            table.addCell(cellule(ligne.ligne(), Element.ALIGN_LEFT));
+            table.addCell(cellule(ligne.libelle(), Element.ALIGN_LEFT));
             for (StatistiquesModel.Cellule c : ligne.cellules()) {
                 table.addCell(cellule(c.nombre() + " (" + pct(c.pourcentage()) + ")", Element.ALIGN_CENTER));
             }
@@ -348,7 +350,7 @@ public class RapportPdf {
         table.setWidthPercentage(100);
         table.setHeaderRows(1);
         for (String entete : entetes) {
-            PdfPCell cellule = new PdfPCell(new Phrase(entete, texteGras));
+            PdfPCell cellule = sens(new PdfPCell(phrase(entete, texteGras)), entete);
             cellule.setBackgroundColor(GRIS_ENTETE);
             cellule.setPadding(4);
             cellule.setBorderColor(GRIS_ENTETE);
@@ -358,7 +360,7 @@ public class RapportPdf {
     }
 
     private PdfPCell cellule(String valeur, int alignement) {
-        PdfPCell cellule = new PdfPCell(new Phrase(valeur, texte));
+        PdfPCell cellule = sens(new PdfPCell(phrase(valeur, texte)), valeur);
         cellule.setHorizontalAlignment(alignement);
         cellule.setPadding(4);
         cellule.setBorderColor(GRIS_ENTETE);
@@ -417,10 +419,16 @@ public class RapportPdf {
                 xTexte += largeur + 6;
             }
             String auteur = infos.personnalise() ? infos.entreprise() : "Batulo";
+            // ColumnText : sélection des polices et écriture de droite à gauche si l'en-tête contient de l'arabe.
+            String entete = auteur + " · " + infos.titre();
+            boolean arabe = contientArabe(entete);
+            ColumnText.showTextAligned(cb, arabe ? Element.ALIGN_RIGHT : Element.ALIGN_LEFT,
+                    phrase(entete, new Font(NORMAL, 8, Font.NORMAL, GRIS_TEXTE)),
+                    arabe ? document.right() : xTexte, page.getTop() - 30, 0,
+                    arabe ? PdfWriter.RUN_DIRECTION_RTL : PdfWriter.RUN_DIRECTION_LTR, 0);
             cb.beginText();
             cb.setFontAndSize(NORMAL, 8);
             cb.setColorFill(GRIS_TEXTE);
-            cb.showTextAligned(Element.ALIGN_LEFT, auteur + " · " + infos.titre(), xTexte, page.getTop() - 30, 0);
             String pageX = "Page " + writer.getPageNumber() + " / ";
             float x = document.right() - 40;
             cb.showTextAligned(Element.ALIGN_RIGHT, pageX, x, 25, 0);
@@ -436,6 +444,63 @@ public class RapportPdf {
             total.showText(String.valueOf(writer.getPageNumber() - 1));
             total.endText();
         }
+    }
+
+    // ---------------------------------------------------------------- Polices et sens d'écriture
+
+    /** Texte dans la police demandée, et Noto Sans Arabic pour les caractères arabes (même taille, style, couleur). */
+    private static Phrase phrase(String valeur, Font police) {
+        String texte = valeur == null ? "" : valeur;
+        if (!contientArabe(texte)) {
+            return new Phrase(texte, police);
+        }
+        FontSelector selecteur = new FontSelector();
+        selecteur.addFont(police);
+        selecteur.addFont(new Font(police.getBaseFont() == GRAS ? ARABE_GRAS : ARABE, police.getSize(),
+                police.getStyle(), police.getColor()));
+        return selecteur.process(texte);
+    }
+
+    /** Une cellule qui contient de l'arabe s'écrit de droite à gauche (lettres liées, ordre bidirectionnel). */
+    private static PdfPCell sens(PdfPCell cellule, String valeur) {
+        if (contientArabe(valeur)) {
+            cellule.setRunDirection(PdfWriter.RUN_DIRECTION_RTL);
+        }
+        return cellule;
+    }
+
+    /**
+     * Paragraphe de texte libre (titres, libellés, réponses). Avec de l'arabe : une cellule sans bordure écrite de
+     * droite à gauche, car OpenPDF ne façonne l'arabe que dans les cellules et les colonnes, pas dans un paragraphe.
+     */
+    private Element bloc(String valeur, Font police, float avant, float apres, float retrait) {
+        if (!contientArabe(valeur)) {
+            Paragraph paragraphe = new Paragraph(phrase(valeur, police));
+            paragraphe.setSpacingBefore(avant);
+            paragraphe.setSpacingAfter(apres);
+            paragraphe.setIndentationLeft(retrait);
+            paragraphe.setKeepTogether(true);
+            return paragraphe;
+        }
+        PdfPTable table = new PdfPTable(1);
+        table.setWidthPercentage(100);
+        table.setSpacingBefore(avant);
+        table.setSpacingAfter(apres);
+        PdfPCell cellule = sens(new PdfPCell(phrase(valeur, police)), valeur);
+        cellule.setBorder(Rectangle.NO_BORDER);
+        cellule.setPadding(0);
+        cellule.setPaddingBottom(3);
+        cellule.setPaddingRight(retrait);
+        table.addCell(cellule);
+        return table;
+    }
+
+    static boolean contientArabe(String texte) {
+        if (texte == null) {
+            return false;
+        }
+        return texte.codePoints().anyMatch(c -> (c >= 0x0600 && c <= 0x06FF) || (c >= 0x0750 && c <= 0x077F)
+                || (c >= 0x08A0 && c <= 0x08FF) || (c >= 0xFB50 && c <= 0xFDFF) || (c >= 0xFE70 && c <= 0xFEFF));
     }
 
     // ---------------------------------------------------------------- Outils

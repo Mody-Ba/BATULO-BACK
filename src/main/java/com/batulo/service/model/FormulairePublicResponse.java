@@ -1,5 +1,6 @@
 package com.batulo.service.model;
 
+import com.batulo.enums.Langue;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import io.swagger.v3.oas.annotations.media.Schema;
 
@@ -27,6 +28,11 @@ public record FormulairePublicResponse(
         String texteConsentement,
         /** Apparence à l'image de l'entreprise (nom affiché, logo, couleurs) ; rien d'autre sur l'entreprise. */
         ApparenceResponse apparence,
+        /** Langue des textes renvoyés : celle demandée (?langue=) si elle est proposée, sinon la langue principale. */
+        Langue langue,
+        Langue languePrincipale,
+        /** Langues proposées au répondant, la langue principale d'abord. */
+        List<Langue> languesDisponibles,
         List<SectionPubliqueResponse> sections,
         /**
          * Seulement si reponseUnique : true si l'appareil (en-tête X-Jeton-Repondant) a déjà répondu à l'une des

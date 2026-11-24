@@ -3,16 +3,17 @@ package com.batulo.service;
 import com.batulo.entity.Question;
 import com.batulo.entity.Sondage;
 import com.batulo.enums.GranulariteDate;
+import com.batulo.enums.Langue;
 import com.batulo.enums.TypeQuestion;
 import com.batulo.exception.RegleGestionException;
 import com.batulo.exception.ResourceNotFoundException;
-import com.batulo.repository.StatistiqueRepository;
 import com.batulo.repository.StatistiqueRepository.Filtre;
+import com.batulo.repository.StatistiqueRepository;
 import com.batulo.service.AnalysePerimetre.Perimetre;
 import com.batulo.service.AnalysePerimetre.Reference;
 import com.batulo.service.model.CritereModel;
 import com.batulo.service.model.CroisementModel;
-import com.batulo.service.model.StatistiquesModel;
+import com.batulo.service.model.LanguesAnalyse;
 import com.batulo.service.model.StatistiquesModel.Cellule;
 import com.batulo.service.model.StatistiquesModel.Classe;
 import com.batulo.service.model.StatistiquesModel.Dates;
@@ -26,6 +27,7 @@ import com.batulo.service.model.StatistiquesModel.QuestionStat;
 import com.batulo.service.model.StatistiquesModel.RangStat;
 import com.batulo.service.model.StatistiquesModel.Resume;
 import com.batulo.service.model.StatistiquesModel.Texte;
+import com.batulo.service.model.StatistiquesModel;
 import com.fasterxml.jackson.databind.JsonNode;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -36,6 +38,7 @@ import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -77,8 +80,8 @@ public class StatistiqueServiceImpl implements StatistiqueService {
     @Override
     public StatistiquesModel statistiques(Long utilisateurId, Long sondageId, boolean lignee, LocalDate du,
                                           LocalDate au, GranulariteDate granulariteDate,
-                                          Map<String, List<String>> criteres) {
-        Perimetre perimetre = analyse.perimetre(utilisateurId, sondageId, lignee, du, au, criteres);
+                                          Map<String, List<String>> criteres, LanguesAnalyse langues) {
+        Perimetre perimetre = analyse.perimetre(utilisateurId, sondageId, lignee, du, au, criteres, langues);
         Sondage sondage = perimetre.sondage();
         List<Sondage> versions = perimetre.versions();
         Map<String, Reference> references = perimetre.references();
@@ -98,15 +101,22 @@ public class StatistiqueServiceImpl implements StatistiqueService {
                         masquees.getOrDefault(e.getKey(), 0L)))
                 .toList();
 
-        return new StatistiquesModel(sondage.getId(), sondage.getTitre(), lignee,
-                versions.stream().map(Sondage::getVersion).toList(), du, au, perimetre.criteres(),
+        Map<String, Long> parLangue = statistiqueRepository.reponsesParLangue(filtre);
+        List<StatistiquesModel.ReponsesLangue> repartitionLangues = Arrays.stream(Langue.values())
+                .filter(l -> parLangue.getOrDefault(l.getCode(), 0L) > 0)
+                .map(l -> new StatistiquesModel.ReponsesLangue(l, parLangue.get(l.getCode())))
+                .toList();
+        return new StatistiquesModel(sondage.getId(), Traducteur.pour(sondage, perimetre.langue()).titre(sondage),
+                lignee, versions.stream().map(Sondage::getVersion).toList(), du, au, perimetre.criteres(),
+                perimetre.langue(), perimetre.langues(), repartitionLangues,
                 new Resume(resume.nombre(), petit(resume.nombre()), resume.premiere(), resume.derniere()), questions);
     }
 
     @Override
     public PageTextes textes(Long utilisateurId, Long sondageId, Long questionId, boolean lignee, LocalDate du,
-                             LocalDate au, Map<String, List<String>> criteres, int page, int taille) {
-        Perimetre perimetre = analyse.perimetre(utilisateurId, sondageId, lignee, du, au, criteres);
+                             LocalDate au, Map<String, List<String>> criteres, LanguesAnalyse langues, int page,
+                             int taille) {
+        Perimetre perimetre = analyse.perimetre(utilisateurId, sondageId, lignee, du, au, criteres, langues);
         Reference reference = perimetre.references().values().stream()
                 .filter(r -> r.ids.contains(questionId) || r.question.getId().equals(questionId))
                 .findFirst()
@@ -125,19 +135,20 @@ public class StatistiqueServiceImpl implements StatistiqueService {
     }
 
     @Override
-    public List<CritereModel> criteres(Long utilisateurId, Long sondageId, boolean lignee) {
-        Perimetre perimetre = analyse.perimetre(utilisateurId, sondageId, lignee, null, null, Map.of());
+    public List<CritereModel> criteres(Long utilisateurId, Long sondageId, boolean lignee, LanguesAnalyse langues) {
+        Perimetre perimetre = analyse.perimetre(utilisateurId, sondageId, lignee, null, null, Map.of(), langues);
         return perimetre.references().entrySet().stream()
                 .filter(e -> e.getValue().question.isEstCritere())
-                .map(e -> new CritereModel(e.getKey(), e.getValue().question.getId(), e.getValue().question.getLibelle(),
+                .map(e -> new CritereModel(e.getKey(), e.getValue().question.getId(), e.getValue().libelle,
                         e.getValue().question.getType(), analyse.valeursCritere(e.getValue(), perimetre.filtre())))
                 .toList();
     }
 
     @Override
     public CroisementModel croisement(Long utilisateurId, Long sondageId, String cleQuestion, String clePar,
-                                      boolean lignee, LocalDate du, LocalDate au, Map<String, List<String>> criteres) {
-        Perimetre perimetre = analyse.perimetre(utilisateurId, sondageId, lignee, du, au, criteres);
+                                      boolean lignee, LocalDate du, LocalDate au, Map<String, List<String>> criteres,
+                                      LanguesAnalyse langues) {
+        Perimetre perimetre = analyse.perimetre(utilisateurId, sondageId, lignee, du, au, criteres, langues);
         Reference question = perimetre.references().get(cleQuestion);
         if (question == null) {
             throw new ResourceNotFoundException("QUESTION_INTROUVABLE", "Aucune question de clé " + cleQuestion + ".");
@@ -208,8 +219,8 @@ public class StatistiqueServiceImpl implements StatistiqueService {
                     .toList();
         }
         return new CroisementModel(
-                new CroisementModel.Entete(cleQuestion, question.question.getLibelle(), type),
-                new CroisementModel.Entete(clePar, par.question.getLibelle(), par.question.getType()),
+                new CroisementModel.Entete(cleQuestion, question.libelle, type),
+                new CroisementModel.Entete(clePar, par.libelle, par.question.getType()),
                 perimetre.criteres(), colonnes, lignes, numerique);
     }
 
@@ -318,12 +329,12 @@ public class StatistiqueServiceImpl implements StatistiqueService {
                 case ECHELLE, NUMERIQUE -> numerique = numerique(question, cle, nombre);
                 case DATE -> dates = dates(cle);
                 case CLASSEMENT -> classement = classement(reference, cle);
-                case MATRICE -> matrice = matrice(question.getConfiguration(), cle);
+                case MATRICE -> matrice = matrice(reference, cle);
                 case TEXTE_COURT, TEXTE_LONG -> pageTextes = new PageTextes(
                         textes.getOrDefault(cle, List.of()).stream().map(t -> new Texte(t.texte(), t.date())).toList(),
                         0, TEXTES_PAR_PAGE, nombre, (int) ((nombre + TEXTES_PAR_PAGE - 1) / TEXTES_PAR_PAGE));
             }
-            return new QuestionStat(question.getId(), cle, reference.section, question.getLibelle(), question.getType(),
+            return new QuestionStat(question.getId(), cle, reference.section, reference.libelle, question.getType(),
                     nombre, Math.max(0, vues - nombre), conditionnelle, vues, petit(nombre), optionStats, numerique, dates,
                     classement, matrice, pageTextes);
         }
@@ -414,7 +425,8 @@ public class StatistiqueServiceImpl implements StatistiqueService {
         }
 
         /** Lignes et colonnes de la référence ; pourcentages sur les réponses de chaque ligne. */
-        private Matrice matrice(JsonNode configuration, String cle) {
+        private Matrice matrice(Reference reference, String cle) {
+            JsonNode configuration = reference.question.getConfiguration();
             List<String> colonnes = new ArrayList<>();
             configuration.path("colonnes").forEach(c -> colonnes.add(c.asText()));
             Map<String, Map<String, Long>> parLigne = new LinkedHashMap<>();
@@ -428,7 +440,8 @@ public class StatistiqueServiceImpl implements StatistiqueService {
             List<LigneMatrice> lignes = parLigne.entrySet().stream()
                     .map(e -> {
                         long totalLigne = e.getValue().values().stream().mapToLong(Long::longValue).sum();
-                        return new LigneMatrice(e.getKey(), totalLigne, colonnes.stream()
+                        return new LigneMatrice(e.getKey(), reference.libellesLignes.getOrDefault(e.getKey(), e.getKey()),
+                                totalLigne, colonnes.stream()
                                 .map(c -> {
                                     long n = e.getValue().getOrDefault(c, 0L);
                                     return new Cellule(c, n, pourcentage(n, totalLigne));
@@ -436,7 +449,8 @@ public class StatistiqueServiceImpl implements StatistiqueService {
                                 .toList());
                     })
                     .toList();
-            return new Matrice(colonnes, lignes);
+            return new Matrice(colonnes, colonnes.stream()
+                    .map(c -> reference.libellesColonnes.getOrDefault(c, c)).toList(), lignes);
         }
 
         private <T> List<T> lancer(Map<TypeQuestion, Set<Long>> ids, Set<TypeQuestion> types,

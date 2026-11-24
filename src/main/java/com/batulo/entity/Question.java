@@ -84,6 +84,11 @@ public class Question {
     @Column(name = "condition_affichage")
     private JsonNode condition;
 
+    /** Traductions par code de langue (voir le changeset 022) ; null : aucune. */
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "traductions")
+    private JsonNode traductions;
+
     @OneToMany(mappedBy = "question", cascade = CascadeType.ALL, orphanRemoval = true)
     @OrderBy("ordre ASC")
     private List<OptionQuestion> options = new ArrayList<>();
@@ -192,5 +197,13 @@ public class Question {
 
     public List<OptionQuestion> getOptions() {
         return options;
+    }
+
+    public JsonNode getTraductions() {
+        return traductions;
+    }
+
+    public void setTraductions(JsonNode traductions) {
+        this.traductions = traductions;
     }
 }

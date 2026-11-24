@@ -5,6 +5,7 @@ import com.batulo.entity.Question;
 import com.batulo.entity.Section;
 import com.batulo.entity.Sondage;
 import com.batulo.entity.Utilisateur;
+import com.batulo.enums.Langue;
 import com.batulo.enums.Role;
 import com.batulo.enums.StatutSondage;
 import com.batulo.exception.ActionInterditeException;
@@ -18,8 +19,8 @@ import com.batulo.service.mappers.SondageMapper;
 import com.batulo.service.model.ApercuModel;
 import com.batulo.service.model.ConditionModel;
 import com.batulo.service.model.CreationSondageModel;
-import com.batulo.service.model.FormulaireModel;
 import com.batulo.service.model.DatesSondageModel;
+import com.batulo.service.model.FormulaireModel;
 import com.batulo.service.model.OptionInfoModel;
 import com.batulo.service.model.QuestionInfoModel;
 import com.batulo.service.model.SectionInfoModel;
@@ -115,6 +116,13 @@ public class SondageServiceImpl implements SondageService {
             sondage = nouveauBrouillon(source, acteur);
             String description = texteFacultatif(creation.description());
             sondage.setDescription(description != null ? description : source.getDescription());
+            // Un texte remplacé perd ses traductions (elles traduisaient l'ancien texte).
+            if (description != null && !description.equals(source.getDescription())) {
+                TextesTraduisibles.effacer(sondage, "description");
+            }
+            if (!creation.titre().trim().equals(source.getTitre())) {
+                TextesTraduisibles.effacer(sondage, "titre");
+            }
         }
         sondage.setTitre(creation.titre().trim());
         if (creation.reponseUnique() != null) {
@@ -187,8 +195,12 @@ public class SondageServiceImpl implements SondageService {
     @Transactional
     public SondageModel modifier(Long utilisateurId, Long sondageId, SondageInfoModel info) {
         Sondage sondage = sondageModifiable(utilisateurId, sondageId);
-        sondage.setTitre(info.titre().trim());
-        sondage.setDescription(texteFacultatif(info.description()));
+        String titre = info.titre().trim();
+        String description = texteFacultatif(info.description());
+        traduitSiChange(sondage, "titre", sondage.getTitre(), titre);
+        traduitSiChange(sondage, "description", sondage.getDescription(), description);
+        sondage.setTitre(titre);
+        sondage.setDescription(description);
         if (info.reponseUnique() != null) {
             sondage.setReponseUnique(info.reponseUnique());
         }
@@ -200,16 +212,22 @@ public class SondageServiceImpl implements SondageService {
     /** Page d'accueil : null = inchangé, texte vide = effacé ; un consentement exigé a toujours son texte. */
     private static void appliquerPageAccueil(Sondage sondage, SondageInfoModel info) {
         if (info.objetEnquete() != null) {
-            sondage.setObjetEnquete(texteFacultatif(info.objetEnquete()));
+            String texte = texteFacultatif(info.objetEnquete());
+            traduitSiChange(sondage, "objetEnquete", sondage.getObjetEnquete(), texte);
+            sondage.setObjetEnquete(texte);
         }
         if (info.texteConfidentialite() != null) {
-            sondage.setTexteConfidentialite(texteFacultatif(info.texteConfidentialite()));
+            String texte = texteFacultatif(info.texteConfidentialite());
+            traduitSiChange(sondage, "texteConfidentialite", sondage.getTexteConfidentialite(), texte);
+            sondage.setTexteConfidentialite(texte);
         }
         if (info.consentementRequis() != null) {
             sondage.setConsentementRequis(info.consentementRequis());
         }
         if (info.texteConsentement() != null) {
-            sondage.setTexteConsentement(texteFacultatif(info.texteConsentement()));
+            String texte = texteFacultatif(info.texteConsentement());
+            traduitSiChange(sondage, "texteConsentement", sondage.getTexteConsentement(), texte);
+            sondage.setTexteConsentement(texte);
         }
         if (sondage.isConsentementRequis() && sondage.getTexteConsentement() == null) {
             throw new RegleGestionException("TEXTE_CONSENTEMENT_REQUIS",
@@ -254,8 +272,14 @@ public class SondageServiceImpl implements SondageService {
     public SondageModel modifierSection(Long utilisateurId, Long sondageId, Long sectionId, SectionInfoModel info) {
         Sondage sondage = sondageModifiable(utilisateurId, sondageId);
         Section section = section(sondage, sectionId);
-        section.setTitre(info.titre().trim());
-        section.setDescription(texteFacultatif(info.description()));
+        String titre = info.titre().trim();
+        String description = texteFacultatif(info.description());
+        JsonNode traductions = TextesTraduisibles.apresModification(section.getTraductions(), "titre",
+                section.getTitre(), titre);
+        section.setTraductions(TextesTraduisibles.apresModification(traductions, "description",
+                section.getDescription(), description));
+        section.setTitre(titre);
+        section.setDescription(description);
         sondage.marquerModifie();
         return enregistrer(sondage);
     }
@@ -393,9 +417,24 @@ public class SondageServiceImpl implements SondageService {
                 : memeType ? question.getCritereConfig() : null;
         question.setCritereConfig(validateurQuestion.validerCritere(info.type(), configuration, critere, critereConfig));
         question.setEstCritere(critere);
+        // Textes modifiés : leurs traductions sont retirées (lignes et colonnes de matrice : rangées sous leur
+        // texte, une ligne renommée n'a simplement plus de traduction).
+        JsonNode traductions = question.getTraductions();
+        String libelle = info.libelle().trim();
+        String aide = texteFacultatif(info.aide());
+        traductions = TextesTraduisibles.apresModification(traductions, "libelle", question.getLibelle(), libelle);
+        traductions = TextesTraduisibles.apresModification(traductions, "aide", question.getAide(), aide);
+        for (String champ : List.of("libelleMin", "libelleMax")) {
+            JsonNode ancien = question.getConfiguration() == null ? null : question.getConfiguration().get(champ);
+            JsonNode nouveau = configuration.get(champ);
+            traductions = TextesTraduisibles.apresModification(traductions, champ,
+                    ancien == null || ancien.isNull() ? null : ancien.asText(),
+                    nouveau == null || nouveau.isNull() ? null : nouveau.asText());
+        }
+        question.setTraductions(traductions);
         question.setConfiguration(configuration);
-        question.setLibelle(info.libelle().trim());
-        question.setAide(texteFacultatif(info.aide()));
+        question.setLibelle(libelle);
+        question.setAide(aide);
         question.setType(info.type());
         question.setObligatoire(info.obligatoire());
         remplacerOptions(question, options);
@@ -431,7 +470,10 @@ public class SondageServiceImpl implements SondageService {
                 option = new OptionQuestion();
                 option.setQuestion(question);
             }
-            option.setLibelle(demande.libelle().trim());
+            String libelleOption = demande.libelle().trim();
+            option.setTraductions(TextesTraduisibles.apresModification(option.getTraductions(), "libelle",
+                    option.getLibelle(), libelleOption));
+            option.setLibelle(libelleOption);
             String valeur = demande.valeur() != null ? demande.valeur().trim()
                     : demande.id() != null ? option.getValeur() : null;
             if (valeur != null) {
@@ -546,6 +588,8 @@ public class SondageServiceImpl implements SondageService {
         }
         verifierComplet(sondage);
         validateurConditions.verifier(sondage);
+        // Chaque langue supplémentaire doit être complète : 400 TRADUCTIONS_INCOMPLETES avec la liste des manquants.
+        Langues.verifierCompletes(sondage);
         Instant maintenant = Instant.now();
         Instant ouverture = dates.datePublication() == null || dates.datePublication().isBefore(maintenant)
                 ? maintenant : dates.datePublication();
@@ -609,9 +653,10 @@ public class SondageServiceImpl implements SondageService {
     }
 
     @Override
-    public ApercuModel apercu(Long utilisateurId, Long sondageId) {
+    public ApercuModel apercu(Long utilisateurId, Long sondageId, Langue langue) {
         Sondage sondage = sondageLisible(acteur(utilisateurId), sondageId);
-        return sondageMapper.toApercuModel(sondage, Instant.now(), personnalisations.apparence(sondage.getEntreprise()));
+        return sondageMapper.toApercuModel(sondage, Instant.now(), personnalisations.apparence(sondage.getEntreprise()),
+                langue);
     }
 
     @Override
@@ -624,6 +669,7 @@ public class SondageServiceImpl implements SondageService {
         Sondage copie = nouveauBrouillon(source, acteur);
         String titre = "Copie de " + source.getTitre();
         copie.setTitre(titre.length() > TITRE_MAX ? titre.substring(0, TITRE_MAX) : titre);
+        TextesTraduisibles.effacer(copie, "titre");
         copie = sondageRepository.save(copie);
         log.info("Sondage {} dupliqué en {} par le compte {}", sondageId, copie.getId(), utilisateurId);
         return enregistrer(copie);
@@ -749,42 +795,16 @@ public class SondageServiceImpl implements SondageService {
         return accesSondage.sondageLisible(acteur, sondageId);
     }
 
-    /** Droit de gérer le sondage (publier, fermer, versionner...), quel que soit son statut. */
-
-    /**
-     * Droit de gérer le sondage (modifier, publier, fermer, versionner, supprimer...), quel que soit son statut :
-     * l'admin, ou le gestionnaire qui a créé CETTE version, avec la permission de créer des sondages. Un gestionnaire
-     * qui le voit seulement par assignation (ou par sa lignée) ne le gère pas : 403 ACTION_RESERVEE_CREATEUR.
-     */
     private Sondage sondageGere(Long utilisateurId, Long sondageId) {
-        Utilisateur acteur = acteur(utilisateurId);
-        verifierDroitDeModifier(acteur);
-        Sondage sondage = sondageLisible(acteur, sondageId);
-        if (acteur.getRole() == Role.GESTIONNAIRE
-                && (sondage.getCreePar() == null || !sondage.getCreePar().getId().equals(acteur.getId()))) {
-            throw new ActionInterditeException("ACTION_RESERVEE_CREATEUR",
-                    "Vous pouvez consulter ce sondage, mais seuls son créateur et l'admin peuvent le modifier, "
-                            + "le publier ou le fermer.");
-        }
-        return sondage;
+        return accesSondage.sondageGere(utilisateurId, sondageId);
     }
 
-    /** Droit de gérer ET contenu modifiable : seul un brouillon l'est, un sondage publié est gelé. */
     private Sondage sondageModifiable(Long utilisateurId, Long sondageId) {
-        Sondage sondage = sondageGere(utilisateurId, sondageId);
-        if (sondage.isPublie()) {
-            throw new ConflitException("SONDAGE_PUBLIE", "Ce sondage est publié : son contenu est gelé. "
-                    + "Créez une nouvelle version (POST /api/sondages/" + sondageId + "/nouvelle-version) pour le modifier.");
-        }
-        return sondage;
+        return accesSondage.sondageModifiable(utilisateurId, sondageId);
     }
 
-    /** Un gestionnaire sans la permission garde la lecture de ses sondages, mais ne crée ni ne modifie plus. */
     private static void verifierDroitDeModifier(Utilisateur acteur) {
-        if (acteur.getRole() == Role.GESTIONNAIRE && !acteur.isPeutCreerSondages()) {
-            throw new ActionInterditeException("PERMISSION_SONDAGES_REQUISE",
-                    "Votre admin ne vous a pas donné la permission de créer ou modifier des sondages.");
-        }
+        AccesSondage.verifierDroitDeModifier(acteur);
     }
 
     private static Section section(Sondage sondage, Long sectionId) {
@@ -835,6 +855,10 @@ public class SondageServiceImpl implements SondageService {
     private SondageModel enregistrer(Sondage sondage) {
         sondageRepository.flush();
         return sondageMapper.toModel(sondage, Instant.now());
+    }
+
+    private static void traduitSiChange(Sondage sondage, String champ, String ancien, String nouveau) {
+        sondage.setTraductions(TextesTraduisibles.apresModification(sondage.getTraductions(), champ, ancien, nouveau));
     }
 
     private static String texteFacultatif(String texte) {

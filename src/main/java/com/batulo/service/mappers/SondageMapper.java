@@ -5,8 +5,11 @@ import com.batulo.entity.Question;
 import com.batulo.entity.Section;
 import com.batulo.entity.Sondage;
 import com.batulo.entity.Utilisateur;
+import com.batulo.enums.Langue;
+import com.batulo.enums.TypeQuestion;
 import com.batulo.service.ConditionAffichage;
 import com.batulo.service.RegleSondage;
+import com.batulo.service.Traducteur;
 import com.batulo.service.model.ApercuModel;
 import com.batulo.service.model.ApparenceModel;
 import com.batulo.service.model.AuteurModel;
@@ -14,6 +17,7 @@ import com.batulo.service.model.ConditionModel;
 import com.batulo.service.model.FormulaireModel;
 import com.batulo.service.model.FormulairePublicModel;
 import com.batulo.service.model.GestionnaireAssigneModel;
+import com.batulo.service.model.LibellesMatriceModel;
 import com.batulo.service.model.OptionModel;
 import com.batulo.service.model.QuestionModel;
 import com.batulo.service.model.SectionModel;
@@ -21,9 +25,11 @@ import com.batulo.service.model.SondageModel;
 import com.batulo.service.model.SondageResumeModel;
 import com.batulo.service.model.VersionModel;
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.springframework.stereotype.Component;
 
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -54,10 +60,12 @@ public class SondageMapper {
                 entity.getTexteConfidentialite(),
                 entity.isConsentementRequis(),
                 entity.getTexteConsentement(),
+                entity.getLanguePrincipale(),
+                entity.getLanguesSupplementaires(),
                 auteur(entity.getCreePar()),
                 entity.getDateCreation(),
                 entity.getDateModification(),
-                sections(entity));
+                sections(entity, Traducteur.principale(), false));
     }
 
     public SondageResumeModel toResumeModel(Sondage entity, Instant maintenant, long nombreSections,
@@ -111,42 +119,55 @@ public class SondageMapper {
                 entity.getDateModification());
     }
 
-    /** Formulaire du répondant : contenu de la version ouverte, sans aucune donnée interne. */
-    public FormulairePublicModel toFormulairePublicModel(Sondage version, Boolean dejaRepondu, ApparenceModel apparence) {
+    /**
+     * Formulaire du répondant : contenu de la version ouverte dans la langue demandée (proposée par cette version,
+     * sinon la langue principale ; texte principal en secours), sans aucune donnée interne.
+     */
+    public FormulairePublicModel toFormulairePublicModel(Sondage version, Boolean dejaRepondu, ApparenceModel apparence,
+                                                         Langue langue) {
+        Traducteur t = Traducteur.pour(version, langue);
         return new FormulairePublicModel(
-                version.getTitre(),
-                version.getDescription(),
+                t.titre(version),
+                t.description(version),
                 version.isReponseUnique(),
                 version.getDateFermeture(),
-                version.getObjetEnquete(),
-                version.getTexteConfidentialite(),
+                t.objetEnquete(version),
+                t.texteConfidentialite(version),
                 version.isConsentementRequis(),
-                version.getTexteConsentement(),
+                t.texteConsentement(version),
                 apparence,
-                sections(version),
+                t.langue(),
+                version.getLanguePrincipale(),
+                version.getLanguesDisponibles(),
+                sections(version, t, true),
                 dejaRepondu);
     }
 
-    public ApercuModel toApercuModel(Sondage entity, Instant maintenant, ApparenceModel apparence) {
+    public ApercuModel toApercuModel(Sondage entity, Instant maintenant, ApparenceModel apparence, Langue langue) {
+        Traducteur t = Traducteur.pour(entity, langue);
         return new ApercuModel(
                 entity.getId(),
-                entity.getTitre(),
-                entity.getDescription(),
+                t.titre(entity),
+                t.description(entity),
                 entity.getVersion(),
                 RegleSondage.statut(entity, maintenant),
-                entity.getObjetEnquete(),
-                entity.getTexteConfidentialite(),
+                t.objetEnquete(entity),
+                t.texteConfidentialite(entity),
                 entity.isConsentementRequis(),
-                entity.getTexteConsentement(),
+                t.texteConsentement(entity),
                 apparence,
-                sections(entity));
+                t.langue(),
+                entity.getLanguePrincipale(),
+                entity.getLanguesDisponibles(),
+                sections(entity, t, true));
     }
 
-    private List<SectionModel> sections(Sondage entity) {
+    /** @param affichage true : formulaire public ou aperçu (libellés de matrice fournis) ; false : éditeur. */
+    private List<SectionModel> sections(Sondage entity, Traducteur t, boolean affichage) {
         // Les règles désignent leur source par sa clé : on la traduit en id de question de cette version.
         Map<String, Long> ids = new HashMap<>();
         entity.getSections().forEach(s -> s.getQuestions().forEach(q -> ids.put(q.getCle(), q.getId())));
-        return entity.getSections().stream().map(s -> toModel(s, ids)).toList();
+        return entity.getSections().stream().map(s -> toModel(s, ids, t, affichage)).toList();
     }
 
     private static ConditionModel condition(JsonNode json, Map<String, Long> ids) {
@@ -161,33 +182,53 @@ public class SondageMapper {
         return entity.getSondageOrigine() == null ? null : entity.getSondageOrigine().getId();
     }
 
-    private SectionModel toModel(Section entity, Map<String, Long> ids) {
+    private SectionModel toModel(Section entity, Map<String, Long> ids, Traducteur t, boolean affichage) {
         return new SectionModel(
                 entity.getId(),
-                entity.getTitre(),
-                entity.getDescription(),
+                t.titre(entity),
+                t.description(entity),
                 entity.getOrdre(),
                 condition(entity.getCondition(), ids),
-                entity.getQuestions().stream().map(q -> toModel(q, ids)).toList());
+                entity.getQuestions().stream().map(q -> toModel(q, ids, t, affichage)).toList());
     }
 
-    private QuestionModel toModel(Question entity, Map<String, Long> ids) {
+    private QuestionModel toModel(Question entity, Map<String, Long> ids, Traducteur t, boolean affichage) {
+        JsonNode configuration = entity.getConfiguration().deepCopy();
+        LibellesMatriceModel libellesMatrice = null;
+        if (entity.getType() == TypeQuestion.ECHELLE && configuration instanceof ObjectNode echelle) {
+            // Textes d'affichage seulement : traduits dans la configuration (les notes ne changent pas).
+            for (String champ : List.of("libelleMin", "libelleMax")) {
+                if (echelle.hasNonNull(champ)) {
+                    echelle.put(champ, t.libelleEchelle(entity, champ));
+                }
+            }
+        }
+        if (affichage && entity.getType() == TypeQuestion.MATRICE) {
+            // configuration.lignes / colonnes restent les valeurs à envoyer (texte principal) ; libellés à côté.
+            List<String> lignes = new ArrayList<>();
+            entity.getConfiguration().path("lignes").forEach(l -> lignes.add(t.matrice(entity, "lignes", l.asText())));
+            List<String> colonnes = new ArrayList<>();
+            entity.getConfiguration().path("colonnes")
+                    .forEach(c -> colonnes.add(t.matrice(entity, "colonnes", c.asText())));
+            libellesMatrice = new LibellesMatriceModel(lignes, colonnes);
+        }
         return new QuestionModel(
                 entity.getId(),
-                entity.getLibelle(),
-                entity.getAide(),
+                t.libelle(entity),
+                t.aide(entity),
                 entity.getType(),
                 entity.isObligatoire(),
                 entity.getOrdre(),
-                entity.getConfiguration().deepCopy(),
-                entity.getOptions().stream().map(this::toModel).toList(),
+                configuration,
+                entity.getOptions().stream().map(o -> toModel(o, t)).toList(),
                 entity.isEstCritere(),
                 entity.getCritereConfig() == null ? null : entity.getCritereConfig().deepCopy(),
-                condition(entity.getCondition(), ids));
+                condition(entity.getCondition(), ids),
+                libellesMatrice);
     }
 
-    private OptionModel toModel(OptionQuestion entity) {
-        return new OptionModel(entity.getId(), entity.getLibelle(), entity.getValeur(), entity.getOrdre());
+    private OptionModel toModel(OptionQuestion entity, Traducteur t) {
+        return new OptionModel(entity.getId(), t.libelle(entity), entity.getValeur(), entity.getOrdre());
     }
 
     private static AuteurModel auteur(Utilisateur utilisateur) {

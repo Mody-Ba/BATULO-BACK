@@ -62,11 +62,15 @@ public class StatistiqueController {
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate au,
             @Parameter(description = "Facultatif : JOUR ou MOIS pour les questions DATE (automatique sinon)")
             @RequestParam(required = false) GranulariteDate granulariteDate,
+            @Parameter(description = "Langue des libellés (fr, en, ar) ; défaut : langue principale du sondage")
+            @RequestParam(required = false) String langue,
+            @Parameter(description = "Filtre sur la langue de réponse, répétable (OU) : fr, en, ar ; défaut : toutes")
+            @RequestParam(required = false) List<String> langueReponse,
             @Parameter(description = "Filtres de segmentation, répétables : cleDuCritere:valeur (OU pour une même clé, "
                     + "ET entre clés). Voir GET /api/sondages/{id}/criteres")
             @RequestParam(required = false) List<String> critere) {
         return statistiqueMapper.toResponse(statistiqueService.statistiques(moi.id(), id, lignee, du, au,
-                granulariteDate, statistiqueMapper.toCriteres(critere)));
+                granulariteDate, statistiqueMapper.toCriteres(critere), statistiqueMapper.toLangues(langue, langueReponse)));
     }
 
     @GetMapping("/criteres")
@@ -76,8 +80,11 @@ public class StatistiqueController {
                     + "mois/années présents dans les réponses.")
     public List<CritereResponse> criteres(@Parameter(hidden = true) @AuthenticationPrincipal UtilisateurConnecte moi,
                                           @PathVariable Long id,
-                                          @RequestParam(defaultValue = "false") boolean lignee) {
-        return statistiqueMapper.toCritereResponses(statistiqueService.criteres(moi.id(), id, lignee));
+                                          @RequestParam(defaultValue = "false") boolean lignee,
+                                          @Parameter(description = "Langue des libellés (fr, en, ar)")
+                                          @RequestParam(required = false) String langue) {
+        return statistiqueMapper.toCritereResponses(statistiqueService.criteres(moi.id(), id, lignee,
+                statistiqueMapper.toLangues(langue, null)));
     }
 
     @GetMapping("/croisement")
@@ -94,11 +101,15 @@ public class StatistiqueController {
             @RequestParam(defaultValue = "false") boolean lignee,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate du,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate au,
+            @Parameter(description = "Langue des libellés (fr, en, ar) ; défaut : langue principale du sondage")
+            @RequestParam(required = false) String langue,
+            @Parameter(description = "Filtre sur la langue de réponse, répétable (OU) : fr, en, ar ; défaut : toutes")
+            @RequestParam(required = false) List<String> langueReponse,
             @Parameter(description = "Filtres de segmentation, répétables : cleDuCritere:valeur (OU pour une même clé, "
                     + "ET entre clés). Voir GET /api/sondages/{id}/criteres")
             @RequestParam(required = false) List<String> critere) {
         return statistiqueMapper.toResponse(statistiqueService.croisement(moi.id(), id, question, par, lignee, du, au,
-                statistiqueMapper.toCriteres(critere)));
+                statistiqueMapper.toCriteres(critere), statistiqueMapper.toLangues(langue, langueReponse)));
     }
 
     @GetMapping("/questions/{questionId}/textes")
@@ -112,6 +123,10 @@ public class StatistiqueController {
             @RequestParam(defaultValue = "false") boolean lignee,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate du,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate au,
+            @Parameter(description = "Langue des libellés (fr, en, ar) ; défaut : langue principale du sondage")
+            @RequestParam(required = false) String langue,
+            @Parameter(description = "Filtre sur la langue de réponse, répétable (OU) : fr, en, ar ; défaut : toutes")
+            @RequestParam(required = false) List<String> langueReponse,
             @Parameter(description = "Filtres de segmentation, répétables : cleDuCritere:valeur (OU pour une même clé, "
                     + "ET entre clés). Voir GET /api/sondages/{id}/criteres")
             @RequestParam(required = false) List<String> critere,
@@ -119,6 +134,7 @@ public class StatistiqueController {
             @RequestParam(defaultValue = "20") @Min(value = 1, message = "taille doit être au moins 1")
             @Max(value = 100, message = "taille ne doit pas dépasser 100") int taille) {
         return statistiqueMapper.toResponse(
-                statistiqueService.textes(moi.id(), id, questionId, lignee, du, au, statistiqueMapper.toCriteres(critere), page, taille));
+                statistiqueService.textes(moi.id(), id, questionId, lignee, du, au, statistiqueMapper.toCriteres(critere),
+                        statistiqueMapper.toLangues(langue, langueReponse), page, taille));
     }
 }

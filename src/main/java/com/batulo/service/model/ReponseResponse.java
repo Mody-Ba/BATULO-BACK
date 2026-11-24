@@ -1,5 +1,7 @@
 package com.batulo.service.model;
 
+import com.batulo.enums.Langue;
+
 import java.time.Instant;
 import java.util.List;
 
@@ -13,6 +15,8 @@ public record ReponseResponse(
         Instant dateSoumission,
         /** Heure du consentement (case cochée), si la version l'exigeait ; null sinon. */
         Instant dateConsentement,
+        /** Langue dans laquelle le répondant a vu le formulaire. */
+        Langue langue,
         List<ValeurReponseResponse> valeurs
 ) {
 }

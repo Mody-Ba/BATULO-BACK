@@ -46,9 +46,19 @@ class DevReponsesAleatoiresIntegrationTest extends PostgresIntegrationTestBase {
         postAvec(jeton, url, Map.of()).andExpect(status().isConflict())
                 .andExpect(jsonPath("$.code").value("SONDAGE_NON_EN_COURS"));
 
+        // Langues fr + en : chaque réponse reçoit une langue au hasard parmi celles du sondage.
+        putAvec(jeton, "/api/sondages/" + id + "/langues", Map.of("languePrincipale", "fr",
+                "languesSupplementaires", List.of("en"))).andExpect(status().isOk());
+        JsonNode textes = lire(getAvec(jeton, "/api/sondages/" + id + "/traductions/en")).get("textes");
+        List<Map<String, Object>> traductions = new java.util.ArrayList<>();
+        textes.forEach(t -> traductions.add(Map.of("cle", t.get("cle").asText(), "traduction", "EN " + t.get("source").asText())));
+        putAvec(jeton, "/api/sondages/" + id + "/traductions/en", Map.of("textes", traductions)).andExpect(status().isOk());
+
         postAvec(jeton, "/api/sondages/" + id + "/publier", Map.of()).andExpect(status().isOk());
         postAvec(jeton, url, Map.of()).andExpect(status().isCreated())
                 .andExpect(jsonPath("$.message").value("50 réponses de test générées."));
+        assertThat(jdbcTemplate.queryForList("select distinct langue from reponse", String.class))
+                .isSubsetOf("fr", "en").hasSize(2);
 
         getAvec(jeton, "/api/sondages/" + id + "/collecte").andExpect(jsonPath("$.nombreReponses").value(50));
         Timestamp plusAncienne = jdbcTemplate.queryForObject("select min(date_soumission) from reponse", Timestamp.class);

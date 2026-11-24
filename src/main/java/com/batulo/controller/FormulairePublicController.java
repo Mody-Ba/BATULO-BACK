@@ -1,5 +1,6 @@
 package com.batulo.controller;
 
+import com.batulo.enums.Langue;
 import com.batulo.mappers.CollecteMapper;
 import com.batulo.service.CollecteService;
 import com.batulo.service.model.ConfirmationReponseResponse;
@@ -17,6 +18,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -42,19 +44,27 @@ public class FormulairePublicController {
     @Operation(summary = "Formulaire à remplir",
             description = "Titre, description, sections, questions, options et configuration, sans donnée interne. "
                     + "Sondage à réponse unique : dejaRepondu (true/false) selon l'en-tête facultatif X-Jeton-Repondant "
-                    + "(absent ou mal formé : false) ; le formulaire est renvoyé dans tous les cas. "
+                    + "(absent ou mal formé : false) ; le formulaire est renvoyé dans tous les cas. Textes dans la langue "
+                    + "demandée (?langue=), avec langue, languePrincipale et languesDisponibles ; les valeurs (options, "
+                    + "lignes et colonnes de matrice) ne changent pas avec la langue : afficher libellesMatrice. "
                     + "404 SONDAGE_INTROUVABLE, 403 SONDAGE_NON_OUVERT (ouverture planifiée), 410 SONDAGE_FERME.")
     public FormulairePublicResponse formulaire(
             @PathVariable String jeton,
             @Parameter(description = "Jeton de l'appareil (UUID) gardé par le navigateur, pour dejaRepondu")
-            @RequestHeader(value = "X-Jeton-Repondant", required = false) String jetonRepondant) {
-        return collecteMapper.toResponse(collecteService.formulaire(jeton, jetonRepondant));
+            @RequestHeader(value = "X-Jeton-Repondant", required = false) String jetonRepondant,
+            @Parameter(description = "Langue souhaitée (fr, en, ar). Non proposée par le sondage ou absente : langue "
+                    + "principale ; un texte non traduit est renvoyé dans la langue principale")
+            @RequestParam(required = false) String langue) {
+        return collecteMapper.toResponse(collecteService.formulaire(jeton, jetonRepondant,
+                Langue.parCode(langue).orElse(null)));
     }
 
     @PostMapping("/reponses")
     @ResponseStatus(HttpStatus.CREATED)
     @Operation(summary = "Envoyer ses réponses",
-            description = "Options désignées par leur valeur, matrice par {\"ligne\": \"colonne\"}. 400 REPONSES_INVALIDES "
+            description = "Options désignées par leur valeur, matrice par {\"ligne\": \"colonne\"} (textes de la langue "
+                    + "principale, quelle que soit la langue affichée) ; langue : celle du formulaire affiché (400 "
+                    + "LANGUE_INVALIDE si le sondage ne la propose pas). 400 REPONSES_INVALIDES "
                     + "(une erreur par question) ou JETON_REPONDANT_INVALIDE, 409 DEJA_REPONDU (réponse unique par "
                     + "appareil), 403/410 si le sondage n'est pas ouvert.")
     public ConfirmationReponseResponse repondre(@PathVariable String jeton,

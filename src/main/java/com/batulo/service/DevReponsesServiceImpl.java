@@ -5,6 +5,7 @@ import com.batulo.entity.Question;
 import com.batulo.entity.Reponse;
 import com.batulo.entity.ReponseQuestion;
 import com.batulo.entity.Sondage;
+import com.batulo.enums.Langue;
 import com.batulo.enums.StatutSondage;
 import com.batulo.exception.ConflitException;
 import com.batulo.repository.ReponseRepository;
@@ -68,6 +69,8 @@ public class DevReponsesServiceImpl implements DevReponsesService {
                     "Les réponses de test ne se génèrent que sur un sondage EN_COURS.");
         }
         List<Question> questions = sondage.getSections().stream().flatMap(s -> s.getQuestions().stream()).toList();
+        // Langue au hasard parmi celles du sondage : elle n'influe ni sur la validation ni sur les conditions.
+        List<Langue> langues = sondage.getLanguesDisponibles();
         List<Reponse> reponses = new ArrayList<>();
         for (int i = 0; i < nombre; i++) {
             // Conditions d'affichage respectées : on parcourt le formulaire comme un répondant, une question masquée
@@ -85,6 +88,7 @@ public class DevReponsesServiceImpl implements DevReponsesService {
             Reponse reponse = new Reponse();
             reponse.setSondage(sondage);
             reponse.setLignee(sondage.getRacine());
+            reponse.setLangue(langues.get(aleatoire.nextInt(langues.size())));
             reponse.setDateSoumission(maintenant.minusSeconds(aleatoire.nextLong(ETALEMENT.toSeconds())));
             ValidateurReponse.Resultat resultat = validateurReponse.valider(questions, valeurs);
             for (ReponseQuestion ligne : resultat.lignes()) {

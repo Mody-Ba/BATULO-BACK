@@ -3,6 +3,8 @@ package com.batulo.service;
 import com.batulo.entity.Sondage;
 import com.batulo.entity.Utilisateur;
 import com.batulo.enums.Role;
+import com.batulo.exception.ActionInterditeException;
+import com.batulo.exception.ConflitException;
 import com.batulo.exception.ResourceNotFoundException;
 import com.batulo.repository.AssignationRepository;
 import com.batulo.repository.SondageRepository;
@@ -49,5 +51,41 @@ public class AccesSondage {
         Long lignee = sondage.getIdLignee();
         return sondageRepository.aCreeDansLaLignee(lignee, acteur.getId())
                 || assignationRepository.existsBySondageIdAndGestionnaireId(lignee, acteur.getId());
+    }
+
+    /**
+     * Droit de gérer le sondage (modifier, publier, fermer, versionner, supprimer...), quel que soit son statut :
+     * l'admin, ou le gestionnaire qui a créé CETTE version, avec la permission de créer des sondages. Un gestionnaire
+     * qui le voit seulement par assignation (ou par sa lignée) ne le gère pas : 403 ACTION_RESERVEE_CREATEUR.
+     */
+    public Sondage sondageGere(Long utilisateurId, Long sondageId) {
+        Utilisateur acteur = acteur(utilisateurId);
+        verifierDroitDeModifier(acteur);
+        Sondage sondage = sondageLisible(acteur, sondageId);
+        if (acteur.getRole() == Role.GESTIONNAIRE
+                && (sondage.getCreePar() == null || !sondage.getCreePar().getId().equals(acteur.getId()))) {
+            throw new ActionInterditeException("ACTION_RESERVEE_CREATEUR",
+                    "Vous pouvez consulter ce sondage, mais seuls son créateur et l'admin peuvent le modifier, "
+                            + "le publier ou le fermer.");
+        }
+        return sondage;
+    }
+
+    /** Droit de gérer ET contenu modifiable : seul un brouillon l'est, un sondage publié est gelé. */
+    public Sondage sondageModifiable(Long utilisateurId, Long sondageId) {
+        Sondage sondage = sondageGere(utilisateurId, sondageId);
+        if (sondage.isPublie()) {
+            throw new ConflitException("SONDAGE_PUBLIE", "Ce sondage est publié : son contenu est gelé. "
+                    + "Créez une nouvelle version (POST /api/sondages/" + sondageId + "/nouvelle-version) pour le modifier.");
+        }
+        return sondage;
+    }
+
+    /** Un gestionnaire sans la permission garde la lecture de ses sondages, mais ne crée ni ne modifie plus. */
+    public static void verifierDroitDeModifier(Utilisateur acteur) {
+        if (acteur.getRole() == Role.GESTIONNAIRE && !acteur.isPeutCreerSondages()) {
+            throw new ActionInterditeException("PERMISSION_SONDAGES_REQUISE",
+                    "Votre admin ne vous a pas donné la permission de créer ou modifier des sondages.");
+        }
     }
 }

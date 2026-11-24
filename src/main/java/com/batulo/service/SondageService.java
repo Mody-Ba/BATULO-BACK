@@ -1,7 +1,7 @@
 package com.batulo.service;
 
+import com.batulo.enums.Langue;
 import com.batulo.enums.StatutSondage;
-import com.fasterxml.jackson.databind.JsonNode;
 import com.batulo.service.model.ApercuModel;
 import com.batulo.service.model.ConditionModel;
 import com.batulo.service.model.CreationSondageModel;
@@ -13,6 +13,7 @@ import com.batulo.service.model.SondageInfoModel;
 import com.batulo.service.model.SondageModel;
 import com.batulo.service.model.SondageResumeModel;
 import com.batulo.service.model.VersionModel;
+import com.fasterxml.jackson.databind.JsonNode;
 import org.springframework.data.domain.Page;
 
 import java.util.List;
@@ -139,8 +140,11 @@ public interface SondageService {
     /** Fermeture manuelle, définitive : le sondage passe à TERMINE. */
     SondageModel fermer(Long utilisateurId, Long sondageId);
 
-    /** Le formulaire tel que le verra le répondant (aussi pour un brouillon). */
-    ApercuModel apercu(Long utilisateurId, Long sondageId);
+    /**
+     * Le formulaire tel que le verra le répondant (aussi pour un brouillon), dans la langue demandée si le sondage la
+     * propose (sinon la langue principale ; texte principal en secours pour un texte non traduit).
+     */
+    ApercuModel apercu(Long utilisateurId, Long sondageId, Langue langue);
 
     /** Copie indépendante : nouveau brouillon « Copie de ... », version 1, créé par l'appelant. */
     SondageModel dupliquer(Long utilisateurId, Long sondageId);

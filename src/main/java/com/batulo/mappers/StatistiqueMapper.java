@@ -1,10 +1,12 @@
 package com.batulo.mappers;
 
 import com.batulo.exception.RegleGestionException;
+import com.batulo.service.Langues;
 import com.batulo.service.model.CritereModel;
 import com.batulo.service.model.CritereResponse;
 import com.batulo.service.model.CroisementModel;
 import com.batulo.service.model.CroisementResponse;
+import com.batulo.service.model.LanguesAnalyse;
 import com.batulo.service.model.StatistiquesModel;
 import com.batulo.service.model.StatistiquesResponse;
 import org.springframework.stereotype.Component;
@@ -23,7 +25,9 @@ public class StatistiqueMapper {
 
     public StatistiquesResponse toResponse(StatistiquesModel m) {
         return new StatistiquesResponse(m.sondageId(), m.titre(), m.lignee(), m.versions(), m.du(), m.au(),
-                toCritereResponses(m.criteres()),
+                toCritereResponses(m.criteres()), m.langue(), m.languesReponse(),
+                m.repartitionLangues().stream()
+                        .map(r -> new StatistiquesResponse.ReponsesLangue(r.langue(), r.nombre())).toList(),
                 new StatistiquesResponse.Resume(m.resume().nombreReponses(), m.resume().petitEffectif(),
                         m.resume().premiereReponse(), m.resume().derniereReponse()),
                 m.questions().stream().map(this::question).toList());
@@ -55,6 +59,11 @@ public class StatistiqueMapper {
                         .toList(),
                 q.matrice() == null ? null : matrice(q.matrice()),
                 q.textes() == null ? null : toResponse(q.textes()));
+    }
+
+    /** ?langue= et ?langueReponse= (répétable) : 400 LANGUE_INVALIDE pour un code inconnu. */
+    public LanguesAnalyse toLangues(String langue, List<String> langueReponse) {
+        return new LanguesAnalyse(Langues.lire(langue), Langues.lire(langueReponse));
     }
 
     /** « cle:valeur » (filtres répétables) -> clé de critère -> valeurs. La clé est un UUID, sans « : ». */
@@ -99,10 +108,10 @@ public class StatistiqueMapper {
 
     private StatistiquesResponse.Matrice matrice(StatistiquesModel.Matrice m) {
         List<StatistiquesResponse.LigneMatrice> lignes = m.lignes().stream()
-                .map(l -> new StatistiquesResponse.LigneMatrice(l.ligne(), l.nombre(), l.cellules().stream()
+                .map(l -> new StatistiquesResponse.LigneMatrice(l.ligne(), l.libelle(), l.nombre(), l.cellules().stream()
                         .map(c -> new StatistiquesResponse.Cellule(c.colonne(), c.nombre(), c.pourcentage()))
                         .toList()))
                 .toList();
-        return new StatistiquesResponse.Matrice(m.colonnes(), lignes);
+        return new StatistiquesResponse.Matrice(m.colonnes(), m.libellesColonnes(), lignes);
     }
 }

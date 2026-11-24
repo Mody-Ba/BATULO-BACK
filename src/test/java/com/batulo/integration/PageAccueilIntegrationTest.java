@@ -178,7 +178,7 @@ class PageAccueilIntegrationTest extends PostgresIntegrationTestBase {
                 .andExpect(jsonPath("$.contenu[0].dateConsentement").doesNotExist());
 
         // Export : pas de colonne Consentement, en-têtes inchangés.
-        assertThat(entetesCsv(id, false)).containsExactly("Id", "Date", "Version", "Q");
+        assertThat(entetesCsv(id, false)).containsExactly("Id", "Date", "Version", "Langue", "Q");
     }
 
     @Test
@@ -199,15 +199,16 @@ class PageAccueilIntegrationTest extends PostgresIntegrationTestBase {
         envoyer(lien, questionId(v2), true).andExpect(status().isCreated());
 
         // v1 seule : pas de colonne ; v2 seule et lignée : colonne après Version.
-        assertThat(entetesCsv(v1, false)).containsExactly("Id", "Date", "Version", "Q");
-        assertThat(entetesCsv(v2, false)).containsExactly("Id", "Date", "Version", "Consentement", "Q");
+        assertThat(entetesCsv(v1, false)).containsExactly("Id", "Date", "Version", "Langue", "Q");
+        assertThat(entetesCsv(v2, false)).containsExactly("Id", "Date", "Version", "Consentement", "Langue", "Q");
         List<String[]> lignes = lignesCsv(v1, true);
-        assertThat(lignes.get(0)).containsExactly("Id", "Date", "Version", "Consentement", "Q");
+        assertThat(lignes.get(0)).containsExactly("Id", "Date", "Version", "Consentement", "Langue", "Q");
         Map<String, String[]> parVersion = new HashMap<>();
         lignes.subList(1, lignes.size()).forEach(l -> parVersion.put(l[2], l));
         assertThat(parVersion.get("1")[3]).isEmpty();
         assertThat(parVersion.get("2")[3]).matches("\\d{4}-\\d{2}-\\d{2}.*");
-        assertThat(parVersion.get("2")[4]).isEqualTo("Oui");
+        assertThat(parVersion.get("2")[4]).isEqualTo("fr");
+        assertThat(parVersion.get("2")[5]).isEqualTo("Oui");
 
         // XLSX : même colonne.
         MockHttpServletResponse xlsx = getAvec(jetonAdmin, "/api/sondages/" + v1

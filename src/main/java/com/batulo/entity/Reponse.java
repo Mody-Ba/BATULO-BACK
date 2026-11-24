@@ -1,8 +1,10 @@
 package com.batulo.entity;
 
+import com.batulo.enums.Langue;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.CollectionTable;
 import jakarta.persistence.Column;
+import jakarta.persistence.Convert;
 import jakarta.persistence.ElementCollection;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
@@ -51,6 +53,11 @@ public class Reponse {
     @Column(name = "date_consentement")
     private Instant dateConsentement;
 
+    /** Langue dans laquelle le répondant a vu le formulaire (langue principale par défaut). */
+    @Convert(converter = LangueConverter.class)
+    @Column(nullable = false, length = 2)
+    private Langue langue;
+
     @OneToMany(mappedBy = "reponse", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<ReponseQuestion> valeurs = new ArrayList<>();
 
@@ -67,6 +74,9 @@ public class Reponse {
     void avantCreation() {
         if (dateSoumission == null) {
             dateSoumission = Instant.now();
+        }
+        if (langue == null) {
+            langue = sondage.getLanguePrincipale();
         }
     }
 
@@ -121,5 +131,13 @@ public class Reponse {
 
     public Set<Long> getQuestionsMasquees() {
         return questionsMasquees;
+    }
+
+    public Langue getLangue() {
+        return langue;
+    }
+
+    public void setLangue(Langue langue) {
+        this.langue = langue;
     }
 }

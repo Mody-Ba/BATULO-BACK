@@ -51,7 +51,7 @@ public class ExportController {
     @GetMapping("/reponses")
     @PreAuthorize(ROLES)
     @Operation(summary = "Exporter les réponses brutes (CSV ou XLSX)",
-            description = "Une ligne par réponse (Id, Date, Version), une colonne par question (libellé). Choix multiple "
+            description = "Une ligne par réponse (Id, Date, Version, Consentement si exigé, Langue), une colonne par question (libellé). Choix multiple "
                     + "et classement : une colonne par option (1/0, ou rang) ; matrice : une colonne par ligne ; vide = "
                     + "pas de réponse. CSV en UTF-8 avec BOM : « ; » et virgule décimale (Excel francophone), ou « , » et "
                     + "point décimal avec separateurDecimal=POINT (Python, R). Écrit en flux, sans limite de volume.")
@@ -65,11 +65,15 @@ public class ExportController {
                          @RequestParam(defaultValue = "false") boolean lignee,
                          @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate du,
                          @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate au,
+                         @Parameter(description = "Langue des libellés (fr, en, ar) ; défaut : langue principale")
+                         @RequestParam(required = false) String langue,
+                         @Parameter(description = "Filtre sur la langue de réponse, répétable : fr, en, ar")
+                         @RequestParam(required = false) List<String> langueReponse,
                          @Parameter(description = "Filtres de segmentation, répétables : cleDuCritere:valeur")
                          @RequestParam(required = false) List<String> critere,
                          HttpServletResponse response) throws IOException {
         envoyer(exportService.exporterReponses(moi.id(), id, format, valeurs, separateurDecimal, lignee, du, au,
-                statistiqueMapper.toCriteres(critere)), response);
+                statistiqueMapper.toCriteres(critere), statistiqueMapper.toLangues(langue, langueReponse)), response);
     }
 
     @GetMapping("/statistiques")
@@ -85,10 +89,14 @@ public class ExportController {
                              @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate du,
                              @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate au,
                              @RequestParam(required = false) GranulariteDate granulariteDate,
+                             @Parameter(description = "Langue des libellés (fr, en, ar) ; défaut : langue principale")
+                             @RequestParam(required = false) String langue,
+                             @Parameter(description = "Filtre sur la langue de réponse, répétable : fr, en, ar")
+                             @RequestParam(required = false) List<String> langueReponse,
                              @RequestParam(required = false) List<String> critere,
                              HttpServletResponse response) throws IOException {
         envoyer(exportService.exporterStatistiques(moi.id(), id, format, lignee, du, au, granulariteDate,
-                statistiqueMapper.toCriteres(critere)), response);
+                statistiqueMapper.toCriteres(critere), statistiqueMapper.toLangues(langue, langueReponse)), response);
     }
 
     @GetMapping("/croisement")
@@ -103,10 +111,14 @@ public class ExportController {
                            @RequestParam(defaultValue = "false") boolean lignee,
                            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate du,
                            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate au,
+                           @Parameter(description = "Langue des libellés (fr, en, ar) ; défaut : langue principale")
+                           @RequestParam(required = false) String langue,
+                           @Parameter(description = "Filtre sur la langue de réponse, répétable : fr, en, ar")
+                           @RequestParam(required = false) List<String> langueReponse,
                            @RequestParam(required = false) List<String> critere,
                            HttpServletResponse response) throws IOException {
         envoyer(exportService.exporterCroisement(moi.id(), id, format, question, par, lignee, du, au,
-                statistiqueMapper.toCriteres(critere)), response);
+                statistiqueMapper.toCriteres(critere), statistiqueMapper.toLangues(langue, langueReponse)), response);
     }
 
     /** En-têtes (nom de fichier, type, pas de cache : ce sont des réponses) puis contenu, écrit en flux. */

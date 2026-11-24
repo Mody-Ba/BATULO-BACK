@@ -187,10 +187,49 @@ Plateforme SaaS de sondages (Spring Boot 3.5, Java 21, PostgreSQL 16, Liquibase)
   `apparence` {nomAffiche, logoUrl absolue, couleurPrincipale, couleurTexte} et rien d'autre sur l'entreprise.
   Rapports PDF : logo et nom affiché sur la page de titre et dans l'en-tête des pages (« Batulo » sans nom affiché ni
   logo) ; « Entreprise » = nom affiché. Fiche super admin (GET /api/super-admin/admins/{id}) : `personnalisation`.
+- Langues des sondages (phase 4, étape 3, partie 2/3) : `sondage.langue_principale` (fr, en, ar ; fr par défaut,
+  énumération `Langue`, JSON et base en code minuscule) et `langues_supplementaires` (JSONB, sans la principale, 2 au
+  plus), modifiables en brouillon par PUT /api/sondages/{id}/langues (400 LANGUE_INVALIDE : doublon, principale
+  répétée, code inconnu). Changer la langue principale ne change que l'étiquette (rien n'est traduit ni échangé) ; les
+  traductions d'une langue retirée sont gardées mais ignorées. Traductions en JSONB `traductions` sur sondage (titre,
+  description, objetEnquete, texteConfidentialite, texteConsentement), section (titre, description), question
+  (libelle, aide, libelleMin, libelleMax, `lignes`/`colonnes` de matrice rangées sous leur texte principal) et option
+  (libelle) : `{"en": {...}}`. Valeurs stables (clés, valeurs d'options, textes principaux des lignes et colonnes de
+  matrice) jamais traduites. `TextesTraduisibles` : inventaire dans l'ordre du formulaire (textes principaux non vides,
+  consentement seulement s'il est exigé), clés d'API `sondage.titre`, `section.{id}.titre`, `question.{id}.libelle`,
+  `question.{id}.ligne.{n}`, `option.{id}.libelle`... `Traducteur` (classe pure) : seul résolveur, traduction sinon texte
+  principal ; langue non proposée par la version = langue principale. Éditeur (`TraductionController`) : GET
+  .../traductions (complétude par langue : traduits, total, manquants), GET .../traductions/{langue} (côte à côte : source
+  et traduction), PUT .../traductions/{langue} (en une fois : absent = inchangé, null ou "" efface ; 400
+  TRADUCTION_INVALIDE si clé inconnue ou en double, trop longue ; tout est contrôlé avant d'écrire). Lecture : comme le
+  sondage ; écriture : brouillon (409 SONDAGE_PUBLIE), droits de modification. Un texte principal modifié (sondage,
+  section, question, option, ligne de matrice renommée) perd ses traductions. Publication : 400 TRADUCTIONS_INCOMPLETES
+  avec `manquants` [{langue, cle, source}] (champ ajouté à `ErrorResponse`). Copies (versions, duplications,
+  réutilisations) : langues et traductions recopiées ; un titre ou une description remplacés à la copie perdent leur
+  traduction (« Copie de ... »). Formulaire public et aperçu : `?langue=` (non proposée ou inconnue : langue
+  principale), réponse avec `langue` (servie), `languePrincipale`, `languesDisponibles` ; ECHELLE : libelleMin/Max
+  traduits dans la configuration ; MATRICE : `configuration.lignes/colonnes` restent les valeurs à envoyer et
+  `libellesMatrice` {lignes, colonnes} donne les libellés au même rang. Envoi : `langue` facultative (principale par
+  défaut), 400 LANGUE_INVALIDE si la version EN_COURS ne la propose pas (contrôlée avant DEJA_REPONDU) ;
+  `reponse.langue` (anciennes réponses : fr), renvoyée dans le détail des réponses. Conditions, validation, réponse
+  unique : indépendantes de la langue. Analyse (`LanguesAnalyse` dans `AnalysePerimetre`) : `?langue=` pour les libellés
+  (langue principale du sondage demandé par défaut ; en lignée, chaque version la sert si elle la propose) et
+  `?langueReponse=` répétable (OU, filtre SQL `r.langue`) sur statistiques, critères, croisement, textes, exports et
+  rapports ; statistiques : `langue`, `languesReponse`, `repartitionLangues` ; matrice : `libellesColonnes` et
+  `LigneMatrice.libelle` à côté des textes principaux. Export brut : colonne « Langue » (code) après Version et
+  Consentement ; en LIBELLES, en-têtes, options et colonnes de matrice traduits ; en CODES, valeurs stables. Envoi des
+  statistiques : `langueReponse` enregistré dans les filtres. Route de dev : langue au hasard parmi celles du sondage.
+  Rapports PDF : Noto Sans Arabic (OFL, `resources/polices/noto/` avec OFL.txt) choisie caractère par caractère
+  (`FontSelector`) avec Liberation Sans ; un texte contenant de l'arabe est écrit de droite à gauche dans une cellule
+  (OpenPDF ne façonne l'arabe que dans les cellules et colonnes, pas dans un paragraphe) ; façonnage vérifié sur image
+  (lettres liées, lam-alif) ; diacritiques placés approximativement. Textes fixes des rapports et des exports (« Oui »,
+  « Résumé », « Langue »...) toujours en français.
 
 ## À traiter dans les étapes suivantes
 - Phase 4 : brouillon et reprise d'une réponse (réutiliser `EvaluateurConditions.Parcours`) ; invitations nominatives (l'unicité par appareil se contourne en vidant le navigateur ou en changeant
   d'appareil : limite acceptée pour la phase 2) ; diffusion courriel, SMS, WhatsApp, intégration web, campagnes.
 - Si l'application tourne un jour sur plusieurs instances : limite de requêtes partagée (Redis ou Bucket4j).
+- Phase 4, étape 3 (partie 3/3) : textes fixes des rapports et exports dans la langue demandée (« Oui », « Résumé »,
+  en-têtes), mise en page de droite à gauche du rapport PDF en arabe.
 - Module 4.4, plus tard : logo dans les rapports XLSX (PDF fait), logo WebP, comparaison de plusieurs sondages (la clé de
   question est déjà recopiée dans les copies), partage sécurisé des rapports, archivage.
