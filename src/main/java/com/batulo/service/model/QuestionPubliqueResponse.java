@@ -1,5 +1,6 @@
 package com.batulo.service.model;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.batulo.enums.TypeQuestion;
 import com.fasterxml.jackson.databind.JsonNode;
 
@@ -23,6 +24,12 @@ public record QuestionPubliqueResponse(
          * Condition d'affichage, pour masquer et afficher en direct ; null : toujours affichée. Le serveur recalcule
          * la visibilité à l'envoi : une réponse à une question masquée est ignorée.
          */
-        ConditionResponse condition
+        ConditionResponse condition,
+        /**
+         * MATRICE (formulaire public et aperçu) : libellés à afficher, au même rang que configuration.lignes et
+         * configuration.colonnes, qui restent les valeurs à envoyer ({"ligne": "colonne"} en langue principale).
+         */
+        @JsonInclude(JsonInclude.Include.NON_NULL)
+        LibellesMatriceResponse libellesMatrice
 ) {
 }

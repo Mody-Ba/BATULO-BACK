@@ -1,5 +1,6 @@
 package com.batulo.service;
 
+import com.batulo.enums.Langue;
 import com.batulo.service.model.FormulairePublicModel;
 import com.batulo.service.model.SoumissionModel;
 
@@ -15,8 +16,9 @@ public interface CollecteService {
     /**
      * @param jetonRepondant jeton de l'appareil (en-tête X-Jeton-Repondant), facultatif ; sert seulement à
      *                       calculer dejaRepondu pour un sondage à réponse unique (absent ou mal formé : false)
+     * @param langue         langue demandée ; non proposée par la version ouverte (ou null) : langue principale
      */
-    FormulairePublicModel formulaire(String jetonPublic, String jetonRepondant);
+    FormulairePublicModel formulaire(String jetonPublic, String jetonRepondant, Langue langue);
 
     /**
      * Valide et enregistre les réponses à la version ouverte.

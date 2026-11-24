@@ -1,6 +1,13 @@
 package com.batulo.entity;
 
 import jakarta.persistence.CascadeType;
+import com.fasterxml.jackson.databind.JsonNode;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
+import com.batulo.enums.Langue;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.JsonNodeFactory;
+import jakarta.persistence.Convert;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
@@ -107,6 +114,21 @@ public class Sondage {
     /** Texte de la case de consentement ; obligatoire si consentementRequis. */
     @Column(name = "texte_consentement", columnDefinition = "TEXT")
     private String texteConsentement;
+
+    /** Langue dans laquelle le contenu est saisi ; modifiable en brouillon seulement. */
+    @Convert(converter = LangueConverter.class)
+    @Column(name = "langue_principale", nullable = false, length = 2)
+    private Langue languePrincipale = Langue.FR;
+
+    /** Codes des langues supplémentaires (JSON, sans la langue principale) ; null ou [] : aucune. */
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "langues_supplementaires")
+    private JsonNode languesSupplementaires;
+
+    /** Traductions par code de langue (voir le changeset 022) ; null : aucune. */
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "traductions")
+    private JsonNode traductions;
 
     @OneToMany(mappedBy = "sondage", cascade = CascadeType.ALL, orphanRemoval = true)
     @OrderBy("ordre ASC")
@@ -296,5 +318,44 @@ public class Sondage {
 
     public void setTexteConsentement(String texteConsentement) {
         this.texteConsentement = texteConsentement;
+    }
+
+    public JsonNode getTraductions() {
+        return traductions;
+    }
+
+    public void setTraductions(JsonNode traductions) {
+        this.traductions = traductions;
+    }
+
+    public Langue getLanguePrincipale() {
+        return languePrincipale;
+    }
+
+    public void setLanguePrincipale(Langue languePrincipale) {
+        this.languePrincipale = languePrincipale;
+    }
+
+    /** Langues supplémentaires, dans l'ordre choisi ; un code inconnu (jamais écrit par le serveur) est ignoré. */
+    public List<Langue> getLanguesSupplementaires() {
+        List<Langue> langues = new ArrayList<>();
+        if (languesSupplementaires != null) {
+            languesSupplementaires.forEach(code -> Langue.parCode(code.asText()).ifPresent(langues::add));
+        }
+        return langues;
+    }
+
+    public void setLanguesSupplementaires(List<Langue> langues) {
+        ArrayNode codes = JsonNodeFactory.instance.arrayNode();
+        langues.forEach(langue -> codes.add(langue.getCode()));
+        this.languesSupplementaires = codes;
+    }
+
+    /** Langue principale d'abord, puis les langues supplémentaires. */
+    public List<Langue> getLanguesDisponibles() {
+        List<Langue> langues = new ArrayList<>();
+        langues.add(languePrincipale);
+        langues.addAll(getLanguesSupplementaires());
+        return langues;
     }
 }

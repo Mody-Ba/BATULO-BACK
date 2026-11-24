@@ -18,6 +18,11 @@ public record SoumissionRequest(
                 + "(400 CONSENTEMENT_REQUIS), ignoré sinon", example = "true")
         Boolean consentement,
 
+        @Size(max = 10, message = "langue invalide")
+        @Schema(description = "Langue dans laquelle le répondant a vu le formulaire (fr, en, ar) ; absente : langue "
+                + "principale. Doit être proposée par le sondage (400 LANGUE_INVALIDE)", example = "ar")
+        String langue,
+
         @NotNull(message = "la liste des réponses est obligatoire")
         @Size(max = 5000, message = "trop de réponses")
         List<@Valid @NotNull(message = "réponse vide") ReponseQuestionRequest> reponses

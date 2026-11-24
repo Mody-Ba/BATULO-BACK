@@ -17,6 +17,9 @@ final class CopieSondage {
     }
 
     static void copierContenu(Sondage source, Sondage cible) {
+        cible.setLanguePrincipale(source.getLanguePrincipale());
+        cible.setLanguesSupplementaires(source.getLanguesSupplementaires());
+        cible.setTraductions(copie(source.getTraductions()));
         for (Section sectionSource : source.getSections()) {
             Section section = new Section();
             section.setSondage(cible);
@@ -26,6 +29,8 @@ final class CopieSondage {
             // Conditions : les sources sont désignées par leur clé, recopiée telle quelle, donc les références
             // suivent les nouvelles questions sans traduction.
             section.setCondition(copie(sectionSource.getCondition()));
+            // Traductions recopiées telles quelles (lignes de matrice rangées sous leur texte principal, recopié aussi).
+            section.setTraductions(copie(sectionSource.getTraductions()));
             for (Question questionSource : sectionSource.getQuestions()) {
                 Question question = new Question();
                 question.setSection(section);
@@ -40,12 +45,14 @@ final class CopieSondage {
                 question.setEstCritere(questionSource.isEstCritere());
                 question.setCritereConfig(copie(questionSource.getCritereConfig()));
                 question.setCondition(copie(questionSource.getCondition()));
+                question.setTraductions(copie(questionSource.getTraductions()));
                 for (OptionQuestion optionSource : questionSource.getOptions()) {
                     OptionQuestion option = new OptionQuestion();
                     option.setQuestion(question);
                     option.setLibelle(optionSource.getLibelle());
                     option.setValeur(optionSource.getValeur());
                     option.setOrdre(optionSource.getOrdre());
+                    option.setTraductions(copie(optionSource.getTraductions()));
                     question.getOptions().add(option);
                 }
                 section.getQuestions().add(question);

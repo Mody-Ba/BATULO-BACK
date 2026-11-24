@@ -1,5 +1,7 @@
 package com.batulo.mappers;
 
+import com.batulo.service.model.LibellesMatriceResponse;
+import com.batulo.service.model.LibellesMatriceModel;
 import com.batulo.enums.CombinaisonCondition;
 import com.batulo.service.model.ApercuModel;
 import com.batulo.service.model.ApercuResponse;
@@ -116,6 +118,8 @@ public class SondageMapper {
                 model.texteConfidentialite(),
                 model.consentementRequis(),
                 model.texteConsentement(),
+                model.languePrincipale(),
+                model.languesSupplementaires(),
                 toResponse(model.creePar()),
                 model.dateCreation(),
                 model.dateModification(),
@@ -130,7 +134,8 @@ public class SondageMapper {
     public ApercuResponse toResponse(ApercuModel model) {
         return new ApercuResponse(model.id(), model.titre(), model.description(), model.version(), model.statut(),
                 model.objetEnquete(), model.texteConfidentialite(), model.consentementRequis(),
-                model.texteConsentement(), personnalisationMapper.toResponse(model.apparence()),
+                model.texteConsentement(), personnalisationMapper.toResponse(model.apparence()), model.langue(),
+                model.languePrincipale(), model.languesDisponibles(),
                 model.sections().stream().map(this::toResponse).toList());
     }
 
@@ -182,7 +187,13 @@ public class SondageMapper {
     private QuestionResponse toResponse(QuestionModel model) {
         return new QuestionResponse(model.id(), model.libelle(), model.aide(), model.type(), model.obligatoire(),
                 model.ordre(), model.configuration(), model.options().stream().map(this::toResponse).toList(),
-                toResponse(model.condition()), model.estCritere(), model.critereConfig());
+                toResponse(model.condition()), model.estCritere(), model.critereConfig(),
+                toResponse(model.libellesMatrice()));
+    }
+
+    /** Partagé avec le formulaire public (CollecteMapper). */
+    public LibellesMatriceResponse toResponse(LibellesMatriceModel model) {
+        return model == null ? null : new LibellesMatriceResponse(model.lignes(), model.colonnes());
     }
 
     public ConditionModel toModel(ConditionRequest req) {

@@ -1,5 +1,8 @@
 package com.batulo.entity;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
@@ -29,6 +32,11 @@ public class OptionQuestion {
     /** Code stable, unique dans la question : les statistiques s'appuient dessus, il ne suit pas le libellé. */
     @Column(nullable = false, length = 100)
     private String valeur;
+
+    /** Traductions par code de langue (voir le changeset 022) ; null : aucune. */
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "traductions")
+    private JsonNode traductions;
 
     @Column(nullable = false)
     private int ordre;
@@ -70,5 +78,13 @@ public class OptionQuestion {
 
     public void setOrdre(int ordre) {
         this.ordre = ordre;
+    }
+
+    public JsonNode getTraductions() {
+        return traductions;
+    }
+
+    public void setTraductions(JsonNode traductions) {
+        this.traductions = traductions;
     }
 }

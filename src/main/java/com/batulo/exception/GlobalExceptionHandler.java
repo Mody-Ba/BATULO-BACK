@@ -49,6 +49,12 @@ public class GlobalExceptionHandler {
                 .body(new ErrorResponse(ReponsesInvalidesException.CODE, ex.getMessage(), ex.getErreurs()));
     }
 
+    @ExceptionHandler(TraductionsIncompletesException.class)
+    public ResponseEntity<ErrorResponse> handleTraductionsIncompletes(TraductionsIncompletesException ex) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).contentType(MediaType.APPLICATION_JSON)
+                .body(new ErrorResponse(TraductionsIncompletesException.CODE, ex.getMessage(), null, ex.getManquants()));
+    }
+
     @ExceptionHandler(ConflitException.class)
     public ResponseEntity<ErrorResponse> handleConflit(ConflitException ex) {
         return reponse(HttpStatus.CONFLICT, ex.getCode(), ex.getMessage());

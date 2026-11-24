@@ -1,0 +1,56 @@
+databaseChangeLog:
+  # Phase 4, étape 3 (partie 2/3) : langues et traductions du contenu des sondages (fr, en, ar).
+  # Traductions en JSON sur chaque élément, par code de langue, par exemple :
+  #   sondage  {"en": {"titre", "description", "objetEnquete", "texteConfidentialite", "texteConsentement"}}
+  #   section  {"en": {"titre", "description"}}
+  #   question {"en": {"libelle", "aide", "libelleMin", "libelleMax", "lignes": {texte principal: traduction},
+  #                    "colonnes": {texte principal: traduction}}}
+  #   option   {"en": {"libelle"}}
+  # Les lignes et colonnes de matrice sont rangées sous leur texte dans la langue principale (leur valeur stable).
+  - property: { name: type.json, value: JSONB, dbms: postgresql }
+  - property: { name: type.json, value: JSON, dbms: h2 }
+
+  - changeSet:
+      id: 022-sondage-langues
+      author: batulo
+      changes:
+        - addColumn:
+            tableName: sondage
+            columns:
+              # Les sondages existants ont été saisis en français.
+              - column:
+                  name: langue_principale
+                  type: VARCHAR(2)
+                  defaultValue: fr
+                  constraints: { nullable: false }
+              # Liste des codes des langues supplémentaires, sans la langue principale ; [] : aucune.
+              - column:
+                  name: langues_supplementaires
+                  type: "${type.json}"
+              - column: { name: traductions, type: "${type.json}" }
+        - addColumn:
+            tableName: section
+            columns:
+              - column: { name: traductions, type: "${type.json}" }
+        - addColumn:
+            tableName: question
+            columns:
+              - column: { name: traductions, type: "${type.json}" }
+        - addColumn:
+            tableName: option_question
+            columns:
+              - column: { name: traductions, type: "${type.json}" }
+
+  - changeSet:
+      id: 022-reponse-langue
+      author: batulo
+      changes:
+        # Langue dans laquelle le répondant a vu le formulaire ; les réponses existantes ont été données en français.
+        - addColumn:
+            tableName: reponse
+            columns:
+              - column:
+                  name: langue
+                  type: VARCHAR(2)
+                  defaultValue: fr
+                  constraints: { nullable: false }

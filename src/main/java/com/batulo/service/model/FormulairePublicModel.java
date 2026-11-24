@@ -1,5 +1,6 @@
 package com.batulo.service.model;
 
+import com.batulo.enums.Langue;
 import java.time.Instant;
 import java.util.List;
 
@@ -24,6 +25,11 @@ public record FormulairePublicModel(
         String texteConsentement,
         /** Apparence à l'image de l'entreprise (nom affiché, logo, couleurs) ; rien d'autre sur l'entreprise. */
         ApparenceModel apparence,
+        /** Langue des textes renvoyés : celle demandée (?langue=) si elle est proposée, sinon la langue principale. */
+        Langue langue,
+        Langue languePrincipale,
+        /** Langues proposées au répondant, la langue principale d'abord. */
+        List<Langue> languesDisponibles,
         List<SectionModel> sections,
         /** reponseUnique : cet appareil (jeton X-Jeton-Repondant) a déjà répondu sur la lignée ; null sinon. */
         Boolean dejaRepondu

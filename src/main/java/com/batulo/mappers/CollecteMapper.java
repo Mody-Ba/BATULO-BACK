@@ -1,5 +1,6 @@
 package com.batulo.mappers;
 
+import com.batulo.service.Langues;
 import com.batulo.service.model.ConfirmationReponseResponse;
 import com.batulo.service.model.FormulairePublicModel;
 import com.batulo.service.model.FormulairePublicResponse;
@@ -41,7 +42,7 @@ public class CollecteMapper {
     }
 
     public SoumissionModel toModel(SoumissionRequest req) {
-        return new SoumissionModel(req.jetonRepondant(), req.consentement(), req.reponses().stream()
+        return new SoumissionModel(req.jetonRepondant(), req.consentement(), Langues.lire(req.langue()), req.reponses().stream()
                 .map(r -> new SoumissionModel.ValeurSoumise(r.questionId(), r.valeur()))
                 .toList());
     }
@@ -49,7 +50,8 @@ public class CollecteMapper {
     public FormulairePublicResponse toResponse(FormulairePublicModel model) {
         return new FormulairePublicResponse(model.titre(), model.description(), model.reponseUnique(),
                 model.dateFermeture(), model.objetEnquete(), model.texteConfidentialite(), model.consentementRequis(),
-                model.texteConsentement(), personnalisationMapper.toResponse(model.apparence()), model.sections().stream().map(this::toResponse).toList(), model.dejaRepondu());
+                model.texteConsentement(), personnalisationMapper.toResponse(model.apparence()), model.langue(),
+                model.languePrincipale(), model.languesDisponibles(), model.sections().stream().map(this::toResponse).toList(), model.dejaRepondu());
     }
 
     public ConfirmationReponseResponse toConfirmation(Instant dateSoumission) {
@@ -69,7 +71,7 @@ public class CollecteMapper {
         return new PageResponse<>(
                 page.getContent().stream()
                         .map(r -> new ReponseResponse(r.id(), r.sondageId(), r.version(), r.dateSoumission(),
-                                r.dateConsentement(), r.valeurs().stream()
+                                r.dateConsentement(), r.langue(), r.valeurs().stream()
                                 .map(v -> new ValeurReponseResponse(v.questionId(), v.libelle(), v.type(), v.valeur()))
                                 .toList()))
                         .toList(),
@@ -88,7 +90,7 @@ public class CollecteMapper {
     private QuestionPubliqueResponse toResponse(QuestionModel model) {
         return new QuestionPubliqueResponse(model.id(), model.libelle(), model.aide(), model.type(), model.obligatoire(),
                 model.ordre(), model.configuration(), model.options().stream().map(this::toResponse).toList(),
-                sondageMapper.toResponse(model.condition()));
+                sondageMapper.toResponse(model.condition()), sondageMapper.toResponse(model.libellesMatrice()));
     }
 
     private OptionPubliqueResponse toResponse(OptionModel model) {

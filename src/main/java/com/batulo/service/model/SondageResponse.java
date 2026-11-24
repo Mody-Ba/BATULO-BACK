@@ -1,5 +1,6 @@
 package com.batulo.service.model;
 
+import com.batulo.enums.Langue;
 import com.batulo.enums.StatutSondage;
 
 import java.time.Instant;
@@ -31,6 +32,10 @@ public record SondageResponse(
         boolean consentementRequis,
         /** Texte de la case de consentement (renseigné si consentementRequis). */
         String texteConsentement,
+        /** Langue dans laquelle le contenu est saisi (fr par défaut). */
+        Langue languePrincipale,
+        /** Langues supplémentaires (sans la principale), traduites dans l'éditeur de traductions. */
+        List<Langue> languesSupplementaires,
         AuteurResponse creePar,
         Instant dateCreation,
         Instant dateModification,

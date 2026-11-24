@@ -18,6 +18,8 @@ public record QuestionModel(
         /** Null si ce n'est pas un critère, ou s'il n'a pas de découpage. */
         JsonNode critereConfig,
         /** Condition d'affichage ; null : toujours affichée (si sa section l'est). */
-        ConditionModel condition
+        ConditionModel condition,
+        /** MATRICE, formulaire public et aperçu : libellés affichés des lignes et colonnes (même rang que la configuration). */
+        LibellesMatriceModel libellesMatrice
 ) {
 }
