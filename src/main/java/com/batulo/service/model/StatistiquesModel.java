@@ -1,6 +1,7 @@
 package com.batulo.service.model;
 
 import com.batulo.enums.GranulariteDate;
+import com.batulo.enums.Langue;
 import com.batulo.enums.TypeQuestion;
 
 import java.math.BigDecimal;
@@ -22,6 +23,12 @@ public record StatistiquesModel(
         LocalDate au,
         /** Critères appliqués (segmentation) ; vide : tous les répondants. */
         List<CritereModel> criteres,
+        /** Langue des libellés (questions, options, sections, lignes et colonnes de matrice). */
+        Langue langue,
+        /** Filtre sur la langue de réponse ; vide : toutes les langues. */
+        List<Langue> languesReponse,
+        /** Réponses retenues par langue de réponse (langues sans réponse omises), dans l'ordre fr, en, ar. */
+        List<ReponsesLangue> repartitionLangues,
         Resume resume,
         List<QuestionStat> questions
 ) {
@@ -79,10 +86,15 @@ public record StatistiquesModel(
     public record RangStat(String valeur, String libelle, BigDecimal rangMoyen, long nombrePremier) {
     }
 
-    public record Matrice(List<String> colonnes, List<LigneMatrice> lignes) {
+    public record ReponsesLangue(Langue langue, long nombre) {
     }
 
-    public record LigneMatrice(String ligne, long nombre, List<Cellule> cellules) {
+    /** colonnes : textes principaux (valeurs stables) ; libellesColonnes : au même rang, dans la langue demandée. */
+    public record Matrice(List<String> colonnes, List<String> libellesColonnes, List<LigneMatrice> lignes) {
+    }
+
+    /** ligne : texte principal (valeur stable) ; libelle : dans la langue demandée. */
+    public record LigneMatrice(String ligne, String libelle, long nombre, List<Cellule> cellules) {
     }
 
     public record Cellule(String colonne, long nombre, BigDecimal pourcentage) {

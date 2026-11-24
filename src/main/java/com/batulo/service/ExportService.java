@@ -5,6 +5,7 @@ import com.batulo.enums.GranulariteDate;
 import com.batulo.enums.SeparateurDecimal;
 import com.batulo.enums.ValeursExport;
 import com.batulo.service.model.ExportModel;
+import com.batulo.service.model.LanguesAnalyse;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -25,15 +26,15 @@ public interface ExportService {
      */
     ExportModel exporterReponses(Long utilisateurId, Long sondageId, FormatExport format, ValeursExport valeurs,
                                  SeparateurDecimal separateurDecimal, boolean lignee, LocalDate du, LocalDate au,
-                                 Map<String, List<String>> criteres);
+                                 Map<String, List<String>> criteres, LanguesAnalyse langues);
 
     /** Rapport des statistiques en PDF (avec graphiques) ou XLSX (résumé + une feuille par question). */
     ExportModel exporterStatistiques(Long utilisateurId, Long sondageId, FormatExport format, boolean lignee,
                                      LocalDate du, LocalDate au, GranulariteDate granulariteDate,
-                                     Map<String, List<String>> criteres);
+                                     Map<String, List<String>> criteres, LanguesAnalyse langues);
 
     /** Tableau croisé en PDF ou XLSX. */
     ExportModel exporterCroisement(Long utilisateurId, Long sondageId, FormatExport format, String cleQuestion,
                                    String clePar, boolean lignee, LocalDate du, LocalDate au,
-                                   Map<String, List<String>> criteres);
+                                   Map<String, List<String>> criteres, LanguesAnalyse langues);
 }

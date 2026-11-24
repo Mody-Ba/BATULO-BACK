@@ -3,12 +3,14 @@ package com.batulo.service;
 import com.batulo.entity.Question;
 import com.batulo.entity.Section;
 import com.batulo.entity.Sondage;
+import com.batulo.enums.Langue;
 import com.batulo.enums.TypeQuestion;
 import com.batulo.exception.RegleGestionException;
 import com.batulo.repository.SondageRepository;
-import com.batulo.repository.StatistiqueRepository;
 import com.batulo.repository.StatistiqueRepository.Filtre;
+import com.batulo.repository.StatistiqueRepository;
 import com.batulo.service.model.CritereModel;
+import com.batulo.service.model.LanguesAnalyse;
 import com.fasterxml.jackson.databind.JsonNode;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
@@ -19,6 +21,7 @@ import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -52,36 +55,58 @@ public class AnalysePerimetre {
     }
 
     /** Le périmètre d'un calcul : versions retenues, références des questions, filtre (période, critères). */
+    /**
+     * @param langue   langue des libellés demandée (null : langue principale du sondage demandé)
+     * @param langues  langues de réponse retenues (vide : toutes)
+     */
     record Perimetre(Sondage sondage, List<Sondage> versions, Map<String, Reference> references,
-                             Filtre filtre, List<CritereModel> criteres) {
+                     Filtre filtre, List<CritereModel> criteres, Langue langue, List<Langue> langues) {
     }
 
     /** Définition de référence d'une question (dernière version qui la contient) et ses occurrences retenues. */
     static final class Reference {
         final Question question;
+        /** Libellé de la question et titre de sa section dans la langue demandée (secours : texte principal). */
+        final String libelle;
         final String section;
+        /** MATRICE : texte principal (valeur stable) -> libellé affiché, pour les lignes et pour les colonnes. */
+        final Map<String, String> libellesLignes = new LinkedHashMap<>();
+        final Map<String, String> libellesColonnes = new LinkedHashMap<>();
         /** Ids des questions de même clé et de même type, dans les versions retenues. */
         final Set<Long> ids = new LinkedHashSet<>();
         final Set<Long> versions = new HashSet<>();
         /** Libellé de chaque valeur d'option (celui de la version la plus récente qui la contient). */
         final Map<String, String> libellesOptions = new LinkedHashMap<>();
 
-        Reference(Question question, String section) {
+        Reference(Question question, String libelle, String section) {
             this.question = question;
+            this.libelle = libelle;
             this.section = section;
         }
     }
 
     Perimetre perimetre(Long utilisateurId, Long sondageId, boolean lignee, LocalDate du, LocalDate au,
-                                Map<String, List<String>> criteres) {
+                        Map<String, List<String>> criteres) {
+        return perimetre(utilisateurId, sondageId, lignee, du, au, criteres, LanguesAnalyse.DEFAUT);
+    }
+
+    /**
+     * @param langues langue des libellés (null : langue principale du sondage demandé ; chaque version la sert si
+     *                elle la propose, sinon sa langue principale) et filtre sur la langue de réponse
+     */
+    Perimetre perimetre(Long utilisateurId, Long sondageId, boolean lignee, LocalDate du, LocalDate au,
+                        Map<String, List<String>> criteres, LanguesAnalyse langues) {
         Sondage sondage = accesSondage.sondageLisible(accesSondage.acteur(utilisateurId), sondageId);
+        Langue langue = langues.libelles() != null ? langues.libelles() : sondage.getLanguePrincipale();
         List<Sondage> versions = versions(sondage, lignee);
-        Map<String, Reference> references = references(versions);
-        Filtre base = filtre(versions, du, au);
+        Map<String, Reference> references = references(versions, langue);
+        List<String> codes = langues.reponses().stream().map(Langue::getCode).toList();
+        Filtre base = filtre(versions, du, au, codes);
         List<CritereModel> appliques = new ArrayList<>();
         List<StatistiqueRepository.FiltreCritere> filtres = filtresCriteres(criteres, references, base, appliques);
         return new Perimetre(sondage, versions, references,
-                new Filtre(base.versions(), base.debut(), base.fin(), filtres), appliques);
+                new Filtre(base.versions(), base.debut(), base.fin(), filtres, codes), appliques, langue,
+                langues.reponses());
     }
 
     /** Cette version, ou toutes les versions publiées de la lignée (plus celle demandée), de la plus ancienne. */
@@ -100,16 +125,21 @@ public class AnalysePerimetre {
      * l'ordre de cette version ; les questions retirées depuis viennent ensuite. Une occurrence d'un autre type
      * (type changé entre deux versions) n'est pas retenue.
      */
-    private static Map<String, Reference> references(List<Sondage> versions) {
+    private static Map<String, Reference> references(List<Sondage> versions, Langue langue) {
         Map<String, Reference> references = new LinkedHashMap<>();
+        Map<Long, Traducteur> traducteurs = new HashMap<>();
+        versions.forEach(v -> traducteurs.put(v.getId(), Traducteur.pour(v, langue)));
         for (int i = versions.size() - 1; i >= 0; i--) {
+            Traducteur t = traducteurs.get(versions.get(i).getId());
             for (Section section : versions.get(i).getSections()) {
                 for (Question question : section.getQuestions()) {
-                    references.putIfAbsent(question.getCle(), new Reference(question, section.getTitre()));
+                    references.computeIfAbsent(question.getCle(),
+                            c -> new Reference(question, t.libelle(question), t.titre(section)));
                 }
             }
         }
         for (Sondage version : versions) {
+            Traducteur t = traducteurs.get(version.getId());
             for (Section section : version.getSections()) {
                 for (Question question : section.getQuestions()) {
                     Reference reference = references.get(question.getCle());
@@ -118,14 +148,21 @@ public class AnalysePerimetre {
                     }
                     reference.ids.add(question.getId());
                     reference.versions.add(version.getId());
-                    question.getOptions().forEach(o -> reference.libellesOptions.put(o.getValeur(), o.getLibelle()));
+                    question.getOptions().forEach(o -> reference.libellesOptions.put(o.getValeur(), t.libelle(o)));
+                    if (question.getType() == TypeQuestion.MATRICE) {
+                        question.getConfiguration().path("lignes").forEach(l -> reference.libellesLignes
+                                .put(l.asText(), t.matrice(question, "lignes", l.asText())));
+                        question.getConfiguration().path("colonnes").forEach(c -> reference.libellesColonnes
+                                .put(c.asText(), t.matrice(question, "colonnes", c.asText())));
+                    }
                 }
             }
         }
         // Options de la référence d'abord, dans son ordre ; puis les options retirées depuis.
         for (Reference reference : references.values()) {
+            Traducteur t = traducteurs.get(reference.question.getSection().getSondage().getId());
             Map<String, String> ordonnees = new LinkedHashMap<>();
-            reference.question.getOptions().forEach(o -> ordonnees.put(o.getValeur(), o.getLibelle()));
+            reference.question.getOptions().forEach(o -> ordonnees.put(o.getValeur(), t.libelle(o)));
             reference.libellesOptions.forEach(ordonnees::putIfAbsent);
             reference.libellesOptions.clear();
             reference.libellesOptions.putAll(ordonnees);
@@ -133,14 +170,14 @@ public class AnalysePerimetre {
         return references;
     }
 
-    private Filtre filtre(List<Sondage> versions, LocalDate du, LocalDate au) {
+    private Filtre filtre(List<Sondage> versions, LocalDate du, LocalDate au, List<String> langues) {
         if (du != null && au != null && du.isAfter(au)) {
             throw new RegleGestionException("PERIODE_INVALIDE", "La date « du » doit être antérieure ou égale à « au ».");
         }
         return new Filtre(
                 versions.stream().map(Sondage::getId).toList(),
                 du == null ? null : du.atStartOfDay(fuseau).toInstant(),
-                au == null ? null : au.plusDays(1).atStartOfDay(fuseau).toInstant());
+                au == null ? null : au.plusDays(1).atStartOfDay(fuseau).toInstant(), List.of(), langues);
     }
 
     /**
@@ -164,12 +201,12 @@ public class AnalysePerimetre {
             for (String valeur : valeurs) {
                 if (!autorisees.containsKey(valeur)) {
                     throw new RegleGestionException("CRITERE_INVALIDE", "« " + valeur + " » n'est pas une valeur du critère « "
-                            + reference.question.getLibelle() + " ».");
+                            + reference.libelle + " ».");
                 }
             }
             List<String> distinctes = valeurs.stream().distinct().toList();
             filtres.add(new StatistiqueRepository.FiltreCritere(reference.ids, decoupage, distinctes));
-            appliques.add(new CritereModel(cle, reference.question.getId(), reference.question.getLibelle(),
+            appliques.add(new CritereModel(cle, reference.question.getId(), reference.libelle,
                     reference.question.getType(), distinctes.stream()
                     .map(v -> new CritereModel.ValeurCritere(v, autorisees.get(v))).toList()));
         });

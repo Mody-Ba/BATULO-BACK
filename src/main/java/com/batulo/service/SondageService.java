@@ -2,7 +2,6 @@ package com.batulo.service;
 
 import com.batulo.enums.Langue;
 import com.batulo.enums.StatutSondage;
-import com.fasterxml.jackson.databind.JsonNode;
 import com.batulo.service.model.ApercuModel;
 import com.batulo.service.model.ConditionModel;
 import com.batulo.service.model.CreationSondageModel;
@@ -14,6 +13,7 @@ import com.batulo.service.model.SondageInfoModel;
 import com.batulo.service.model.SondageModel;
 import com.batulo.service.model.SondageResumeModel;
 import com.batulo.service.model.VersionModel;
+import com.fasterxml.jackson.databind.JsonNode;
 import org.springframework.data.domain.Page;
 
 import java.util.List;

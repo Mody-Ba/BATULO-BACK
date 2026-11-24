@@ -1,6 +1,7 @@
 package com.batulo.service.model;
 
 import com.batulo.enums.GranulariteDate;
+import com.batulo.enums.Langue;
 import com.batulo.enums.TypeQuestion;
 import com.fasterxml.jackson.annotation.JsonInclude;
 
@@ -23,6 +24,12 @@ public record StatistiquesResponse(
         LocalDate au,
         /** Critères appliqués (segmentation) ; vide : tous les répondants. */
         List<CritereResponse> criteres,
+        /** Langue des libellés (?langue=, langue principale par défaut ; texte principal pour un texte non traduit). */
+        Langue langue,
+        /** Filtre sur la langue de réponse (?langueReponse=) ; vide : toutes les langues. */
+        List<Langue> languesReponse,
+        /** Réponses retenues par langue de réponse (langues sans réponse omises). */
+        List<ReponsesLangue> repartitionLangues,
         Resume resume,
         List<QuestionStat> questions
 ) {
@@ -83,10 +90,15 @@ public record Classe(BigDecimal valeur, BigDecimal de, BigDecimal a, long nombre
     public record RangStat(String valeur, String libelle, BigDecimal rangMoyen, long nombrePremier) {
     }
 
-    public record Matrice(List<String> colonnes, List<LigneMatrice> lignes) {
+    public record ReponsesLangue(Langue langue, long nombre) {
     }
 
-    public record LigneMatrice(String ligne, long nombre, List<Cellule> cellules) {
+    /** colonnes : textes principaux (valeurs stables, repris dans Cellule.colonne) ; libellesColonnes : au même rang, dans la langue demandée. */
+    public record Matrice(List<String> colonnes, List<String> libellesColonnes, List<LigneMatrice> lignes) {
+    }
+
+    /** ligne : texte principal (valeur stable) ; libelle : dans la langue demandée. */
+    public record LigneMatrice(String ligne, String libelle, long nombre, List<Cellule> cellules) {
     }
 
     public record Cellule(String colonne, long nombre, BigDecimal pourcentage) {

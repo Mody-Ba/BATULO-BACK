@@ -24,6 +24,10 @@ public record EnvoiStatistiqueRequest(
         @Size(max = 50, message = "trop de critères")
         List<String> critere,
 
-        GranulariteDate granulariteDate
+        GranulariteDate granulariteDate,
+
+        @Schema(description = "Filtre sur la langue de réponse (fr, en, ar) ; absent : toutes", example = "[\"ar\"]")
+        @Size(max = 3, message = "trop de langues")
+        List<String> langueReponse
 ) {
 }

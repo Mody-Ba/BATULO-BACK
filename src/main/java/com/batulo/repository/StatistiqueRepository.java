@@ -38,9 +38,15 @@ public class StatistiqueRepository {
      * Réponses retenues : ces versions, la période [debut, fin[ si elle est donnée, et les critères (segmentation) :
      * plusieurs valeurs d'un même critère se combinent en OU, des critères différents en ET.
      */
-    public record Filtre(Collection<Long> versions, Instant debut, Instant fin, List<FiltreCritere> criteres) {
+    public record Filtre(Collection<Long> versions, Instant debut, Instant fin, List<FiltreCritere> criteres,
+                         Collection<String> langues) {
         public Filtre(Collection<Long> versions, Instant debut, Instant fin) {
-            this(versions, debut, fin, List.of());
+            this(versions, debut, fin, List.of(), List.of());
+        }
+
+        /** @param langues codes des langues de réponse retenues (« fr », « ar »...) ; vide : toutes */
+        public Filtre {
+            langues = langues == null ? List.of() : langues;
         }
     }
 
@@ -108,6 +114,17 @@ public class StatistiqueRepository {
         jdbc.query("select r.sondage_id, count(*) from reponse r where " + conditions(filtre, p)
                 + " group by r.sondage_id", p, rs -> {
             resultat.put(rs.getLong(1), rs.getLong(2));
+        });
+        return resultat;
+    }
+
+    /** Réponses retenues par langue de réponse (code « fr », « en », « ar »). */
+    public Map<String, Long> reponsesParLangue(Filtre filtre) {
+        MapSqlParameterSource p = new MapSqlParameterSource();
+        Map<String, Long> resultat = new HashMap<>();
+        jdbc.query("select r.langue, count(*) from reponse r where " + conditions(filtre, p)
+                + " group by r.langue", p, rs -> {
+            resultat.put(rs.getString(1), rs.getLong(2));
         });
         return resultat;
     }
@@ -344,6 +361,10 @@ public class StatistiqueRepository {
         if (filtre.fin() != null) {
             sql.append(" and r.date_soumission < :fin");
             p.addValue("fin", Timestamp.from(filtre.fin()));
+        }
+        if (!filtre.langues().isEmpty()) {
+            sql.append(" and r.langue in (:languesReponse)");
+            p.addValue("languesReponse", filtre.langues());
         }
         for (int i = 0; i < filtre.criteres().size(); i++) {
             FiltreCritere critere = filtre.criteres().get(i);

@@ -36,7 +36,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 /** Étape 3.3 : exports CSV, XLSX et PDF, vérifiés sur un jeu de 3 réponses connu (et un gros volume). */
 class ExportIntegrationTest extends PostgresIntegrationTestBase {
 
-    private static final String ENTETES = "Id;Date;Version;Région;Cultures – Mil;Cultures – Arachide;Engrais ?;"
+    private static final String ENTETES = "Id;Date;Version;Langue;Région;Cultures – Mil;Cultures – Arachide;Engrais ?;"
             + "Surface (ha);Semis;Remarque;Priorités – Semences;Priorités – Engrais;Services – Vulgarisation;"
             + "Services – Marché";
 
@@ -101,14 +101,14 @@ class ExportIntegrationTest extends PostgresIntegrationTestBase {
         String[] lignes = csv.split("\r\n");
         assertThat(lignes[0]).isEqualTo(ENTETES);
         // Réponse 1 : formule neutralisée par une apostrophe, virgule décimale, 1/1 pour le choix multiple, rangs.
-        assertThat(lignes[1]).matches("\\d+;\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2};1;Kaolack;1;1;Oui;12,5;2026-07-01;"
+        assertThat(lignes[1]).matches("\\d+;\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2};1;fr;Kaolack;1;1;Oui;12,5;2026-07-01;"
                 + "'=SOMME\\(A1\\);2;1;Bon;Moyen");
         // Réponse 2 : choix multiple non répondu = cases vides ; texte entre guillemets (« ; », guillemets, retour).
         // Le retour à la ligne du texte (\n) reste dans les guillemets : la réponse 2 tient sur un seul enregistrement.
-        assertThat(lignes[2]).matches("(?s)\\d+;[^;]+;1;Fatick;;;Non;3;;\"Texte; avec \"\"guillemets\"\"\net retour\";"
+        assertThat(lignes[2]).matches("(?s)\\d+;[^;]+;1;fr;Fatick;;;Non;3;;\"Texte; avec \"\"guillemets\"\"\net retour\";"
                 + "1;2;Moyen;Bon");
         // Réponse 3 : arachide seule → 0/1.
-        assertThat(csv).containsPattern("\\d+;[^;]+;1;Kaolack;0;1;Oui;0,5;2026-07-15;;2;1;Bon;Bon\r\n");
+        assertThat(csv).containsPattern("\\d+;[^;]+;1;fr;Kaolack;0;1;Oui;0,5;2026-07-15;;2;1;Bon;Bon\r\n");
     }
 
     @Test
@@ -116,8 +116,8 @@ class ExportIntegrationTest extends PostgresIntegrationTestBase {
         String csv = texte(exporter("reponses?format=CSV&separateurDecimal=POINT&valeurs=CODES"));
         String[] lignes = csv.split("\r\n");
         assertThat(lignes[0]).isEqualTo(ENTETES.replace(';', ','));
-        assertThat(lignes[1]).matches("\\d+,[^,]+,1,kaolack,1,1,1,12\\.5,2026-07-01,'=SOMME\\(A1\\),2,1,Bon,Moyen");
-        assertThat(csv).containsPattern(",1,kaolack,0,1,1,0\\.5,2026-07-15,,2,1,Bon,Bon\r\n");
+        assertThat(lignes[1]).matches("\\d+,[^,]+,1,fr,kaolack,1,1,1,12\\.5,2026-07-01,'=SOMME\\(A1\\),2,1,Bon,Moyen");
+        assertThat(csv).containsPattern(",1,fr,kaolack,0,1,1,0\\.5,2026-07-15,,2,1,Bon,Bon\r\n");
     }
 
     @Test
@@ -133,15 +133,15 @@ class ExportIntegrationTest extends PostgresIntegrationTestBase {
             feuille.getRow(0).forEach(c -> entetes.add(c.getStringCellValue()));
             assertThat(String.join(";", entetes)).isEqualTo(ENTETES);
             Row premiere = feuille.getRow(1);
-            assertThat(premiere.getCell(3).getStringCellValue()).isEqualTo("Kaolack");
-            assertThat(premiere.getCell(7).getCellType()).isEqualTo(CellType.NUMERIC);
-            assertThat(premiere.getCell(7).getNumericCellValue()).isEqualTo(12.5);
-            assertThat(DateUtil.isCellDateFormatted(premiere.getCell(8))).isTrue();
-            assertThat(premiere.getCell(8).getLocalDateTimeCellValue().toLocalDate()).hasToString("2026-07-01");
+            assertThat(premiere.getCell(4).getStringCellValue()).isEqualTo("Kaolack");
+            assertThat(premiere.getCell(8).getCellType()).isEqualTo(CellType.NUMERIC);
+            assertThat(premiere.getCell(8).getNumericCellValue()).isEqualTo(12.5);
+            assertThat(DateUtil.isCellDateFormatted(premiere.getCell(9))).isTrue();
+            assertThat(premiere.getCell(9).getLocalDateTimeCellValue().toLocalDate()).hasToString("2026-07-01");
             // Le texte qui ressemble à une formule reste un texte.
-            assertThat(premiere.getCell(9).getCellType()).isEqualTo(CellType.STRING);
-            assertThat(premiere.getCell(9).getStringCellValue()).isEqualTo("=SOMME(A1)");
-            assertThat(feuille.getRow(2).getCell(4)).isNull();
+            assertThat(premiere.getCell(10).getCellType()).isEqualTo(CellType.STRING);
+            assertThat(premiere.getCell(10).getStringCellValue()).isEqualTo("=SOMME(A1)");
+            assertThat(feuille.getRow(2).getCell(5)).isNull();
         }
     }
 

@@ -1,7 +1,5 @@
 package com.batulo.mappers;
 
-import com.batulo.service.model.LibellesMatriceResponse;
-import com.batulo.service.model.LibellesMatriceModel;
 import com.batulo.enums.CombinaisonCondition;
 import com.batulo.service.model.ApercuModel;
 import com.batulo.service.model.ApercuResponse;
@@ -17,6 +15,8 @@ import com.batulo.service.model.DatesSondageRequest;
 import com.batulo.service.model.FormulaireModel;
 import com.batulo.service.model.FormulaireResponse;
 import com.batulo.service.model.GestionnaireAssigneResponse;
+import com.batulo.service.model.LibellesMatriceModel;
+import com.batulo.service.model.LibellesMatriceResponse;
 import com.batulo.service.model.OptionInfoModel;
 import com.batulo.service.model.OptionModel;
 import com.batulo.service.model.OptionRequest;

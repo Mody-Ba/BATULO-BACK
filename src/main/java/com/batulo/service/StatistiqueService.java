@@ -3,8 +3,9 @@ package com.batulo.service;
 import com.batulo.enums.GranulariteDate;
 import com.batulo.service.model.CritereModel;
 import com.batulo.service.model.CroisementModel;
-import com.batulo.service.model.StatistiquesModel;
+import com.batulo.service.model.LanguesAnalyse;
 import com.batulo.service.model.StatistiquesModel.PageTextes;
+import com.batulo.service.model.StatistiquesModel;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -23,13 +24,15 @@ public interface StatistiqueService {
      * @param granulariteDate facultative : JOUR ou MOIS pour les questions DATE (automatique sinon)
      * @param criteres filtres de segmentation « clé de critère -> valeurs » (OU dans une clé, ET entre clés) ;
      *                 vide : tous les répondants
+     * @param langues  langue des libellés (langue principale par défaut) et filtre sur la langue de réponse
      * @throws com.batulo.exception.RegleGestionException PERIODE_INVALIDE si du est après au ; CRITERE_INVALIDE
      */
     StatistiquesModel statistiques(Long utilisateurId, Long sondageId, boolean lignee, LocalDate du, LocalDate au,
-                                   GranulariteDate granulariteDate, Map<String, List<String>> criteres);
+                                   GranulariteDate granulariteDate, Map<String, List<String>> criteres,
+                                   LanguesAnalyse langues);
 
     /** Critères d'analyse du sondage (ou de la lignée) et leurs valeurs, pour construire les filtres. */
-    List<CritereModel> criteres(Long utilisateurId, Long sondageId, boolean lignee);
+    List<CritereModel> criteres(Long utilisateurId, Long sondageId, boolean lignee, LanguesAnalyse langues);
 
     /**
      * Tableau croisé d'une question (choix, oui/non, échelle, numérique) par un critère.
@@ -38,7 +41,8 @@ public interface StatistiqueService {
      * @throws com.batulo.exception.ResourceNotFoundException QUESTION_INTROUVABLE
      */
     CroisementModel croisement(Long utilisateurId, Long sondageId, String cleQuestion, String clePar, boolean lignee,
-                               LocalDate du, LocalDate au, Map<String, List<String>> criteres);
+                               LocalDate du, LocalDate au, Map<String, List<String>> criteres,
+                               LanguesAnalyse langues);
 
     /**
      * Textes d'une question TEXTE_COURT ou TEXTE_LONG, les plus récents d'abord, avec les mêmes filtres.
@@ -47,5 +51,5 @@ public interface StatistiqueService {
      * @throws com.batulo.exception.RegleGestionException QUESTION_NON_TEXTE
      */
     PageTextes textes(Long utilisateurId, Long sondageId, Long questionId, boolean lignee, LocalDate du, LocalDate au,
-                      Map<String, List<String>> criteres, int page, int taille);
+                      Map<String, List<String>> criteres, LanguesAnalyse langues, int page, int taille);
 }

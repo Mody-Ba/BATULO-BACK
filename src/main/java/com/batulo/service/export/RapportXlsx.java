@@ -1,8 +1,8 @@
 package com.batulo.service.export;
 
 import com.batulo.service.model.CroisementModel;
-import com.batulo.service.model.StatistiquesModel;
 import com.batulo.service.model.StatistiquesModel.QuestionStat;
+import com.batulo.service.model.StatistiquesModel;
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.CellStyle;
 import org.apache.poi.ss.usermodel.Font;
@@ -185,14 +185,14 @@ public class RapportXlsx {
             }
         } else if (q.matrice() != null) {
             List<String> titres = new ArrayList<>(List.of("Ligne"));
-            q.matrice().colonnes().forEach(c -> {
+            q.matrice().libellesColonnes().forEach(c -> {
                 titres.add(c + " (nombre)");
                 titres.add(c + " (%)");
             });
             titres(feuille, ligne++, titres.toArray(String[]::new));
             for (StatistiquesModel.LigneMatrice l : q.matrice().lignes()) {
                 Row row = feuille.createRow(ligne++);
-                row.createCell(0).setCellValue(l.ligne());
+                row.createCell(0).setCellValue(l.libelle());
                 for (int i = 0; i < l.cellules().size(); i++) {
                     nombre(row, 1 + 2 * i, l.cellules().get(i).nombre());
                     pct(row, 2 + 2 * i, l.cellules().get(i).pourcentage());

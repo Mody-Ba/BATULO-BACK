@@ -249,6 +249,15 @@ class MessagerieIntegrationTest extends PostgresIntegrationTestBase {
         adminActif("bob@test.com");
         getAvec(jeton("bob@test.com"), "/api/statistiques-recues/" + envoiId).andExpect(status().isNotFound());
 
+        // Filtre sur la langue de réponse enregistré avec l'envoi (toutes les réponses sont en français ici).
+        postAvec(jetonG1, "/api/sondages/" + s.id + "/envois-statistiques", Map.of("langueReponse", List.of("xx")))
+                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("LANGUE_INVALIDE"));
+        long envoiEn = lire(postAvec(jetonG1, "/api/sondages/" + s.id + "/envois-statistiques",
+                Map.of("langueReponse", List.of("en"))).andExpect(status().isCreated())).get("id").asLong();
+        getAvec(jetonAdmin, "/api/statistiques-recues/" + envoiEn).andExpect(status().isOk())
+                .andExpect(jsonPath("$.resume.nombreReponses").value(0))
+                .andExpect(jsonPath("$.languesReponse[0]").value("en"));
+
         // Gestionnaire supprimé : l'envoi reste, avec son nom (GE-06).
         deleteAvec(jetonAdmin, "/api/admin/gestionnaires/" + g1.getId()).andExpect(status().is2xxSuccessful());
         JsonNode apres = lire(getAvec(jetonAdmin, "/api/statistiques-recues")).at("/contenu/0");

@@ -4,12 +4,13 @@ import com.batulo.entity.Entreprise;
 import com.batulo.entity.Sondage;
 import com.batulo.enums.FormatExport;
 import com.batulo.enums.GranulariteDate;
+import com.batulo.enums.Langue;
 import com.batulo.enums.SeparateurDecimal;
 import com.batulo.enums.TypeQuestion;
 import com.batulo.enums.ValeursExport;
 import com.batulo.exception.RegleGestionException;
-import com.batulo.repository.ExportRepository;
 import com.batulo.repository.ExportRepository.LigneBrute;
+import com.batulo.repository.ExportRepository;
 import com.batulo.repository.StatistiqueRepository.Filtre;
 import com.batulo.service.AnalysePerimetre.Perimetre;
 import com.batulo.service.AnalysePerimetre.Reference;
@@ -22,6 +23,7 @@ import com.batulo.service.export.RapportXlsx;
 import com.batulo.service.model.CritereModel;
 import com.batulo.service.model.CroisementModel;
 import com.batulo.service.model.ExportModel;
+import com.batulo.service.model.LanguesAnalyse;
 import com.batulo.service.model.StatistiquesModel;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -92,17 +94,21 @@ public class ExportServiceImpl implements ExportService {
     // ---------------------------------------------------------------- Réponses brutes
 
     /** Une colonne du fichier : une question, ou une option (choix multiple, classement) ou ligne (matrice). */
+    /**
+     * @param libelles libellé de chaque valeur dans la langue demandée : options (choix) ou colonnes (matrice, sous
+     *                 leur texte principal)
+     */
     private record Colonne(String cle, TypeQuestion type, String sous, Map<String, String> libellesOptions) {
     }
 
     @Override
     public ExportModel exporterReponses(Long utilisateurId, Long sondageId, FormatExport format, ValeursExport valeurs,
                                         SeparateurDecimal separateurDecimal, boolean lignee, LocalDate du,
-                                        LocalDate au, Map<String, List<String>> criteres) {
+                                        LocalDate au, Map<String, List<String>> criteres, LanguesAnalyse langues) {
         if (format == FormatExport.PDF) {
             throw new RegleGestionException("FORMAT_INVALIDE", "Les réponses s'exportent en CSV ou en XLSX.");
         }
-        Perimetre perimetre = analyse.perimetre(utilisateurId, sondageId, lignee, du, au, criteres);
+        Perimetre perimetre = analyse.perimetre(utilisateurId, sondageId, lignee, du, au, criteres, langues);
 
         // Tout ce dont l'écriture a besoin est copié ici, dans la transaction : aucune entité n'en sort.
         List<String> entetes = new ArrayList<>(List.of("Id", "Date", "Version"));
@@ -112,11 +118,13 @@ public class ExportServiceImpl implements ExportService {
         if (avecConsentement) {
             entetes.add("Consentement");
         }
+        // Langue dans laquelle le répondant a vu le formulaire (code fr, en, ar).
+        entetes.add("Langue");
         List<Colonne> colonnes = new ArrayList<>();
         Set<Long> questions = new LinkedHashSet<>();
         for (Map.Entry<String, Reference> e : perimetre.references().entrySet()) {
             Reference r = e.getValue();
-            String libelle = r.question.getLibelle();
+            String libelle = r.libelle;
             Map<String, String> options = Map.copyOf(r.libellesOptions);
             questions.addAll(r.ids);
             switch (r.question.getType()) {
@@ -125,8 +133,9 @@ public class ExportServiceImpl implements ExportService {
                     colonnes.add(new Colonne(e.getKey(), r.question.getType(), valeur, options));
                 });
                 case MATRICE -> r.question.getConfiguration().path("lignes").forEach(ligne -> {
-                    entetes.add(libelle + " – " + ligne.asText());
-                    colonnes.add(new Colonne(e.getKey(), TypeQuestion.MATRICE, ligne.asText(), options));
+                    entetes.add(libelle + " – " + r.libellesLignes.getOrDefault(ligne.asText(), ligne.asText()));
+                    colonnes.add(new Colonne(e.getKey(), TypeQuestion.MATRICE, ligne.asText(),
+                            Map.copyOf(r.libellesColonnes)));
                 });
                 default -> {
                     entetes.add(libelle);
@@ -170,6 +179,7 @@ public class ExportServiceImpl implements ExportService {
         private Instant date;
         private Instant dateConsentement;
         private int version;
+        private String langue;
         private final Map<String, List<LigneBrute>> parCle = new HashMap<>();
         private final Map<String, JsonNode> jsonParCle = new HashMap<>();
         private long lignes;
@@ -191,6 +201,7 @@ public class ExportServiceImpl implements ExportService {
             date = ligne.dateSoumission();
             dateConsentement = ligne.dateConsentement();
             version = ligne.version();
+            langue = ligne.langue();
             if (ligne.cle() != null) {
                 parCle.computeIfAbsent(ligne.cle(), c -> new ArrayList<>()).add(ligne);
             }
@@ -211,6 +222,7 @@ public class ExportServiceImpl implements ExportService {
                 // Vide pour une réponse d'une version qui n'exigeait pas le consentement.
                 cellules.add(dateConsentement == null ? null : LocalDateTime.ofInstant(dateConsentement, fuseau));
             }
+            cellules.add(langue);
             for (Colonne colonne : colonnes) {
                 cellules.add(valeur(colonne, parCle.getOrDefault(colonne.cle(), List.of())));
             }
@@ -249,8 +261,10 @@ public class ExportServiceImpl implements ExportService {
                     yield null;
                 }
                 case MATRICE -> {
+                    // Colonne choisie : texte principal (valeur stable) ; en LIBELLES, son libellé dans la langue demandée.
                     JsonNode choix = json(colonne.cle(), premiere).get(colonne.sous());
-                    yield choix == null ? null : choix.asText();
+                    yield choix == null ? null : codes ? choix.asText()
+                            : colonne.libellesOptions().getOrDefault(choix.asText(), choix.asText());
                 }
             };
         }
@@ -272,12 +286,13 @@ public class ExportServiceImpl implements ExportService {
     @Override
     public ExportModel exporterStatistiques(Long utilisateurId, Long sondageId, FormatExport format, boolean lignee,
                                             LocalDate du, LocalDate au, GranulariteDate granulariteDate,
-                                            Map<String, List<String>> criteres) {
+                                            Map<String, List<String>> criteres, LanguesAnalyse langues) {
         verifierFormatRapport(format);
         StatistiquesModel stats = statistiqueService.statistiques(utilisateurId, sondageId, lignee, du, au,
-                granulariteDate, criteres);
+                granulariteDate, criteres, langues);
         Sondage sondage = accesSondage.sondageLisible(accesSondage.acteur(utilisateurId), sondageId);
-        InfosRapport infos = infos(sondage, stats.versions(), lignee, du, au, stats.criteres());
+        InfosRapport infos = infos(sondage, stats.versions(), lignee, du, au, stats.criteres(), stats.langue(),
+                stats.languesReponse());
         journaliser("statistiques " + format, utilisateurId, sondageId, lignee, du, au, stats.criteres());
         String nom = nomFichier(sondage, lignee, "_statistiques", extension(format));
         return new ExportModel(nom, type(format), flux -> {
@@ -292,13 +307,13 @@ public class ExportServiceImpl implements ExportService {
     @Override
     public ExportModel exporterCroisement(Long utilisateurId, Long sondageId, FormatExport format, String cleQuestion,
                                           String clePar, boolean lignee, LocalDate du, LocalDate au,
-                                          Map<String, List<String>> criteres) {
+                                          Map<String, List<String>> criteres, LanguesAnalyse langues) {
         verifierFormatRapport(format);
         CroisementModel tableau = statistiqueService.croisement(utilisateurId, sondageId, cleQuestion, clePar, lignee,
-                du, au, criteres);
-        Perimetre perimetre = analyse.perimetre(utilisateurId, sondageId, lignee, du, au, Map.of());
+                du, au, criteres, langues);
+        Perimetre perimetre = analyse.perimetre(utilisateurId, sondageId, lignee, du, au, Map.of(), langues);
         InfosRapport infos = infos(perimetre.sondage(), perimetre.versions().stream().map(Sondage::getVersion).toList(),
-                lignee, du, au, tableau.criteres());
+                lignee, du, au, tableau.criteres(), perimetre.langue(), perimetre.langues());
         journaliser("croisement " + format, utilisateurId, sondageId, lignee, du, au, tableau.criteres());
         String nom = nomFichier(perimetre.sondage(), lignee, "_croisement", extension(format));
         return new ExportModel(nom, type(format), flux -> {
@@ -313,19 +328,24 @@ public class ExportServiceImpl implements ExportService {
     // ---------------------------------------------------------------- Outils
 
     private InfosRapport infos(Sondage sondage, List<Integer> versions, boolean lignee, LocalDate du, LocalDate au,
-                               List<CritereModel> criteres) {
+                               List<CritereModel> criteres, Langue langue, List<Langue> languesReponse) {
         String perimetre = lignee
                 ? "Toutes les versions (" + versions.stream().map(String::valueOf).collect(Collectors.joining(", ")) + ")"
                 : "Version " + sondage.getVersion();
         String periode = du == null && au == null ? "Toutes les dates"
                 : du == null ? "Jusqu'au " + au : au == null ? "Depuis le " + du : "Du " + du + " au " + au;
-        List<String> texteCriteres = criteres.stream()
+        List<String> texteCriteres = new ArrayList<>(criteres.stream()
                 .map(c -> c.libelle() + " : " + c.valeurs().stream().map(CritereModel.ValeurCritere::libelle)
                         .collect(Collectors.joining(", ")))
-                .toList();
+                .toList());
+        if (!languesReponse.isEmpty()) {
+            texteCriteres.add("Langue de réponse : " + languesReponse.stream().map(Langue::getCode)
+                    .collect(Collectors.joining(", ")));
+        }
         Entreprise entreprise = sondage.getEntreprise();
         byte[] logo = personnalisations.logoPourRapport(entreprise);
-        return new InfosRapport(sondage.getTitre(), personnalisations.nomEffectif(entreprise), perimetre, periode,
+        return new InfosRapport(Traducteur.pour(sondage, langue).titre(sondage), personnalisations.nomEffectif(entreprise),
+                perimetre, periode,
                 texteCriteres, GENERE_LE.format(LocalDateTime.now(analyse.fuseau())), effectifMinimum, logo,
                 logo != null || entreprise.getNomAffiche() != null);
     }

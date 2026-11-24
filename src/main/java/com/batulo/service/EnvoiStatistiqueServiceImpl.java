@@ -7,6 +7,7 @@ import com.batulo.entity.Utilisateur;
 import com.batulo.enums.CoteConversation;
 import com.batulo.enums.FormatExport;
 import com.batulo.enums.GranulariteDate;
+import com.batulo.enums.Langue;
 import com.batulo.enums.Role;
 import com.batulo.enums.StatutSondage;
 import com.batulo.enums.TypeMessage;
@@ -21,6 +22,7 @@ import com.batulo.service.model.CritereModel;
 import com.batulo.service.model.EnvoiStatistiqueDemandeModel;
 import com.batulo.service.model.EnvoiStatistiqueModel;
 import com.batulo.service.model.ExportModel;
+import com.batulo.service.model.LanguesAnalyse;
 import com.batulo.service.model.StatistiquesModel;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -80,7 +82,7 @@ public class EnvoiStatistiqueServiceImpl implements EnvoiStatistiqueService {
     public EnvoiStatistiqueModel envoyer(Long gestionnaireId, Long sondageId, EnvoiStatistiqueDemandeModel demande) {
         // Droits (créateur ou assigné) et filtres validés comme pour GET /statistiques.
         Perimetre perimetre = analyse.perimetre(gestionnaireId, sondageId, demande.lignee(), demande.du(), demande.au(),
-                demande.criteres());
+                demande.criteres(), new LanguesAnalyse(null, demande.languesReponse()));
         Sondage sondage = perimetre.sondage();
         Instant maintenant = Instant.now();
         List<Sondage> aVerifier = demande.lignee()
@@ -143,7 +145,7 @@ public class EnvoiStatistiqueServiceImpl implements EnvoiStatistiqueService {
         EnvoiStatistique envoi = envoiDeLAdmin(adminId, envoiId);
         JsonNode f = envoi.getFiltres();
         return statistiqueService.statistiques(adminId, envoi.getSondage().getId(), envoi.isLignee(), date(f, "du"),
-                date(f, "au"), granularite(f), criteres(f));
+                date(f, "au"), granularite(f), criteres(f), langues(f));
     }
 
     @Override
@@ -152,7 +154,7 @@ public class EnvoiStatistiqueServiceImpl implements EnvoiStatistiqueService {
         EnvoiStatistique envoi = envoiDeLAdmin(adminId, envoiId);
         JsonNode f = envoi.getFiltres();
         return exportService.exporterStatistiques(adminId, envoi.getSondage().getId(), FormatExport.PDF,
-                envoi.isLignee(), date(f, "du"), date(f, "au"), granularite(f), criteres(f));
+                envoi.isLignee(), date(f, "du"), date(f, "au"), granularite(f), criteres(f), langues(f));
     }
 
     /** L'envoi doit être adressé à cet admin ; il est alors marqué comme consulté. Sinon 404. */
@@ -193,6 +195,10 @@ public class EnvoiStatistiqueServiceImpl implements EnvoiStatistiqueService {
             ArrayNode liste = criteres.putArray(cle);
             valeurs.forEach(liste::add);
         });
+        if (demande.languesReponse() != null && !demande.languesReponse().isEmpty()) {
+            ArrayNode langues = filtres.putArray("languesReponse");
+            demande.languesReponse().forEach(l -> langues.add(l.getCode()));
+        }
         ArrayNode texte = filtres.putArray("descriptionCriteres");
         descriptions.forEach(texte::add);
         return filtres;
@@ -229,6 +235,13 @@ public class EnvoiStatistiqueServiceImpl implements EnvoiStatistiqueService {
 
     private static GranulariteDate granularite(JsonNode filtres) {
         return filtres.hasNonNull("granularite") ? GranulariteDate.valueOf(filtres.get("granularite").asText()) : null;
+    }
+
+    /** Langues de réponse enregistrées (absentes pour les anciens envois : toutes). */
+    private static LanguesAnalyse langues(JsonNode filtres) {
+        List<Langue> langues = new ArrayList<>();
+        filtres.path("languesReponse").forEach(c -> Langue.parCode(c.asText()).ifPresent(langues::add));
+        return new LanguesAnalyse(null, langues);
     }
 
     private static Map<String, List<String>> criteres(JsonNode filtres) {
