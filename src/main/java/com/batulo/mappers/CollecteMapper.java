@@ -4,6 +4,8 @@ import com.batulo.service.Langues;
 import com.batulo.service.model.ConfirmationReponseResponse;
 import com.batulo.service.model.FormulairePublicModel;
 import com.batulo.service.model.FormulairePublicResponse;
+import com.batulo.service.model.InvitationPubliqueResponse;
+import com.batulo.service.model.InviteResponse;
 import com.batulo.service.model.LienSondageModel;
 import com.batulo.service.model.LienSondageResponse;
 import com.batulo.service.model.OptionModel;
@@ -42,7 +44,7 @@ public class CollecteMapper {
     }
 
     public SoumissionModel toModel(SoumissionRequest req) {
-        return new SoumissionModel(req.jetonRepondant(), req.consentement(), Langues.lire(req.langue()), req.reponses().stream()
+        return new SoumissionModel(req.jetonRepondant(), req.jetonInvitation(), req.consentement(), Langues.lire(req.langue()), req.reponses().stream()
                 .map(r -> new SoumissionModel.ValeurSoumise(r.questionId(), r.valeur()))
                 .toList());
     }
@@ -51,7 +53,9 @@ public class CollecteMapper {
         return new FormulairePublicResponse(model.titre(), model.description(), model.reponseUnique(),
                 model.dateFermeture(), model.objetEnquete(), model.texteConfidentialite(), model.consentementRequis(),
                 model.texteConsentement(), personnalisationMapper.toResponse(model.apparence()), model.langue(),
-                model.languePrincipale(), model.languesDisponibles(), model.sections().stream().map(this::toResponse).toList(), model.dejaRepondu());
+                model.languePrincipale(), model.languesDisponibles(), model.sections().stream().map(this::toResponse).toList(), model.dejaRepondu(),
+                model.invitation() == null ? null : new InvitationPubliqueResponse(model.invitation().dejaRepondu(),
+                        model.invitation().reponsesNominatives()));
     }
 
     public ConfirmationReponseResponse toConfirmation(Instant dateSoumission) {
@@ -71,7 +75,10 @@ public class CollecteMapper {
         return new PageResponse<>(
                 page.getContent().stream()
                         .map(r -> new ReponseResponse(r.id(), r.sondageId(), r.version(), r.dateSoumission(),
-                                r.dateConsentement(), r.langue(), r.valeurs().stream()
+                                r.dateConsentement(), r.langue(),
+                                r.invite() == null ? null : new InviteResponse(r.invite().invitationId(),
+                                        r.invite().prenom(), r.invite().nom(), r.invite().courriel()),
+                                r.valeurs().stream()
                                 .map(v -> new ValeurReponseResponse(v.questionId(), v.libelle(), v.type(), v.valeur()))
                                 .toList()))
                         .toList(),

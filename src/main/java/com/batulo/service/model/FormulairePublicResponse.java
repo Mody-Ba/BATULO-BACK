@@ -40,6 +40,9 @@ public record FormulairePublicResponse(
          */
         @JsonInclude(JsonInclude.Include.NON_NULL)
         @Schema(description = "Seulement si reponseUnique : l'appareil (X-Jeton-Repondant) a déjà répondu")
-        Boolean dejaRepondu
+        Boolean dejaRepondu,
+        /** Lien personnel (en-tête X-Jeton-Invitation) : état de l'invitation ; absent sans lien personnel. */
+        @JsonInclude(JsonInclude.Include.NON_NULL)
+        InvitationPubliqueResponse invitation
 ) {
 }

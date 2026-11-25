@@ -36,6 +36,8 @@ public record SondageModel(
         Langue languePrincipale,
         /** Langues supplémentaires (sans la principale), traduites dans l'éditeur de traductions. */
         List<Langue> languesSupplementaires,
+        /** true : réponses reçues par invitation associées aux invités ; false : anonymes (défaut). */
+        boolean reponsesNominatives,
         AuteurModel creePar,
         Instant dateCreation,
         Instant dateModification,

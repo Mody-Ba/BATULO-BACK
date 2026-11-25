@@ -1,6 +1,7 @@
 package com.batulo.service.model;
 
 import com.batulo.enums.Langue;
+import com.fasterxml.jackson.annotation.JsonInclude;
 
 import java.time.Instant;
 import java.util.List;
@@ -17,6 +18,9 @@ public record ReponseResponse(
         Instant dateConsentement,
         /** Langue dans laquelle le répondant a vu le formulaire. */
         Langue langue,
+        /** Seulement si la version associe les réponses aux personnes invitées ; absent sinon (anonyme). */
+        @JsonInclude(JsonInclude.Include.NON_NULL)
+        InviteResponse invite,
         List<ValeurReponseResponse> valeurs
 ) {
 }

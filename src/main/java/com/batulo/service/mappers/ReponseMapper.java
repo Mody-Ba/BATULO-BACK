@@ -1,8 +1,10 @@
 package com.batulo.service.mappers;
 
+import com.batulo.entity.Invitation;
 import com.batulo.entity.Question;
 import com.batulo.entity.Reponse;
 import com.batulo.entity.ReponseQuestion;
+import com.batulo.service.model.InviteModel;
 import com.batulo.service.model.ReponseModel;
 import com.batulo.service.model.ValeurReponseModel;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -43,7 +45,7 @@ public class ReponseMapper {
                         valeur(e.getKey(), e.getValue())))
                 .toList();
         return new ReponseModel(entity.getId(), entity.getSondage().getId(), entity.getSondage().getVersion(),
-                entity.getDateSoumission(), entity.getDateConsentement(), entity.getLangue(), valeurs);
+                entity.getDateSoumission(), entity.getDateConsentement(), entity.getLangue(), invite(entity), valeurs);
     }
 
     private static JsonNode valeur(Question question, List<ReponseQuestion> lignes) {
@@ -70,5 +72,14 @@ public class ReponseMapper {
     private static BigDecimal nombre(BigDecimal valeur) {
         BigDecimal reduit = valeur.stripTrailingZeros();
         return reduit.scale() < 0 ? reduit.setScale(0) : reduit;
+    }
+
+    /** L'invité n'est associé à une réponse qu'en mode nominatif ; affiché seulement si la version l'est. */
+    private static InviteModel invite(Reponse entity) {
+        Invitation i = entity.getInvitation();
+        if (i == null || !entity.getSondage().isReponsesNominatives()) {
+            return null;
+        }
+        return new InviteModel(i.getId(), i.getPrenom(), i.getNom(), i.getCourriel());
     }
 }

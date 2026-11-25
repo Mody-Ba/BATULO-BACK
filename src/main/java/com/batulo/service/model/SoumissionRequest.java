@@ -14,6 +14,12 @@ public record SoumissionRequest(
                 + "réponse par appareil", example = "3f6c2a1e-8b1d-4c3e-9a77-2f0e5b4d9c11")
         String jetonRepondant,
 
+        @Size(max = 100, message = "jetonInvitation invalide")
+        @Schema(description = "Jeton du lien personnel (paramètre « i » du lien reçu par courriel) ; une seule réponse "
+                + "par invitation (409 DEJA_REPONDU), 404 INVITATION_INVALIDE, 410 INVITATION_REVOQUEE. Avec lui, "
+                + "jetonRepondant n'est pas utilisé")
+        String jetonInvitation,
+
         @Schema(description = "Case de consentement cochée ; obligatoire (true) si le sondage exige le consentement "
                 + "(400 CONSENTEMENT_REQUIS), ignoré sinon", example = "true")
         Boolean consentement,

@@ -29,11 +29,11 @@ public interface ReponseRepository extends JpaRepository<Reponse, Long> {
      * Réponses d'une version, avec leur version (même requête). Les valeurs sont chargées par lots
      * (default_batch_fetch_size), sans pagination en mémoire.
      */
-    @EntityGraph(attributePaths = "sondage")
+    @EntityGraph(attributePaths = {"sondage", "invitation"})
     Page<Reponse> findBySondageId(Long sondageId, Pageable pageable);
 
     /** Réponses de toute une lignée (toutes versions), avec leur version ; valeurs chargées par lots. */
-    @EntityGraph(attributePaths = "sondage")
+    @EntityGraph(attributePaths = {"sondage", "invitation"})
     Page<Reponse> findByLigneeId(Long ligneeId, Pageable pageable);
 
     /** Réponses de plusieurs versions en une requête : [sondageId, nombre] (absentes si aucune réponse). */

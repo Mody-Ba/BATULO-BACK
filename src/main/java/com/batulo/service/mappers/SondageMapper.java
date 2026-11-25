@@ -17,6 +17,7 @@ import com.batulo.service.model.ConditionModel;
 import com.batulo.service.model.FormulaireModel;
 import com.batulo.service.model.FormulairePublicModel;
 import com.batulo.service.model.GestionnaireAssigneModel;
+import com.batulo.service.model.InvitationPubliqueModel;
 import com.batulo.service.model.LibellesMatriceModel;
 import com.batulo.service.model.OptionModel;
 import com.batulo.service.model.QuestionModel;
@@ -62,6 +63,7 @@ public class SondageMapper {
                 entity.getTexteConsentement(),
                 entity.getLanguePrincipale(),
                 entity.getLanguesSupplementaires(),
+                entity.isReponsesNominatives(),
                 auteur(entity.getCreePar()),
                 entity.getDateCreation(),
                 entity.getDateModification(),
@@ -124,7 +126,7 @@ public class SondageMapper {
      * sinon la langue principale ; texte principal en secours), sans aucune donnée interne.
      */
     public FormulairePublicModel toFormulairePublicModel(Sondage version, Boolean dejaRepondu, ApparenceModel apparence,
-                                                         Langue langue) {
+                                                         Langue langue, InvitationPubliqueModel invitation) {
         Traducteur t = Traducteur.pour(version, langue);
         return new FormulairePublicModel(
                 t.titre(version),
@@ -140,7 +142,8 @@ public class SondageMapper {
                 version.getLanguePrincipale(),
                 version.getLanguesDisponibles(),
                 sections(version, t, true),
-                dejaRepondu);
+                dejaRepondu,
+                invitation);
     }
 
     public ApercuModel toApercuModel(Sondage entity, Instant maintenant, ApparenceModel apparence, Langue langue) {

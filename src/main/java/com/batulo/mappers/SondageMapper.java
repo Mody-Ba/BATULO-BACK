@@ -75,7 +75,8 @@ public class SondageMapper {
 
     public SondageInfoModel toModel(SondageRequest req) {
         return new SondageInfoModel(req.titre(), req.description(), req.reponseUnique(), req.objetEnquete(),
-                req.texteConfidentialite(), req.consentementRequis(), req.texteConsentement());
+                req.texteConfidentialite(), req.consentementRequis(), req.texteConsentement(),
+                req.reponsesNominatives());
     }
 
     public SectionInfoModel toModel(SectionRequest req) {
@@ -120,6 +121,7 @@ public class SondageMapper {
                 model.texteConsentement(),
                 model.languePrincipale(),
                 model.languesSupplementaires(),
+                model.reponsesNominatives(),
                 toResponse(model.creePar()),
                 model.dateCreation(),
                 model.dateModification(),

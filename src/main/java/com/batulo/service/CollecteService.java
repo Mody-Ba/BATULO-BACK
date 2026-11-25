@@ -16,9 +16,12 @@ public interface CollecteService {
     /**
      * @param jetonRepondant jeton de l'appareil (en-tête X-Jeton-Repondant), facultatif ; sert seulement à
      *                       calculer dejaRepondu pour un sondage à réponse unique (absent ou mal formé : false)
-     * @param langue         langue demandée ; non proposée par la version ouverte (ou null) : langue principale
+     * @param langue         langue demandée ; non proposée par la version ouverte (ou null) : langue préférée de
+     *                       l'invité, sinon langue principale
+     * @param jetonInvitation jeton du lien personnel (en-tête X-Jeton-Invitation), facultatif : 404
+     *                       INVITATION_INVALIDE, 410 INVITATION_REVOQUEE ; la première ouverture est enregistrée
      */
-    FormulairePublicModel formulaire(String jetonPublic, String jetonRepondant, Langue langue);
+    FormulairePublicModel formulaire(String jetonPublic, String jetonRepondant, Langue langue, String jetonInvitation);
 
     /**
      * Valide et enregistre les réponses à la version ouverte.
