@@ -55,6 +55,11 @@ public class GlobalExceptionHandler {
                 .body(new ErrorResponse(TraductionsIncompletesException.CODE, ex.getMessage(), null, ex.getManquants()));
     }
 
+    @ExceptionHandler(LimiteDepasseeException.class)
+    public ResponseEntity<ErrorResponse> handleLimiteDepassee(LimiteDepasseeException ex) {
+        return reponse(HttpStatus.TOO_MANY_REQUESTS, ex.getCode(), ex.getMessage());
+    }
+
     @ExceptionHandler(ConflitException.class)
     public ResponseEntity<ErrorResponse> handleConflit(ConflitException ex) {
         return reponse(HttpStatus.CONFLICT, ex.getCode(), ex.getMessage());

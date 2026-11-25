@@ -7,6 +7,8 @@ import java.util.List;
 
 public record SoumissionModel(
         String jetonRepondant,
+        /** Jeton du lien personnel ; null : lien public. */
+        String jetonInvitation,
         /** Case de consentement cochée (null : non envoyée). */
         Boolean consentement,
         /** Langue choisie par le répondant ; null : langue principale. */
@@ -19,6 +21,6 @@ public record SoumissionModel(
     /** Le jeton du répondant n'est jamais écrit dans les logs. */
     @Override
     public String toString() {
-        return "SoumissionModel[jetonRepondant=****, reponses=" + reponses.size() + "]";
+        return "SoumissionModel[jetonRepondant=****, jetonInvitation=****, reponses=" + reponses.size() + "]";
     }
 }

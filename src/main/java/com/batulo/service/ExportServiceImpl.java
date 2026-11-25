@@ -52,6 +52,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 @Service
 @Transactional(readOnly = true)
@@ -120,6 +121,12 @@ public class ExportServiceImpl implements ExportService {
         }
         // Langue dans laquelle le répondant a vu le formulaire (code fr, en, ar).
         entetes.add("Langue");
+        // Invité : seulement si l'une des versions exportées associe les réponses aux personnes invitées.
+        boolean avecInvite = perimetre.versions().stream().anyMatch(Sondage::isReponsesNominatives);
+        if (avecInvite) {
+            entetes.add("Invité");
+            entetes.add("Courriel de l'invité");
+        }
         List<Colonne> colonnes = new ArrayList<>();
         Set<Long> questions = new LinkedHashSet<>();
         for (Map.Entry<String, Reference> e : perimetre.references().entrySet()) {
@@ -153,7 +160,8 @@ public class ExportServiceImpl implements ExportService {
             try (EcrivainTableau ecrivain = format == FormatExport.CSV
                     ? new EcrivainCsv(flux, separateurDecimal) : new EcrivainXlsx(flux, "Réponses")) {
                 ecrivain.entetes(entetesUniques);
-                Assembleur assembleur = new Assembleur(colonnes, avecConsentement, valeurs, fuseau, ecrivain);
+                Assembleur assembleur = new Assembleur(colonnes, avecConsentement, avecInvite, valeurs, fuseau,
+                        ecrivain);
                 lectureSeule.executeWithoutResult(statut ->
                         exportRepository.parcourir(filtre, questions, assembleur::ajouter));
                 assembleur.terminer();
@@ -172,6 +180,7 @@ public class ExportServiceImpl implements ExportService {
 
         private final List<Colonne> colonnes;
         private final boolean avecConsentement;
+        private final boolean avecInvite;
         private final ValeursExport valeurs;
         private final ZoneId fuseau;
         private final EcrivainTableau ecrivain;
@@ -180,14 +189,17 @@ public class ExportServiceImpl implements ExportService {
         private Instant dateConsentement;
         private int version;
         private String langue;
+        private String invite;
+        private String courrielInvite;
         private final Map<String, List<LigneBrute>> parCle = new HashMap<>();
         private final Map<String, JsonNode> jsonParCle = new HashMap<>();
         private long lignes;
 
-        Assembleur(List<Colonne> colonnes, boolean avecConsentement, ValeursExport valeurs, ZoneId fuseau,
-                   EcrivainTableau ecrivain) {
+        Assembleur(List<Colonne> colonnes, boolean avecConsentement, boolean avecInvite, ValeursExport valeurs,
+                   ZoneId fuseau, EcrivainTableau ecrivain) {
             this.colonnes = colonnes;
             this.avecConsentement = avecConsentement;
+            this.avecInvite = avecInvite;
             this.valeurs = valeurs;
             this.fuseau = fuseau;
             this.ecrivain = ecrivain;
@@ -202,6 +214,9 @@ public class ExportServiceImpl implements ExportService {
             dateConsentement = ligne.dateConsentement();
             version = ligne.version();
             langue = ligne.langue();
+            courrielInvite = ligne.inviteCourriel();
+            invite = courrielInvite == null ? null : String.join(" ", Stream.of(ligne.invitePrenom(),
+                    ligne.inviteNom()).filter(t -> t != null && !t.isBlank()).toList());
             if (ligne.cle() != null) {
                 parCle.computeIfAbsent(ligne.cle(), c -> new ArrayList<>()).add(ligne);
             }
@@ -223,6 +238,11 @@ public class ExportServiceImpl implements ExportService {
                 cellules.add(dateConsentement == null ? null : LocalDateTime.ofInstant(dateConsentement, fuseau));
             }
             cellules.add(langue);
+            if (avecInvite) {
+                // Vide pour une réponse anonyme (lien public, ou version non nominative).
+                cellules.add(invite);
+                cellules.add(courrielInvite);
+            }
             for (Colonne colonne : colonnes) {
                 cellules.add(valeur(colonne, parCle.getOrDefault(colonne.cle(), List.of())));
             }

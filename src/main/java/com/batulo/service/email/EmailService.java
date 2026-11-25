@@ -38,4 +38,13 @@ public interface EmailService {
      * @param lien adresse complète de la page de réinitialisation, jeton compris
      */
     void envoyerLienReinitialisation(String courriel, String prenom, String lien, Instant expireLe);
+
+    /**
+     * Invitation (ou relance) à répondre à un sondage, avec le lien personnel, dans la langue de l'invité. Seule
+     * méthode synchrone et qui renvoie le résultat : appelée hors transaction par l'envoi en arrière-plan, qui
+     * enregistre un échec (« courriel en échec ») au lieu de l'ignorer.
+     *
+     * @return true si le serveur de courriel a accepté le message
+     */
+    boolean envoyerInvitation(String courriel, MessageInvitation message);
 }

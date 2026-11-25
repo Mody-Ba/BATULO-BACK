@@ -1,5 +1,6 @@
 package com.batulo.service;
 
+import com.batulo.entity.Invitation;
 import com.batulo.entity.Question;
 import com.batulo.entity.Reponse;
 import com.batulo.entity.ReponseQuestion;
@@ -11,17 +12,21 @@ import com.batulo.exception.ConflitException;
 import com.batulo.exception.RegleGestionException;
 import com.batulo.exception.ResourceNotFoundException;
 import com.batulo.exception.RessourceFermeeException;
+import com.batulo.repository.InvitationRepository;
 import com.batulo.repository.ReponseRepository;
 import com.batulo.repository.SondageRepository;
 import com.batulo.service.mappers.SondageMapper;
 import com.batulo.service.model.FormulairePublicModel;
+import com.batulo.service.model.InvitationPubliqueModel;
 import com.batulo.service.model.SoumissionModel;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.time.ZoneId;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
@@ -44,11 +49,19 @@ public class CollecteServiceImpl implements CollecteService {
     private final RegleCollecte regleCollecte;
     private final FormatDate formatDate;
     private final Personnalisations personnalisations;
+    private final InvitationRepository invitationRepository;
+    private final JetonsInvitation jetonsInvitation;
+    private final ZoneId fuseau;
 
     public CollecteServiceImpl(SondageRepository sondageRepository, ReponseRepository reponseRepository,
                                SondageMapper sondageMapper, ValidateurReponse validateurReponse,
                                RegleCollecte regleCollecte, FormatDate formatDate,
-                               Personnalisations personnalisations) {
+                               Personnalisations personnalisations, InvitationRepository invitationRepository,
+                               JetonsInvitation jetonsInvitation,
+                               @Value("${batulo.fuseau-horaire}") String fuseauHoraire) {
+        this.invitationRepository = invitationRepository;
+        this.jetonsInvitation = jetonsInvitation;
+        this.fuseau = ZoneId.of(fuseauHoraire);
         this.sondageRepository = sondageRepository;
         this.reponseRepository = reponseRepository;
         this.sondageMapper = sondageMapper;
@@ -59,11 +72,43 @@ public class CollecteServiceImpl implements CollecteService {
     }
 
     @Override
-    public FormulairePublicModel formulaire(String jetonPublic, String jetonRepondant, Langue langue) {
-        Sondage version = versionOuverte(jetonPublic, Instant.now());
-        Boolean dejaRepondu = version.isReponseUnique() ? dejaRepondu(version, jetonRepondant) : null;
-        return sondageMapper.toFormulairePublicModel(version, dejaRepondu,
-                personnalisations.apparence(version.getEntreprise()), langue);
+    @Transactional
+    public FormulairePublicModel formulaire(String jetonPublic, String jetonRepondant, Langue langue,
+                                            String jetonInvitation) {
+        Instant maintenant = Instant.now();
+        Sondage version = versionOuverte(jetonPublic, maintenant);
+        if (jetonInvitation == null || jetonInvitation.isBlank()) {
+            Boolean dejaRepondu = version.isReponseUnique() ? dejaRepondu(version, jetonRepondant) : null;
+            return sondageMapper.toFormulairePublicModel(version, dejaRepondu,
+                    personnalisations.apparence(version.getEntreprise()), langue, null);
+        }
+        // Lien personnel : une réponse par invitation, quel que soit l'appareil ; langue préférée de l'invité si
+        // aucune n'est demandée (et si la version la propose : sinon la langue principale).
+        Invitation invitation = invitationValide(version.getRacine(), jetonInvitation);
+        if (invitation.getOuverteLe() == null) {
+            invitation.setOuverteLe(maintenant);
+        }
+        boolean repondu = invitation.getReponduLe() != null;
+        return sondageMapper.toFormulairePublicModel(version, repondu,
+                personnalisations.apparence(version.getEntreprise()), langue != null ? langue : invitation.getLangue(),
+                new InvitationPubliqueModel(repondu, version.isReponsesNominatives()));
+    }
+
+    /**
+     * Invitation du lien personnel, de cette lignée : 404 INVITATION_INVALIDE (inconnue, autre sondage),
+     * 410 INVITATION_REVOQUEE. Le jeton est retrouvé par son SHA-256 (jamais stocké en clair).
+     */
+    private Invitation invitationValide(Sondage racine, String jetonInvitation) {
+        String jeton = jetonInvitation.trim();
+        Invitation invitation = jeton.length() > 100 ? null
+                : invitationRepository.findByJetonHash(jetonsInvitation.hash(jeton)).orElse(null);
+        if (invitation == null || !invitation.getLignee().getId().equals(racine.getId())) {
+            throw new ResourceNotFoundException("INVITATION_INVALIDE", "Ce lien personnel n'est pas valide.");
+        }
+        if (invitation.getRevoqueeLe() != null) {
+            throw new RessourceFermeeException("INVITATION_REVOQUEE", "Cette invitation a été annulée par l'organisateur.");
+        }
+        return invitation;
     }
 
     /** Même contrôle que l'envoi (lignée, jeton haché) ; un jeton absent ou mal formé n'a jamais répondu. */
@@ -105,7 +150,14 @@ public class CollecteServiceImpl implements CollecteService {
         }
 
         String jetonRepondantHash = null;
-        if (version.isReponseUnique()) {
+        Invitation invitation = null;
+        if (soumission.jetonInvitation() != null && !soumission.jetonInvitation().isBlank()) {
+            // Lien personnel : une réponse par invitation (le jeton d'appareil n'est pas utilisé).
+            invitation = invitationValide(racine, soumission.jetonInvitation());
+            if (invitation.getReponduLe() != null) {
+                throw new ConflitException("DEJA_REPONDU", "Vous avez déjà répondu avec ce lien personnel.");
+            }
+        } else if (version.isReponseUnique()) {
             String jetonRepondant = uuid(soumission.jetonRepondant());
             jetonRepondantHash = HachageJeton.hacher(jetonRepondant);
             if (reponseRepository.existsByLigneeIdAndJetonRepondantHash(racine.getId(), jetonRepondantHash)) {
@@ -124,6 +176,18 @@ public class CollecteServiceImpl implements CollecteService {
         reponse.setJetonRepondantHash(jetonRepondantHash);
         reponse.setDateConsentement(dateConsentement);
         reponse.setLangue(langue);
+        if (invitation != null) {
+            // Réservation atomique : deux envois simultanés du même lien, un seul passe. Mode anonyme : date arrondie
+            // au jour, et la réponse ne porte aucune trace de l'invitation.
+            boolean nominatif = version.isReponsesNominatives();
+            Instant date = nominatif ? maintenant : maintenant.atZone(fuseau).toLocalDate().atStartOfDay(fuseau).toInstant();
+            if (invitationRepository.reserverReponse(invitation.getId(), date) == 0) {
+                throw new ConflitException("DEJA_REPONDU", "Vous avez déjà répondu avec ce lien personnel.");
+            }
+            if (nominatif) {
+                reponse.setInvitation(invitation);
+            }
+        }
         for (ReponseQuestion ligne : resultat.lignes()) {
             ligne.setReponse(reponse);
             reponse.getValeurs().add(ligne);

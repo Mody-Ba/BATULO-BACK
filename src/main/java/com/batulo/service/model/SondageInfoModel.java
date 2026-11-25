@@ -9,6 +9,8 @@ public record SondageInfoModel(
         String objetEnquete,
         String texteConfidentialite,
         Boolean consentementRequis,
-        String texteConsentement
+        String texteConsentement,
+        /** Null : inchangé. */
+        Boolean reponsesNominatives
 ) {
 }

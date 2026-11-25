@@ -17,6 +17,8 @@ public record ReponseModel(
         Instant dateConsentement,
         /** Langue dans laquelle le répondant a vu le formulaire. */
         Langue langue,
+        /** Invité qui a répondu : seulement si la version est nominative ; null sinon (réponse anonyme). */
+        InviteModel invite,
         List<ValeurReponseModel> valeurs
 ) {
 }

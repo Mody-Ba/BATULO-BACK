@@ -35,6 +35,14 @@ batulo:
     secret-webhook: ""
   cors:
     origines: http://localhost:4200
+  invitations:
+    secret: secret-de-test-des-invitations-au-moins-32-octets-0123456789
+    envois-par-heure: 500
+    delai-relance-heures: 24
+    invites-max: 10000
+    lignes-import-max: 1000
+    # Envoi dans le fil de la requête (après validation) : vérifications déterministes.
+    envoi-synchrone: true
   collecte:
     url-formulaire: http://localhost:4200/s
     # Les tests envoient beaucoup de requêtes publiques : limite relevée (un test dédié la vérifie).

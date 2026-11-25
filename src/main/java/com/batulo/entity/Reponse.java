@@ -58,6 +58,11 @@ public class Reponse {
     @Column(nullable = false, length = 2)
     private Langue langue;
 
+    /** Invité qui a répondu : seulement si la version est nominative (jamais en mode anonyme). */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "invitation_id")
+    private Invitation invitation;
+
     @OneToMany(mappedBy = "reponse", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<ReponseQuestion> valeurs = new ArrayList<>();
 
@@ -139,5 +144,13 @@ public class Reponse {
 
     public void setLangue(Langue langue) {
         this.langue = langue;
+    }
+
+    public Invitation getInvitation() {
+        return invitation;
+    }
+
+    public void setInvitation(Invitation invitation) {
+        this.invitation = invitation;
     }
 }

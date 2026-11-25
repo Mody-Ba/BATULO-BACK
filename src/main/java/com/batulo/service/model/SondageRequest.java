@@ -38,6 +38,11 @@ public record SondageRequest(
         @Size(max = 2000, message = "le texte de consentement ne doit pas dépasser 2000 caractères")
         @Schema(description = "Texte de la case, obligatoire si consentementRequis (400 TEXTE_CONSENTEMENT_REQUIS). "
                 + "Absent : inchangé ; \"\" l'efface.", example = "J'accepte de participer à cette enquête.")
-        String texteConsentement
+        String texteConsentement,
+
+        @Schema(description = "true : associer les réponses reçues par invitation aux personnes invitées (nom et "
+                + "courriel dans les réponses et les exports ; le répondant en est prévenu). false par défaut : on sait "
+                + "seulement que l'invité a répondu. Brouillon seulement. Absent : inchangé.", example = "false")
+        Boolean reponsesNominatives
 ) {
 }

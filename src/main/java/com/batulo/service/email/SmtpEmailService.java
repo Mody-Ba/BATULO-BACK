@@ -1,6 +1,7 @@
 package com.batulo.service.email;
 
 import com.batulo.enums.Formule;
+import com.batulo.enums.Langue;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -136,6 +137,68 @@ public class SmtpEmailService implements EmailService {
                 Ce lien est valable jusqu'au %s et ne peut servir qu'une fois.
                 Si vous n'êtes pas à l'origine de cette demande, ignorez ce courriel : votre mot de passe ne change pas.
                 """.formatted(prenom, lien, date(expireLe)));
+    }
+
+    @Override
+    public boolean envoyerInvitation(String courriel, MessageInvitation m) {
+        Locale locale = switch (m.langue()) {
+            case FR -> Locale.FRENCH;
+            case EN -> Locale.ENGLISH;
+            case AR -> Locale.forLanguageTag("ar");
+        };
+        String fermeture = m.dateFermeture() == null ? null
+                : DateTimeFormatter.ofPattern(m.langue() == Langue.AR ? "d MMMM yyyy، HH:mm" : "d MMMM yyyy, HH:mm",
+                        locale).withZone(formatDate.getZone())
+                .format(m.dateFermeture());
+        String[] contenu = switch (m.langue()) {
+            case FR -> new String[]{
+                    (m.relance() ? "Rappel : " : "") + "votre avis sur « " + m.titreSondage() + " »",
+                    (m.prenom() == null ? "Bonjour," : "Bonjour " + m.prenom() + ",") + "\n\n"
+                            + (m.relance() ? "Nous n'avons pas encore reçu votre réponse. " : "")
+                            + m.entreprise() + " vous invite à répondre au sondage « " + m.titreSondage() + " ».\n\n"
+                            + "Votre lien personnel (ne le transférez pas, il ne sert qu'une fois) :\n\n" + m.lien()
+                            + (fermeture == null ? "" : "\n\nLe sondage ferme le " + fermeture + ".")
+                            + "\n\nMerci de votre participation.",
+                    "\n\n--\nEnvoyé par Batulo pour " + m.entreprise()
+                            + ".\nCe courriel est envoyé automatiquement, merci de ne pas y répondre.\n"};
+            case EN -> new String[]{
+                    (m.relance() ? "Reminder: " : "") + "your opinion on \"" + m.titreSondage() + "\"",
+                    (m.prenom() == null ? "Hello," : "Hello " + m.prenom() + ",") + "\n\n"
+                            + (m.relance() ? "We have not received your answers yet. " : "")
+                            + m.entreprise() + " invites you to take the survey \"" + m.titreSondage() + "\".\n\n"
+                            + "Your personal link (please do not share it, it can only be used once):\n\n" + m.lien()
+                            + (fermeture == null ? "" : "\n\nThe survey closes on " + fermeture + ".")
+                            + "\n\nThank you for taking part.",
+                    "\n\n--\nSent by Batulo on behalf of " + m.entreprise()
+                            + ".\nThis is an automated message, please do not reply.\n"};
+            case AR -> new String[]{
+                    (m.relance() ? "تذكير: " : "") + "رأيك في «" + m.titreSondage() + "»",
+                    (m.prenom() == null ? "مرحبًا،" : "مرحبًا " + m.prenom() + "،") + "\n\n"
+                            + (m.relance() ? "لم نتلقَّ إجاباتك بعد. " : "")
+                            + "تدعوك " + m.entreprise() + " إلى المشاركة في الاستبيان «" + m.titreSondage() + "».\n\n"
+                            + "رابطك الشخصي (لا تشاركه مع أحد، فهو صالح لاستخدام واحد فقط):\n\n" + m.lien()
+                            + (fermeture == null ? "" : "\n\nيُغلق الاستبيان في " + fermeture + ".")
+                            + "\n\nشكرًا لمشاركتك.",
+                    "\n\n--\nأُرسلت هذه الرسالة عبر Batulo نيابةً عن " + m.entreprise()
+                            + ".\nهذه رسالة آلية، يُرجى عدم الرد عليها.\n"};
+        };
+        SimpleMailMessage message = new SimpleMailMessage();
+        message.setFrom(expediteur);
+        message.setTo(courriel);
+        message.setSubject(contenu[0]);
+        message.setText(contenu[1] + contenu[2]);
+        String sujet = m.relance() ? "relance d'invitation" : "invitation";
+        try {
+            mailSender.send(message);
+            log.info("Courriel « {} » ({}) envoyé", sujet, m.langue());
+            return true;
+        } catch (MailException e) {
+            log.error("Échec de l'envoi du courriel « {} » : {} (cause : {}).", sujet, e.getClass().getSimpleName(),
+                    causeRacine(e));
+        } catch (RuntimeException e) {
+            log.error("Échec inattendu de l'envoi du courriel « {} » : {}.", sujet, e.getClass().getSimpleName());
+        }
+        return false;
     }
 
     /** Envoie tout de suite, ou après la validation de la transaction en cours s'il y en a une. */

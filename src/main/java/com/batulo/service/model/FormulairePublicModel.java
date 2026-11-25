@@ -33,6 +33,8 @@ public record FormulairePublicModel(
         List<Langue> languesDisponibles,
         List<SectionModel> sections,
         /** reponseUnique : cet appareil (jeton X-Jeton-Repondant) a déjà répondu sur la lignée ; null sinon. */
-        Boolean dejaRepondu
+        Boolean dejaRepondu,
+        /** Lien personnel (en-tête X-Jeton-Invitation) : état de l'invitation ; absent sans lien personnel. */
+        InvitationPubliqueModel invitation
 ) {
 }

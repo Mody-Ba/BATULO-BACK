@@ -1,0 +1,134 @@
+databaseChangeLog:
+  # Phase 4, étape 4 : invitations nominatives. Les invités portent sur la lignée (version 1) : toutes les versions
+  # partagent la même liste, une seule réponse par invité sur la lignée. Le jeton personnel n'est jamais stocké : il est
+  # recalculé (HMAC du secret INVITATION_SECRET et du sel) et seul son SHA-256 sert à le retrouver.
+
+  - changeSet:
+      id: 023-creer-table-invitation
+      author: batulo
+      changes:
+        - createTable:
+            tableName: invitation
+            columns:
+              - column:
+                  name: id
+                  type: BIGINT
+                  autoIncrement: true
+                  constraints: { primaryKey: true, primaryKeyName: pk_invitation }
+              - column:
+                  name: lignee_id
+                  type: BIGINT
+                  constraints:
+                    nullable: false
+                    foreignKeyName: fk_invitation_lignee
+                    references: sondage(id)
+                    deleteCascade: true
+              - column: { name: prenom, type: VARCHAR(100) }
+              - column: { name: nom, type: VARCHAR(100) }
+              # Normalisé en minuscules (NormaliseurCourriel).
+              - column: { name: courriel, type: VARCHAR(254), constraints: { nullable: false } }
+              - column: { name: telephone, type: VARCHAR(30) }
+              # Langue préférée (fr, en, ar) ; null : langue principale du sondage.
+              - column: { name: langue, type: VARCHAR(2) }
+              # Jeton = base64url(HMAC-SHA256(INVITATION_SECRET, sel)) ; seul son SHA-256 est stocké.
+              - column: { name: jeton_hash, type: VARCHAR(64), constraints: { nullable: false } }
+              - column: { name: jeton_sel, type: VARCHAR(43), constraints: { nullable: false } }
+              - column: { name: cree_par_id, type: BIGINT }
+              - column: { name: date_creation, type: TIMESTAMP WITH TIME ZONE, constraints: { nullable: false } }
+              - column: { name: premier_envoi_le, type: TIMESTAMP WITH TIME ZONE }
+              - column: { name: dernier_envoi_le, type: TIMESTAMP WITH TIME ZONE }
+              - column: { name: derniere_relance_le, type: TIMESTAMP WITH TIME ZONE }
+              - column:
+                  name: nombre_envois
+                  type: INT
+                  defaultValueNumeric: 0
+                  constraints: { nullable: false }
+              # Envoi demandé, pas encore parti (file en mémoire) : évite deux envois simultanés.
+              - column: { name: envoi_en_file_le, type: TIMESTAMP WITH TIME ZONE }
+              # Dernier envoi en échec (null : dernier envoi réussi ou aucun envoi).
+              - column: { name: echec_envoi_le, type: TIMESTAMP WITH TIME ZONE }
+              - column: { name: ouverte_le, type: TIMESTAMP WITH TIME ZONE }
+              # Mode anonyme : arrondie au jour (jamais l'heure exacte, qui permettrait de retrouver la réponse).
+              - column: { name: repondu_le, type: TIMESTAMP WITH TIME ZONE }
+              - column: { name: revoquee_le, type: TIMESTAMP WITH TIME ZONE }
+        - addForeignKeyConstraint:
+            constraintName: fk_invitation_cree_par
+            baseTableName: invitation
+            baseColumnNames: cree_par_id
+            referencedTableName: utilisateur
+            referencedColumnNames: id
+            onDelete: SET NULL
+        - addUniqueConstraint:
+            tableName: invitation
+            columnNames: lignee_id, courriel
+            constraintName: uq_invitation_lignee_courriel
+        - addUniqueConstraint:
+            tableName: invitation
+            columnNames: jeton_hash
+            constraintName: uq_invitation_jeton_hash
+
+  - changeSet:
+      id: 023-creer-table-invitation-envoi
+      author: batulo
+      changes:
+        # Journal des envois : limite par heure et par entreprise (survit à la suppression de l'invité).
+        - createTable:
+            tableName: invitation_envoi
+            columns:
+              - column:
+                  name: id
+                  type: BIGINT
+                  autoIncrement: true
+                  constraints: { primaryKey: true, primaryKeyName: pk_invitation_envoi }
+              - column:
+                  name: entreprise_id
+                  type: BIGINT
+                  constraints:
+                    nullable: false
+                    foreignKeyName: fk_invitation_envoi_entreprise
+                    references: entreprise(id)
+                    deleteCascade: true
+              - column: { name: invitation_id, type: BIGINT }
+              # INVITATION ou RELANCE.
+              - column: { name: type, type: VARCHAR(20), constraints: { nullable: false } }
+              - column: { name: date_envoi, type: TIMESTAMP WITH TIME ZONE, constraints: { nullable: false } }
+              - column: { name: succes, type: BOOLEAN, constraints: { nullable: false } }
+        - addForeignKeyConstraint:
+            constraintName: fk_invitation_envoi_invitation
+            baseTableName: invitation_envoi
+            baseColumnNames: invitation_id
+            referencedTableName: invitation
+            referencedColumnNames: id
+            onDelete: SET NULL
+        - createIndex:
+            tableName: invitation_envoi
+            indexName: idx_invitation_envoi_entreprise_date
+            columns:
+              - column: { name: entreprise_id }
+              - column: { name: date_envoi }
+
+  - changeSet:
+      id: 023-reponses-nominatives
+      author: batulo
+      changes:
+        - addColumn:
+            tableName: sondage
+            columns:
+              # true : les réponses reçues par invitation sont associées à l'invité (nom et courriel visibles).
+              - column:
+                  name: reponses_nominatives
+                  type: BOOLEAN
+                  defaultValueBoolean: false
+                  constraints: { nullable: false }
+        - addColumn:
+            tableName: reponse
+            columns:
+              # Rempli seulement si la version est nominative ; jamais en mode anonyme (par défaut).
+              - column: { name: invitation_id, type: BIGINT }
+        - addForeignKeyConstraint:
+            constraintName: fk_reponse_invitation
+            baseTableName: reponse
+            baseColumnNames: invitation_id
+            referencedTableName: invitation
+            referencedColumnNames: id
+            onDelete: SET NULL

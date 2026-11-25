@@ -43,3 +43,5 @@ databaseChangeLog:
       file: db/changelog/changes/021-personnalisation.yaml
   - include:
       file: db/changelog/changes/022-langues.yaml
+  - include:
+      file: db/changelog/changes/023-invitations.yaml

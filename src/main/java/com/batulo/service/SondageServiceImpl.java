@@ -204,6 +204,9 @@ public class SondageServiceImpl implements SondageService {
         if (info.reponseUnique() != null) {
             sondage.setReponseUnique(info.reponseUnique());
         }
+        if (info.reponsesNominatives() != null) {
+            sondage.setReponsesNominatives(info.reponsesNominatives());
+        }
         appliquerPageAccueil(sondage, info);
         sondage.marquerModifie();
         return enregistrer(sondage);
@@ -734,6 +737,7 @@ public class SondageServiceImpl implements SondageService {
         brouillon.setSondageOrigine(source);
         brouillon.setDescription(source.getDescription());
         brouillon.setReponseUnique(source.isReponseUnique());
+        brouillon.setReponsesNominatives(source.isReponsesNominatives());
         brouillon.setObjetEnquete(source.getObjetEnquete());
         brouillon.setTexteConfidentialite(source.getTexteConfidentialite());
         brouillon.setConsentementRequis(source.isConsentementRequis());

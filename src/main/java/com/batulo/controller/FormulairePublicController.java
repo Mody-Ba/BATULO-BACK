@@ -46,7 +46,9 @@ public class FormulairePublicController {
                     + "Sondage à réponse unique : dejaRepondu (true/false) selon l'en-tête facultatif X-Jeton-Repondant "
                     + "(absent ou mal formé : false) ; le formulaire est renvoyé dans tous les cas. Textes dans la langue "
                     + "demandée (?langue=), avec langue, languePrincipale et languesDisponibles ; les valeurs (options, "
-                    + "lignes et colonnes de matrice) ne changent pas avec la langue : afficher libellesMatrice. "
+                    + "lignes et colonnes de matrice) ne changent pas avec la langue : afficher libellesMatrice. Lien personnel "
+                    + "(X-Jeton-Invitation) : langue préférée de l'invité par défaut, invitation {dejaRepondu, "
+                    + "reponsesNominatives}, 404 INVITATION_INVALIDE, 410 INVITATION_REVOQUEE. "
                     + "404 SONDAGE_INTROUVABLE, 403 SONDAGE_NON_OUVERT (ouverture planifiée), 410 SONDAGE_FERME.")
     public FormulairePublicResponse formulaire(
             @PathVariable String jeton,
@@ -54,9 +56,12 @@ public class FormulairePublicController {
             @RequestHeader(value = "X-Jeton-Repondant", required = false) String jetonRepondant,
             @Parameter(description = "Langue souhaitée (fr, en, ar). Non proposée par le sondage ou absente : langue "
                     + "principale ; un texte non traduit est renvoyé dans la langue principale")
-            @RequestParam(required = false) String langue) {
+            @RequestParam(required = false) String langue,
+            @Parameter(description = "Jeton du lien personnel (paramètre « i » du lien reçu par courriel), jamais dans "
+                    + "l'URL de l'API")
+            @RequestHeader(value = "X-Jeton-Invitation", required = false) String jetonInvitation) {
         return collecteMapper.toResponse(collecteService.formulaire(jeton, jetonRepondant,
-                Langue.parCode(langue).orElse(null)));
+                Langue.parCode(langue).orElse(null), jetonInvitation));
     }
 
     @PostMapping("/reponses")

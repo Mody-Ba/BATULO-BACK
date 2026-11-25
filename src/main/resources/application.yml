@@ -112,6 +112,18 @@ batulo:
     limite-envoi-par-minute: ${PUBLIC_RATE_POST:20}
     # true seulement derrière un proxy de confiance (l'adresse vient alors de X-Forwarded-For).
     faire-confiance-proxy: ${TRUST_PROXY:false}
+  # Invitations nominatives (phase 4, étape 4).
+  invitations:
+    # Clé HMAC des liens personnels, dédiée (jamais JWT_SECRET), au moins 32 octets. Obligatoire : l'application
+    # refuse de démarrer sans. La changer rend invalides tous les liens d'invitation déjà envoyés.
+    secret: ${INVITATION_SECRET:}
+    # Courriels d'invitation et de relance au plus, par entreprise et par heure glissante.
+    envois-par-heure: ${INVITATION_ENVOIS_PAR_HEURE:500}
+    # Délai minimal entre deux envois à la même personne (relance).
+    delai-relance-heures: 24
+    # Invités au plus par sondage (lignée) et lignes au plus par import CSV.
+    invites-max: 10000
+    lignes-import-max: 1000
   # Apparence des formulaires (phase 4, étape 2).
   personnalisation:
     # Couleur principale par défaut des formulaires : celle du thème du front (azure, ton 40).

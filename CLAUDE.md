@@ -224,10 +224,46 @@ Plateforme SaaS de sondages (Spring Boot 3.5, Java 21, PostgreSQL 16, Liquibase)
   (OpenPDF ne façonne l'arabe que dans les cellules et colonnes, pas dans un paragraphe) ; façonnage vérifié sur image
   (lettres liées, lam-alif) ; diacritiques placés approximativement. Textes fixes des rapports et des exports (« Oui »,
   « Résumé », « Langue »...) toujours en français.
+- Invitations nominatives (phase 4, étape 4) : en plus du lien public (inchangé). Table `invitation` sur la lignée
+  (version 1) : toutes les versions partagent la liste (une nouvelle version ne copie rien), une seule réponse par
+  invité sur la lignée ; duplication et réutilisation : aucune invitation, la liste se reprend par POST
+  .../invitations/reprendre {sondageSourceId} (identité seulement, sans statut ni lien). Courriel en minuscules, unique
+  par lignée (409 INVITE_EXISTANT) ; 10 000 invités au plus. Routes /api/sondages/{id}/invitations/** ({id} = n'importe
+  quelle version) : liste paginée (statut, recherche `RechercheTexte`), /resume (une agrégation `sum(case ...)` ; taux =
+  répondus / envoyées hors révoquées), ajout, modification et suppression avant réponse (409 INVITE_A_REPONDU), /revoquer
+  (définitif), /import (CSV multipart `fichier`, UTF-8 avec ou sans BOM, « , » ou « ; » détecté sur l'en-tête, en-têtes
+  prenom, nom, courriel, telephone, langue sans majuscules ni accents, 1000 lignes max : 400 IMPORT_TROP_GRAND ; rapport
+  acceptées / refusées avec raison), /envoyer et /relancer (202), /export (CSV du suivi). Accès : `sondageLisible`
+  (admin, gestionnaire créateur ou assigné ; sinon 404). Statut calculé (`RegleInvitation`, SQL dans
+  `InvitationSpecifications.condition`) : REVOQUEE > A_REPONDU > OUVERTE > EN_ECHEC > INVITEE > A_INVITER.
+  Jeton personnel = base64url(HMAC-SHA256(INVITATION_SECRET, sel)) : seuls le sel et le SHA-256 du jeton sont en base,
+  le même lien est recalculé pour chaque relance (`JetonsInvitation`). INVITATION_SECRET est dédié (jamais JWT_SECRET),
+  32 octets minimum, sinon l'application refuse de démarrer ; le changer invalide les liens envoyés. Lien
+  {PUBLIC_FORM_URL}/{jetonSondage}?i={jetonInvitation} ; l'API ne le reçoit jamais dans l'URL : en-tête
+  `X-Jeton-Invitation` (formulaire) et `jetonInvitation` (envoi). Inconnu ou d'une autre lignée : 404
+  INVITATION_INVALIDE ; révoqué : 410 INVITATION_REVOQUEE ; déjà répondu : 409 DEJA_REPONDU (réservation atomique
+  `update ... where repondu_le is null and revoquee_le is null`), le jeton d'appareil n'est alors pas utilisé.
+  Formulaire avec lien : langue préférée de l'invité si `?langue=` est absent, `ouverte_le` à la première ouverture,
+  `invitation {dejaRepondu, reponsesNominatives}`, jamais d'identité. Anonymat par défaut : `reponse.invitation_id`
+  jamais rempli, `repondu_le` arrondi au jour (minuit, fuseau de Batulo) pour ne pas recouper `date_soumission`.
+  `sondage.reponses_nominatives` (brouillon, recopié comme `reponseUnique`) : `reponse.invitation_id` et `repondu_le`
+  exact ; `invite` {prénom, nom, courriel} dans le détail des réponses, colonnes « Invité » et « Courriel de l'invité »
+  après « Langue » dans les exports si une version exportée est nominative. Envoi : `EmailService.envoyerInvitation`
+  (synchrone, renvoie succès ou échec, fr/en/ar selon la langue de l'invité, titre traduit, nom affiché, lien, date de
+  fermeture) ; seulement si une version est EN_COURS ou planifiée (409 SONDAGE_NON_OUVERT) et si l'entreprise peut
+  collecter (409 SONDAGE_FERME). La requête réserve (`envoi_en_file_le`, entreprise verrouillée) puis `EnvoiInvitations`
+  envoie après validation dans l'exécuteur `envoiInvitationsExecutor` (2 fils, file en mémoire, une seule instance ;
+  `batulo.invitations.envoi-synchrone=true` en test), une transaction courte avant et après chaque courriel SMTP.
+  Envoyer : jamais invités (un premier envoi en échec se retente) ; relancer : déjà invités, sans réponse, dernier envoi
+  réussi il y a 24 h ou plus (DELAI_RELANCE). Limite `batulo.invitations.envois-par-heure` (500) par entreprise,
+  comptée dans `invitation_envoi` (journal qui survit à la suppression d'un invité) plus les envois en file : lot
+  refusé en entier, 429 LIMITE_ENVOIS (`LimiteDepasseeException`).
 
 ## À traiter dans les étapes suivantes
-- Phase 4 : brouillon et reprise d'une réponse (réutiliser `EvaluateurConditions.Parcours`) ; invitations nominatives (l'unicité par appareil se contourne en vidant le navigateur ou en changeant
-  d'appareil : limite acceptée pour la phase 2) ; diffusion courriel, SMS, WhatsApp, intégration web, campagnes.
+- Phase 4 : brouillon et reprise d'une réponse (réutiliser `EvaluateurConditions.Parcours`), pour le lien public comme
+  pour le lien personnel (le brouillon d'un invité se rattachera à son invitation) ; diffusion SMS (le téléphone des
+  invités est déjà saisi), WhatsApp, intégration web, campagnes. L'unicité par appareil du lien public se contourne en
+  vidant le navigateur ou en changeant d'appareil (limite acceptée) ; les invitations nominatives n'ont pas ce défaut.
 - Si l'application tourne un jour sur plusieurs instances : limite de requêtes partagée (Redis ou Bucket4j).
 - Phase 4, étape 3 (partie 3/3) : textes fixes des rapports et exports dans la langue demandée (« Oui », « Résumé »,
   en-têtes), mise en page de droite à gauche du rapport PDF en arabe.

@@ -115,6 +115,13 @@ public class Sondage {
     @Column(name = "texte_consentement", columnDefinition = "TEXT")
     private String texteConsentement;
 
+    /**
+     * true : une réponse reçue par invitation est associée à l'invité (nom et courriel dans la liste des réponses et
+     * les exports). false (défaut) : on sait seulement que l'invité a répondu. Choisi dans le brouillon, figé ensuite.
+     */
+    @Column(name = "reponses_nominatives", nullable = false)
+    private boolean reponsesNominatives;
+
     /** Langue dans laquelle le contenu est saisi ; modifiable en brouillon seulement. */
     @Convert(converter = LangueConverter.class)
     @Column(name = "langue_principale", nullable = false, length = 2)
@@ -357,5 +364,13 @@ public class Sondage {
         langues.add(languePrincipale);
         langues.addAll(getLanguesSupplementaires());
         return langues;
+    }
+
+    public boolean isReponsesNominatives() {
+        return reponsesNominatives;
+    }
+
+    public void setReponsesNominatives(boolean reponsesNominatives) {
+        this.reponsesNominatives = reponsesNominatives;
     }
 }
