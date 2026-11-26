@@ -11,6 +11,7 @@ import com.batulo.exception.NonAuthentifieException;
 import com.batulo.exception.RegleGestionException;
 import com.batulo.exception.ResourceNotFoundException;
 import com.batulo.repository.AbonnementRepository;
+import com.batulo.repository.CreditSondageRepository;
 import com.batulo.repository.JetonRafraichissementRepository;
 import com.batulo.repository.JetonReinitialisationRepository;
 import com.batulo.repository.UtilisateurRepository;
@@ -18,6 +19,7 @@ import com.batulo.service.email.EmailService;
 import com.batulo.service.mappers.UtilisateurMapper;
 import com.batulo.service.model.ChangementMotDePasseModel;
 import com.batulo.service.model.ConnexionModel;
+import com.batulo.service.model.CreditsModel;
 import com.batulo.service.model.IdentifiantsModel;
 import com.batulo.service.model.ProfilModel;
 import com.batulo.service.model.ReinitialisationMotDePasseModel;
@@ -51,6 +53,7 @@ public class AuthServiceImpl implements AuthService {
     private final PasswordEncoder passwordEncoder;
     private final JwtUtils jwtUtils;
     private final EmailService emailService;
+    private final CreditSondageRepository creditSondageRepository;
 
     /**
      * Hash calculé une fois : comparé quand le courriel est inconnu, pour que la réponse prenne le même temps
@@ -77,7 +80,8 @@ public class AuthServiceImpl implements AuthService {
                            UtilisateurMapper utilisateurMapper,
                            PasswordEncoder passwordEncoder,
                            JwtUtils jwtUtils,
-                           EmailService emailService) {
+                           EmailService emailService,
+                           CreditSondageRepository creditSondageRepository) {
         this.utilisateurRepository = utilisateurRepository;
         this.abonnementRepository = abonnementRepository;
         this.jetonRafraichissementRepository = jetonRafraichissementRepository;
@@ -86,6 +90,7 @@ public class AuthServiceImpl implements AuthService {
         this.passwordEncoder = passwordEncoder;
         this.jwtUtils = jwtUtils;
         this.emailService = emailService;
+        this.creditSondageRepository = creditSondageRepository;
         this.hashFactice = passwordEncoder.encode(UUID.randomUUID().toString());
     }
 
@@ -205,20 +210,33 @@ public class AuthServiceImpl implements AuthService {
     public ProfilModel moi(Long utilisateurId) {
         Utilisateur utilisateur = utilisateurRepository.findWithEntrepriseById(utilisateurId)
                 .orElseThrow(() -> new ResourceNotFoundException("UTILISATEUR_INTROUVABLE", "Compte introuvable."));
-        return new ProfilModel(utilisateurMapper.toModel(utilisateur), statutAbonnement(utilisateur));
+        CreditsModel credits = utilisateur.getEntreprise() == null ? null
+                : creditSondageRepository.infos(utilisateur.getEntreprise().getId())
+                .map(i -> new CreditsModel(i.solde(), i.totalAchete(), i.totalUtilise()))
+                .orElse(CreditsModel.AUCUN);
+        return new ProfilModel(utilisateurMapper.toModel(utilisateur), statutAbonnement(utilisateur), credits);
     }
 
     @Override
     public Optional<UtilisateurConnecteModel> utilisateurConnecte(Long utilisateurId) {
         return utilisateurRepository.findWithEntrepriseById(utilisateurId)
-                .map(u -> new UtilisateurConnecteModel(
-                        u.getId(),
-                        u.getCourriel(),
-                        u.getRole(),
-                        u.getEntreprise() == null ? null : u.getEntreprise().getId(),
-                        u.isActif(),
-                        u.isMotDePasseTemporaire(),
-                        statutAbonnement(u)));
+                .map(u -> {
+                    StatutAbonnement statut = statutAbonnement(u);
+                    // Compte de crédits : lu seulement quand il change quelque chose (abonnement en attente ou expiré).
+                    boolean compteCredits = (statut == StatutAbonnement.EN_ATTENTE_PAIEMENT
+                            || statut == StatutAbonnement.EXPIRE)
+                            && creditSondageRepository.existsByEntrepriseIdAndTotalAcheteGreaterThan(
+                            u.getEntreprise().getId(), 0);
+                    return new UtilisateurConnecteModel(
+                            u.getId(),
+                            u.getCourriel(),
+                            u.getRole(),
+                            u.getEntreprise() == null ? null : u.getEntreprise().getId(),
+                            u.isActif(),
+                            u.isMotDePasseTemporaire(),
+                            statut,
+                            compteCredits);
+                });
     }
 
     /** Nouveau mot de passe définitif : fin du mot de passe temporaire et fermeture de toutes les sessions. */

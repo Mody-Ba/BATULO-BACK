@@ -423,7 +423,7 @@ public class InvitationServiceImpl implements InvitationService {
                     ? "Ce sondage est terminé : publiez une nouvelle version pour inviter ou relancer."
                     : "Publiez le sondage avant d'envoyer les invitations (la liste peut être préparée dans le brouillon).");
         }
-        if (!regleCollecte.entrepriseAutorisee(racine.getEntreprise(), maintenant)) {
+        if (!regleCollecte.ligneeAutorisee(racine, maintenant)) {
             throw new ConflitException("SONDAGE_FERME",
                     "Votre entreprise ne peut pas collecter de réponses actuellement (abonnement ou compte inactif).");
         }

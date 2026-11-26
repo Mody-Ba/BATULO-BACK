@@ -1,5 +1,6 @@
 package com.batulo.service.model;
 
+import com.batulo.enums.TypePaiement;
 import com.batulo.enums.Formule;
 import io.swagger.v3.oas.annotations.media.Schema;
 
@@ -14,11 +15,16 @@ public record IntentionPaiementResponse(
         String clePublique,
         Formule formule,
         BigDecimal montant,
-        String devise
+        String devise,
+        @Schema(description = "ABONNEMENT ou ACHAT_SONDAGES (formule null)")
+        TypePaiement type,
+        @Schema(description = "Nombre de sondages achetés ; null pour un abonnement")
+        Integer quantite
 ) {
     @Override
     public String toString() {
         return "IntentionPaiementResponse[paymentIntentId=" + paymentIntentId + ", clientSecret=****, formule="
-                + formule + ", montant=" + montant + ", devise=" + devise + "]";
+                + formule + ", montant=" + montant + ", devise=" + devise + ", type=" + type + ", quantite="
+                + quantite + "]";
     }
 }

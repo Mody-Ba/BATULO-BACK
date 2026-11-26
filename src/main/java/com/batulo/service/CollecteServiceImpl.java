@@ -204,7 +204,7 @@ public class CollecteServiceImpl implements CollecteService {
     private Sondage versionOuverte(String jetonPublic, Instant maintenant) {
         Sondage racine = sondageRepository.findByJetonPublic(jetonPublic)
                 .orElseThrow(() -> new ResourceNotFoundException("SONDAGE_INTROUVABLE", "Ce lien de sondage n'existe pas."));
-        if (!regleCollecte.entrepriseAutorisee(racine.getEntreprise(), maintenant)) {
+        if (!regleCollecte.ligneeAutorisee(racine, maintenant)) {
             throw new RessourceFermeeException("SONDAGE_FERME", MESSAGE_FERME);
         }
         List<Sondage> lignee = sondageRepository.findLignee(racine.getId());

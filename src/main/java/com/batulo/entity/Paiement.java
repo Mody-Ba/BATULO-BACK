@@ -3,6 +3,7 @@ package com.batulo.entity;
 import com.batulo.enums.Formule;
 import com.batulo.enums.FournisseurPaiement;
 import com.batulo.enums.StatutPaiement;
+import com.batulo.enums.TypePaiement;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -52,9 +53,19 @@ public class Paiement {
     @Column(name = "session_externe_id", length = 100)
     private String sessionExterneId;
 
+    /** ABONNEMENT (formule renseignée) ou ACHAT_SONDAGES (quantite renseignée). */
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
+    private TypePaiement type = TypePaiement.ABONNEMENT;
+
+    /** Formule payée ; null pour un achat de sondages. */
+    @Enumerated(EnumType.STRING)
+    @Column(length = 20)
     private Formule formule;
+
+    /** Nombre de sondages achetés ; null pour un abonnement. */
+    @Column
+    private Integer quantite;
 
     @Column(nullable = false, precision = 10, scale = 2)
     private BigDecimal montant;
@@ -142,6 +153,22 @@ public class Paiement {
 
     public void setDatePaiement(Instant datePaiement) {
         this.datePaiement = datePaiement;
+    }
+
+    public TypePaiement getType() {
+        return type;
+    }
+
+    public void setType(TypePaiement type) {
+        this.type = type;
+    }
+
+    public Integer getQuantite() {
+        return quantite;
+    }
+
+    public void setQuantite(Integer quantite) {
+        this.quantite = quantite;
     }
 
     public FournisseurPaiement getFournisseur() {

@@ -1,5 +1,14 @@
 package com.batulo.service;
 
+import java.util.ArrayList;
+import java.math.BigDecimal;
+import com.batulo.service.model.PaiementModel;
+import com.batulo.service.model.CreditsModel;
+import com.batulo.repository.PaiementRepository;
+import com.batulo.repository.CreditSondageRepository;
+import com.batulo.enums.TypePaiement;
+import com.batulo.enums.StatutPaiement;
+import com.batulo.entity.CreditSondage;
 import com.batulo.entity.Abonnement;
 import com.batulo.entity.Entreprise;
 import com.batulo.entity.Utilisateur;
@@ -58,6 +67,9 @@ public class SuperAdminServiceImpl implements SuperAdminService {
     private final MotDePasseTemporaire motDePasseTemporaire;
     private final EmailService emailService;
     private final Personnalisations personnalisations;
+    private final PaiementRepository paiementRepository;
+    private final CreditSondageRepository creditRepository;
+    private final CreditsSondages creditsSondages;
 
     @Value("${batulo.abonnement.jours-alerte-expiration}")
     private int joursAlerte;
@@ -70,7 +82,10 @@ public class SuperAdminServiceImpl implements SuperAdminService {
                                  AbonnementMapper abonnementMapper,
                                  MotDePasseTemporaire motDePasseTemporaire,
                                  EmailService emailService,
-                                 Personnalisations personnalisations) {
+                                 Personnalisations personnalisations,
+                                 PaiementRepository paiementRepository,
+                                 CreditSondageRepository creditRepository,
+                                 CreditsSondages creditsSondages) {
         this.utilisateurRepository = utilisateurRepository;
         this.entrepriseRepository = entrepriseRepository;
         this.abonnementRepository = abonnementRepository;
@@ -80,6 +95,9 @@ public class SuperAdminServiceImpl implements SuperAdminService {
         this.motDePasseTemporaire = motDePasseTemporaire;
         this.emailService = emailService;
         this.personnalisations = personnalisations;
+        this.paiementRepository = paiementRepository;
+        this.creditRepository = creditRepository;
+        this.creditsSondages = creditsSondages;
     }
 
     @Override
@@ -118,8 +136,9 @@ public class SuperAdminServiceImpl implements SuperAdminService {
         emailService.envoyerMotDePasseTemporaire(courriel, prenom, motDePasse, admin.getMotDePasseTemporaireExpireLe());
         log.info("Super admin : admin {} et entreprise {} créés, abonnement {} en attente de paiement",
                 admin.getId(), entreprise.getId(), abonnement.getId());
-        return new AdminDetailModel(utilisateurMapper.toModel(admin), versModele(abonnement, Instant.now()), 0,
-                personnalisations.de(entreprise));
+        return new AdminDetailModel(utilisateurMapper.toModel(admin),
+                versModele(abonnement, Instant.now()).avecCredits(CreditsModel.AUCUN), 0,
+                personnalisations.de(entreprise), CreditsModel.AUCUN);
     }
 
     @Override
@@ -136,6 +155,9 @@ public class SuperAdminServiceImpl implements SuperAdminService {
         Map<Long, Abonnement> abonnements = entrepriseIds.isEmpty() ? Map.of()
                 : abonnementRepository.findByEntrepriseIdIn(entrepriseIds).stream()
                 .collect(Collectors.toMap(a -> a.getEntreprise().getId(), Function.identity()));
+        Map<Long, Integer> soldes = entrepriseIds.isEmpty() ? Map.of()
+                : creditRepository.findByEntrepriseIdIn(entrepriseIds).stream()
+                .collect(Collectors.toMap(CreditSondage::getEntrepriseId, CreditSondage::getSolde));
         Map<Long, Long> gestionnaires = new HashMap<>();
         if (!entrepriseIds.isEmpty()) {
             for (Object[] ligne : utilisateurRepository.compterParEntreprise(entrepriseIds, Role.GESTIONNAIRE)) {
@@ -154,7 +176,8 @@ public class SuperAdminServiceImpl implements SuperAdminService {
                     abonnement == null ? null : new AdminLigneModel.Abonnement(abonnement.getFormule(),
                             RegleAbonnement.statutEffectif(abonnement, maintenant, joursAlerte),
                             abonnement.getDateExpiration(), RegleAbonnement.joursRestants(abonnement, maintenant)),
-                    gestionnaires.getOrDefault(entreprise.getId(), 0L));
+                    gestionnaires.getOrDefault(entreprise.getId(), 0L),
+                    soldes.getOrDefault(entreprise.getId(), 0));
         });
     }
 
@@ -169,7 +192,28 @@ public class SuperAdminServiceImpl implements SuperAdminService {
                         parStatut.get(StatutAbonnement.EXPIRE),
                         parStatut.get(StatutAbonnement.EN_ATTENTE_PAIEMENT),
                         parStatut.get(StatutAbonnement.DESACTIVE)),
-                demandeRepository.countByStatut(StatutDemande.EN_ATTENTE));
+                demandeRepository.countByStatut(StatutDemande.EN_ATTENTE),
+                revenus());
+    }
+
+    private TableauDeBordSuperAdminModel.Revenus revenus() {
+        List<TableauDeBordSuperAdminModel.LigneRevenus> lignes = new ArrayList<>();
+        long sondagesVendus = 0;
+        for (Object[] ligne : paiementRepository.revenus()) {
+            lignes.add(new TableauDeBordSuperAdminModel.LigneRevenus((TypePaiement) ligne[0], (String) ligne[1],
+                    (BigDecimal) ligne[2], ((Number) ligne[3]).longValue()));
+            sondagesVendus += ((Number) ligne[4]).longValue();
+        }
+        return new TableauDeBordSuperAdminModel.Revenus(lignes, sondagesVendus);
+    }
+
+    @Override
+    public Page<PaiementModel> achatsSondages(Long adminId, int page, int taille) {
+        Long entrepriseId = adminTrouve(adminId).getEntreprise().getId();
+        return paiementRepository.findByAbonnementEntrepriseIdAndTypeAndStatut(entrepriseId,
+                        TypePaiement.ACHAT_SONDAGES, StatutPaiement.REUSSI,
+                        PageRequest.of(page, taille, Sort.by(Sort.Direction.DESC, "datePaiement", "id")))
+                .map(abonnementMapper::toModel);
     }
 
     @Override
@@ -282,8 +326,10 @@ public class SuperAdminServiceImpl implements SuperAdminService {
                 .map(a -> versModele(a, Instant.now()))
                 .orElse(null);
         long gestionnaires = utilisateurRepository.countByEntrepriseIdAndRole(entrepriseId, Role.GESTIONNAIRE);
-        return new AdminDetailModel(utilisateurMapper.toModel(admin), abonnement, gestionnaires,
-                personnalisations.de(admin.getEntreprise()));
+        CreditsModel credits = creditsSondages.de(entrepriseId);
+        return new AdminDetailModel(utilisateurMapper.toModel(admin),
+                abonnement == null ? null : abonnement.avecCredits(credits), gestionnaires,
+                personnalisations.de(admin.getEntreprise()), credits);
     }
 
     private AbonnementModel versModele(Abonnement abonnement, Instant maintenant) {

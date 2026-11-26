@@ -74,6 +74,7 @@ public class SondageServiceImpl implements SondageService {
     private final ReponseRepository reponseRepository;
     private final ValidateurConditions validateurConditions;
     private final Personnalisations personnalisations;
+    private final CreditsSondages creditsSondages;
 
     @PersistenceContext
     private EntityManager entityManager;
@@ -85,7 +86,8 @@ public class SondageServiceImpl implements SondageService {
                               ResumesSondages resumesSondages,
                               ReponseRepository reponseRepository,
                               ValidateurConditions validateurConditions,
-                              Personnalisations personnalisations) {
+                              Personnalisations personnalisations,
+                              CreditsSondages creditsSondages) {
         this.sondageRepository = sondageRepository;
         this.accesSondage = accesSondage;
         this.sondageMapper = sondageMapper;
@@ -94,6 +96,7 @@ public class SondageServiceImpl implements SondageService {
         this.reponseRepository = reponseRepository;
         this.validateurConditions = validateurConditions;
         this.personnalisations = personnalisations;
+        this.creditsSondages = creditsSondages;
     }
 
     // ---------------------------------------------------------------- Sondage
@@ -597,6 +600,9 @@ public class SondageServiceImpl implements SondageService {
         Instant ouverture = dates.datePublication() == null || dates.datePublication().isBefore(maintenant)
                 ? maintenant : dates.datePublication();
         verifierFermeture(dates.dateFermeture(), ouverture, maintenant);
+        // Sans abonnement actif, une lignée pas encore payée utilise un crédit (402 CREDITS_EPUISES sinon), dans
+        // cette transaction : un refus annule la publication, deux publications simultanées ne débitent qu'un crédit.
+        boolean creditUtilise = creditsSondages.utiliserPourPublication(sondage, maintenant);
         sondage.setDatePublication(ouverture);
         sondage.setDateFermeture(dates.dateFermeture());
         // Lien public stable : un seul jeton par lignée, porté par la version 1, généré à la première publication.
@@ -605,8 +611,8 @@ public class SondageServiceImpl implements SondageService {
             racine.setJetonPublic(HachageJeton.nouveauJeton());
         }
         fermerVersionsPrecedentes(sondage, maintenant);
-        log.info("Sondage {} (version {}) publié par le compte {}, ouverture {}",
-                sondageId, sondage.getVersion(), utilisateurId, ouverture);
+        log.info("Sondage {} (version {}) publié par le compte {}, ouverture {}{}",
+                sondageId, sondage.getVersion(), utilisateurId, ouverture, creditUtilise ? ", un crédit utilisé" : "");
         return enregistrer(sondage);
     }
 

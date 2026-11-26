@@ -55,6 +55,11 @@ public class GlobalExceptionHandler {
                 .body(new ErrorResponse(TraductionsIncompletesException.CODE, ex.getMessage(), null, ex.getManquants()));
     }
 
+    @ExceptionHandler(CreditsEpuisesException.class)
+    public ResponseEntity<ErrorResponse> handleCreditsEpuises(CreditsEpuisesException ex) {
+        return reponse(HttpStatus.PAYMENT_REQUIRED, ex.getCode(), ex.getMessage());
+    }
+
     @ExceptionHandler(LimiteDepasseeException.class)
     public ResponseEntity<ErrorResponse> handleLimiteDepassee(LimiteDepasseeException ex) {
         return reponse(HttpStatus.TOO_MANY_REQUESTS, ex.getCode(), ex.getMessage());

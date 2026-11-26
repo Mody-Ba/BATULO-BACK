@@ -1,12 +1,15 @@
 package com.batulo.service;
 
 import com.batulo.entity.Abonnement;
+import com.batulo.entity.Entreprise;
 import com.batulo.entity.Paiement;
 import com.batulo.enums.Role;
 import com.batulo.enums.StatutPaiement;
 import com.batulo.enums.TypeNotification;
+import com.batulo.enums.TypePaiement;
 import com.batulo.repository.UtilisateurRepository;
 import com.batulo.service.email.EmailService;
+import com.batulo.service.model.CreditsModel;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -15,7 +18,7 @@ import org.springframework.stereotype.Component;
 import java.time.Instant;
 
 /**
- * Seule façon d'activer ou de prolonger un abonnement après un paiement (RG-09), commune à Stripe (confirmation)
+ * Seule façon d'activer ou de prolonger un abonnement, ou de créditer un achat de sondages, après un paiement (RG-09), commune à Stripe (confirmation)
  * et à Moosyl (webhook, relecture du statut). Idempotente : un paiement déjà REUSSI ne change plus rien, donc un
  * paiement ne prolonge jamais l'abonnement deux fois.
  *
@@ -31,16 +34,18 @@ public class ActivationPaiement {
     private final NotificationService notificationService;
     private final EmailService emailService;
     private final FormatDate formatDate;
+    private final CreditsSondages creditsSondages;
 
     @Value("${batulo.abonnement.jours-alerte-expiration}")
     private int joursAlerte;
 
     public ActivationPaiement(UtilisateurRepository utilisateurRepository, NotificationService notificationService,
-                              EmailService emailService, FormatDate formatDate) {
+                              EmailService emailService, FormatDate formatDate, CreditsSondages creditsSondages) {
         this.utilisateurRepository = utilisateurRepository;
         this.notificationService = notificationService;
         this.emailService = emailService;
         this.formatDate = formatDate;
+        this.creditsSondages = creditsSondages;
     }
 
     /**
@@ -52,8 +57,12 @@ public class ActivationPaiement {
      */
     public boolean activer(Paiement paiementVerrouille, Instant maintenant, String source) {
         if (paiementVerrouille.getStatut() == StatutPaiement.REUSSI) {
-            log.info("Paiement {} déjà réussi ({}) : abonnement inchangé", paiementVerrouille.getId(), source);
+            log.info("Paiement {} déjà réussi ({}) : rien ne change", paiementVerrouille.getId(), source);
             return false;
+        }
+        if (paiementVerrouille.getType() == TypePaiement.ACHAT_SONDAGES) {
+            crediterAchat(paiementVerrouille, maintenant, source);
+            return true;
         }
         Abonnement abonnement = paiementVerrouille.getAbonnement();
         // Renouvellement : l'entreprise avait déjà payé une période (en cours ou expirée).
@@ -78,6 +87,26 @@ public class ActivationPaiement {
                 paiementVerrouille.getFournisseur(), source, abonnement.getId(), abonnement.getStatut(),
                 abonnement.getDateExpiration());
         return true;
+    }
+
+    /** Achat de sondages : le solde augmente de la quantité payée (l'abonnement ne change pas). */
+    private void crediterAchat(Paiement paiement, Instant maintenant, String source) {
+        Abonnement abonnement = paiement.getAbonnement();
+        Entreprise entreprise = abonnement.getEntreprise();
+        int quantite = paiement.getQuantite();
+        paiement.setStatut(StatutPaiement.REUSSI);
+        paiement.setDatePaiement(maintenant);
+        CreditsModel credits = creditsSondages.crediter(entreprise, quantite, maintenant);
+
+        notificationService.notifierSuperAdmins(TypeNotification.PAIEMENT_RECU, "Paiement reçu",
+                entreprise.getNom() + " a payé " + paiement.getMontant().toPlainString() + " " + paiement.getDevise()
+                        + " (achat de " + quantite + " sondage(s)). Solde : " + credits.solde() + " sondage(s).",
+                abonnement.getId(), null);
+        utilisateurRepository.findFirstByEntrepriseIdAndRole(entreprise.getId(), Role.ADMIN)
+                .ifPresent(admin -> emailService.envoyerConfirmationAchatSondages(admin.getCourriel(),
+                        admin.getPrenom(), quantite, paiement.getMontant(), paiement.getDevise(), credits.solde()));
+        log.info("Paiement {} ({}, {}) réussi : {} sondage(s) pour l'entreprise {}, solde {}", paiement.getId(),
+                paiement.getFournisseur(), source, quantite, entreprise.getId(), credits.solde());
     }
 
     /** Courriel de confirmation à l'admin et notification aux super admins (envoyés après validation). */

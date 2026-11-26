@@ -1,5 +1,6 @@
 package com.batulo.service;
 
+import com.batulo.enums.OffreInscription;
 import com.batulo.entity.Abonnement;
 import com.batulo.entity.Entreprise;
 import com.batulo.entity.Utilisateur;
@@ -32,19 +33,22 @@ public class InscriptionServiceImpl implements InscriptionService {
     private final UtilisateurMapper utilisateurMapper;
     private final PasswordEncoder passwordEncoder;
     private final NotificationService notificationService;
+    private final TarifAchatSondages tarif;
 
     public InscriptionServiceImpl(UtilisateurRepository utilisateurRepository,
                                   EntrepriseRepository entrepriseRepository,
                                   AbonnementRepository abonnementRepository,
                                   UtilisateurMapper utilisateurMapper,
                                   PasswordEncoder passwordEncoder,
-                                  NotificationService notificationService) {
+                                  NotificationService notificationService,
+                                  TarifAchatSondages tarif) {
         this.utilisateurRepository = utilisateurRepository;
         this.entrepriseRepository = entrepriseRepository;
         this.abonnementRepository = abonnementRepository;
         this.utilisateurMapper = utilisateurMapper;
         this.passwordEncoder = passwordEncoder;
         this.notificationService = notificationService;
+        this.tarif = tarif;
     }
 
     @Override
@@ -54,6 +58,9 @@ public class InscriptionServiceImpl implements InscriptionService {
             throw new RegleGestionException("MOTS_DE_PASSE_DIFFERENTS",
                     "Le mot de passe et sa confirmation ne correspondent pas.");
         }
+        OffreInscription offre = inscription.offre();
+        Integer nombreSondages = offre == OffreInscription.ACHAT_SONDAGES
+                ? tarif.verifierQuantite(inscription.nombreSondages()) : null;
         String courriel = NormaliseurCourriel.normaliser(inscription.courriel());
         if (utilisateurRepository.existsByCourriel(courriel)) {
             throw new CompteExistantException();
@@ -82,14 +89,19 @@ public class InscriptionServiceImpl implements InscriptionService {
         Abonnement abonnement = new Abonnement();
         abonnement.setEntreprise(entreprise);
         abonnement.setStatut(StatutAbonnement.EN_ATTENTE_PAIEMENT);
+        abonnement.setOffreChoisie(offre);
+        abonnement.setNombreSondagesChoisi(nombreSondages);
         abonnement = abonnementRepository.save(abonnement);
 
         notificationService.notifierSuperAdmins(TypeNotification.NOUVELLE_INSCRIPTION, "Nouvelle inscription",
                 prenom + " " + nom + " (" + courriel + ") a inscrit l'entreprise « " + entreprise.getNom()
-                        + " ». Abonnement en attente de paiement.", abonnement.getId(), null);
+                        + " »" + (offre == null ? "" : " (offre choisie : " + (offre == OffreInscription.ACHAT_SONDAGES
+                        ? nombreSondages + " sondage(s)" : offre.name().toLowerCase()) + ")")
+                        + ". Paiement en attente.", abonnement.getId(), null);
 
         log.info("Inscription : admin {} et entreprise {} créés, abonnement {} en attente de paiement",
                 admin.getId(), entreprise.getId(), abonnement.getId());
-        return new InscriptionEffectueeModel(utilisateurMapper.toModel(admin), abonnement.getId(), abonnement.getStatut());
+        return new InscriptionEffectueeModel(utilisateurMapper.toModel(admin), abonnement.getId(), abonnement.getStatut(),
+                offre, nombreSondages);
     }
 }

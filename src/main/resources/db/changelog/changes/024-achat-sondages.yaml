@@ -1,0 +1,65 @@
+databaseChangeLog:
+  # Achat de sondages à l'unité, en plus des abonnements (inchangés) : solde de crédits par entreprise, sans date
+  # limite ; un crédit est utilisé à la publication d'une lignée hors abonnement actif.
+
+  - changeSet:
+      id: 024-creer-table-credit-sondage
+      author: batulo
+      changes:
+        - createTable:
+            tableName: credit_sondage
+            columns:
+              - column:
+                  name: entreprise_id
+                  type: BIGINT
+                  constraints:
+                    primaryKey: true
+                    primaryKeyName: pk_credit_sondage
+                    nullable: false
+                    foreignKeyName: fk_credit_sondage_entreprise
+                    references: entreprise(id)
+                    deleteCascade: true
+              - column: { name: solde, type: INT, defaultValueNumeric: 0, constraints: { nullable: false } }
+              - column: { name: total_achete, type: INT, defaultValueNumeric: 0, constraints: { nullable: false } }
+              - column: { name: total_utilise, type: INT, defaultValueNumeric: 0, constraints: { nullable: false } }
+              - column: { name: date_modification, type: TIMESTAMP WITH TIME ZONE, constraints: { nullable: false } }
+        # Dernier rempart contre un double débit : le solde ne passe jamais sous zéro.
+        - sql:
+            sql: ALTER TABLE credit_sondage ADD CONSTRAINT ck_credit_sondage_solde CHECK (solde >= 0)
+
+  - changeSet:
+      id: 024-paiement-achat-sondages
+      author: batulo
+      changes:
+        - addColumn:
+            tableName: paiement
+            columns:
+              # ABONNEMENT (formule) ou ACHAT_SONDAGES (quantite) ; les paiements existants sont des abonnements.
+              - column: { name: type, type: VARCHAR(20), defaultValue: ABONNEMENT, constraints: { nullable: false } }
+              - column: { name: quantite, type: INT }
+        - dropNotNullConstraint:
+            tableName: paiement
+            columnName: formule
+            columnDataType: VARCHAR(20)
+
+  - changeSet:
+      id: 024-sondage-credit-utilise
+      author: batulo
+      changes:
+        - addColumn:
+            tableName: sondage
+            columns:
+              # Sur la version 1 : la lignée a été publiée avec un crédit (une seule fois) ; elle collecte alors
+              # même sans abonnement actif.
+              - column: { name: credit_utilise_le, type: TIMESTAMP WITH TIME ZONE }
+
+  - changeSet:
+      id: 024-abonnement-offre-choisie
+      author: batulo
+      changes:
+        - addColumn:
+            tableName: abonnement
+            columns:
+              # Choix fait à l'inscription (MENSUEL, ANNUEL, ACHAT_SONDAGES), pour guider le premier paiement.
+              - column: { name: offre_choisie, type: VARCHAR(20) }
+              - column: { name: nombre_sondages_choisi, type: INT }

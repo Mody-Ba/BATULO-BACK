@@ -1,5 +1,7 @@
 package com.batulo.service;
 
+import com.batulo.service.model.DemandeAchatSondagesModel;
+import com.batulo.enums.TypePaiement;
 import com.batulo.entity.Abonnement;
 import com.batulo.entity.Paiement;
 import com.batulo.enums.Formule;
@@ -57,6 +59,8 @@ public class PaiementMobileServiceImpl implements PaiementMobileService {
     private final AbonnementMapper abonnementMapper;
     private final MoosylClient moosylClient;
     private final ActivationPaiement activationPaiement;
+    private final CreditsSondages creditsSondages;
+    private final TarifAchatSondages tarif;
     private final ObjectMapper objectMapper;
     private final TransactionTemplate transaction;
     private final TransactionTemplate lecture;
@@ -77,12 +81,15 @@ public class PaiementMobileServiceImpl implements PaiementMobileService {
     public PaiementMobileServiceImpl(PaiementRepository paiementRepository, AbonnementRepository abonnementRepository,
                                      AbonnementMapper abonnementMapper, MoosylClient moosylClient,
                                      ActivationPaiement activationPaiement, ObjectMapper objectMapper,
-                                     PlatformTransactionManager transactionManager) {
+                                     PlatformTransactionManager transactionManager, CreditsSondages creditsSondages,
+                                     TarifAchatSondages tarif) {
         this.paiementRepository = paiementRepository;
         this.abonnementRepository = abonnementRepository;
         this.abonnementMapper = abonnementMapper;
         this.moosylClient = moosylClient;
         this.activationPaiement = activationPaiement;
+        this.creditsSondages = creditsSondages;
+        this.tarif = tarif;
         this.objectMapper = objectMapper;
         this.transaction = new TransactionTemplate(transactionManager);
         this.lecture = new TransactionTemplate(transactionManager);
@@ -99,6 +106,20 @@ public class PaiementMobileServiceImpl implements PaiementMobileService {
 
     @Override
     public PaiementMobileModel demarrer(Long entrepriseId, DemandePaiementMobileModel demande) {
+        Formule formule = demande.formule();
+        return demarrer(entrepriseId, TypePaiement.ABONNEMENT, formule, null, prixMru(formule), demande.telephone());
+    }
+
+    @Override
+    public PaiementMobileModel demarrerAchat(Long entrepriseId, DemandeAchatSondagesModel demande) {
+        int quantite = tarif.verifierQuantite(demande.quantite());
+        return demarrer(entrepriseId, TypePaiement.ACHAT_SONDAGES, null, quantite, tarif.montantMobile(quantite),
+                demande.telephone());
+    }
+
+    /** Paiement EN_ATTENTE et session Moosyl, communs aux abonnements et aux achats de sondages. */
+    private PaiementMobileModel demarrer(Long entrepriseId, TypePaiement type, Formule formule, Integer quantite,
+                                         long montantMru, String telephone) {
         return transaction.execute(statut -> {
             Abonnement abonnement = abonnementRepository.findByEntrepriseId(entrepriseId)
                     .orElseThrow(() -> new ResourceNotFoundException("ABONNEMENT_INTROUVABLE",
@@ -107,28 +128,29 @@ public class PaiementMobileServiceImpl implements PaiementMobileService {
                 throw new RegleGestionException("ENTREPRISE_DESACTIVEE",
                         "Votre entreprise a été désactivée : le paiement est impossible. Contactez Batulo.");
             }
-            Formule formule = demande.formule();
-            long montantMru = prixMru(formule);
             String reference = UUID.randomUUID().toString();
 
             Paiement paiement = new Paiement();
             paiement.setAbonnement(abonnement);
             paiement.setFournisseur(FournisseurPaiement.MOOSYL);
             paiement.setReference(reference);
+            paiement.setType(type);
             paiement.setFormule(formule);
+            paiement.setQuantite(quantite);
             paiement.setMontant(BigDecimal.valueOf(montantMru).setScale(2));
             paiement.setDevise(DEVISE);
             paiement.setStatut(StatutPaiement.EN_ATTENTE);
             paiement = paiementRepository.save(paiement);
 
             // Échec chez Moosyl : exception, la transaction est annulée et aucun paiement n'est enregistré.
-            SessionMoosylModel session = moosylClient.creerSession(reference, montantMru, demande.telephone(),
+            SessionMoosylModel session = moosylClient.creerSession(reference, montantMru, telephone,
                     urlRetour(reference), expirationMinutes);
             paiement.setSessionExterneId(session.id());
             log.info("Paiement mobile {} créé pour l'abonnement {} ({}, {} MRU), session Moosyl {}",
-                    reference, abonnement.getId(), formule, montantMru, session.id());
+                    reference, abonnement.getId(), type == TypePaiement.ABONNEMENT ? formule : quantite + " sondage(s)",
+                    montantMru, session.id());
             return new PaiementMobileModel(reference, session.checkoutUrl(), formule, paiement.getMontant(), DEVISE,
-                    session.expireLe());
+                    session.expireLe(), type, quantite);
         });
     }
 
@@ -204,7 +226,7 @@ public class PaiementMobileServiceImpl implements PaiementMobileService {
         }
         Paiement paiement = trouve.get();
         if (montantRecu != null && montantRecu.compareTo(paiement.getMontant()) != 0) {
-            log.warn("Paiement Moosyl {} : montant reçu {} au lieu de {} ({}) : abonnement inchangé", reference,
+            log.warn("Paiement Moosyl {} : montant reçu {} au lieu de {} ({}) : rien n'est activé ni crédité", reference,
                     montantRecu.toPlainString(), paiement.getMontant().toPlainString(), source);
             return false;
         }
@@ -240,7 +262,8 @@ public class PaiementMobileServiceImpl implements PaiementMobileService {
         return new StatutPaiementMobileModel(paiement.getReference(), paiement.getStatut(), paiement.getFormule(),
                 paiement.getMontant(), paiement.getDevise(), paiement.getDateCreation(), paiement.getDatePaiement(),
                 abonnementMapper.toModel(abonnement, RegleAbonnement.statutEffectif(abonnement, maintenant, joursAlerte),
-                        RegleAbonnement.joursRestants(abonnement, maintenant)));
+                        RegleAbonnement.joursRestants(abonnement, maintenant)), paiement.getType(), paiement.getQuantite(),
+                creditsSondages.de(abonnement.getEntreprise().getId()));
     }
 
     private String urlRetour(String reference) {

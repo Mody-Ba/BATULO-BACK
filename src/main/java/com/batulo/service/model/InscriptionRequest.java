@@ -1,5 +1,6 @@
 package com.batulo.service.model;
 
+import com.batulo.enums.OffreInscription;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
@@ -36,12 +37,19 @@ public record InscriptionRequest(
 
         @Size(max = 150, message = "le nom de l'entreprise ne doit pas dépasser 150 caractères")
         @Schema(description = "Facultatif. Par défaut : « Entreprise de Prénom Nom »", example = "Entreprise Test")
-        String nomEntreprise
+        String nomEntreprise,
+        @Schema(description = "Facultatif : offre choisie (MENSUEL, ANNUEL ou ACHAT_SONDAGES), enregistrée pour guider "
+                + "le premier paiement (aucun paiement n'est créé à l'inscription)", example = "ACHAT_SONDAGES")
+        OffreInscription offre,
+        @Schema(description = "Obligatoire avec ACHAT_SONDAGES : nombre de sondages, de 1 à 1000 (400 "
+                + "QUANTITE_INVALIDE) ; ignoré sinon", example = "5")
+        Integer nombreSondages
 ) {
     /** Le toString généré par le record afficherait les mots de passe en clair. */
     @Override
     public String toString() {
         return "InscriptionRequest[prenom=" + prenom + ", nom=" + nom + ", courriel=" + courriel
-                + ", motDePasse=****, confirmationMotDePasse=****, nomEntreprise=" + nomEntreprise + "]";
+                + ", motDePasse=****, confirmationMotDePasse=****, nomEntreprise=" + nomEntreprise + ", offre=" + offre
+                + ", nombreSondages=" + nombreSondages + "]";
     }
 }

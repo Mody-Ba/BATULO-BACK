@@ -1,5 +1,6 @@
 package com.batulo.service.model;
 
+import com.batulo.enums.TypePaiement;
 import com.batulo.enums.Formule;
 
 import java.math.BigDecimal;
@@ -12,6 +13,8 @@ public record PaiementMobileModel(
         Formule formule,
         BigDecimal montant,
         String devise,
-        Instant expireLe
+        Instant expireLe,
+        TypePaiement type,
+        Integer quantite
 ) {
 }

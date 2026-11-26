@@ -1,5 +1,8 @@
 package com.batulo.controller;
 
+import com.batulo.service.model.CreditsResponse;
+import com.batulo.service.model.AchatSondagesRequest;
+import com.batulo.service.model.AchatSondagesMobileRequest;
 import com.batulo.configs.security.UtilisateurConnecte;
 import com.batulo.mappers.AbonnementMapper;
 import com.batulo.service.AbonnementService;
@@ -44,7 +47,8 @@ import java.util.List;
  */
 @RestController
 @RequestMapping("/api/abonnements")
-@Tag(name = "Abonnement", description = "Formules, abonnement de l'admin et paiement Stripe (mode test)")
+@Tag(name = "Abonnement", description = "Formules, abonnement de l'admin, achat de sondages et paiement (Stripe en "
+        + "mode test, Moosyl)")
 public class AbonnementController {
 
     private final AbonnementService abonnementService;
@@ -60,7 +64,10 @@ public class AbonnementController {
 
     @GetMapping("/formules")
     @SecurityRequirements
-    @Operation(summary = "Formules disponibles et prix (public)")
+    @Operation(summary = "Formules disponibles et prix (public)",
+            description = "MENSUEL et ANNUEL (type ABONNEMENT, publication illimitée pendant la période), puis un 3e "
+                    + "élément type ACHAT_SONDAGES (formule null) : prix et prixMobile d'UN sondage, quantiteMin 1, "
+                    + "quantiteMax 1000. Montant d'un achat = quantité × prix unitaire.")
     public List<FormuleResponse> formules() {
         return abonnementService.formules().stream().map(abonnementMapper::toResponse).toList();
     }
@@ -74,11 +81,50 @@ public class AbonnementController {
         return abonnementMapper.toResponse(abonnementService.monAbonnement(moi.entrepriseId()));
     }
 
+    @GetMapping("/credits")
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "Mes sondages achetés : solde, total acheté, total utilisé",
+            description = "Le solde n'a pas de date limite ; les achats s'additionnent. Un sondage est utilisé à la "
+                    + "publication d'une lignée hors abonnement actif (une seule fois par lignée). Zéros si "
+                    + "l'entreprise n'a jamais acheté.")
+    public CreditsResponse credits(@Parameter(hidden = true) @AuthenticationPrincipal UtilisateurConnecte moi) {
+        return abonnementMapper.toResponse(abonnementService.credits(moi.entrepriseId()));
+    }
+
+    @PostMapping("/achat-sondages/intention")
+    @PreAuthorize("hasRole('ADMIN')")
+    @ResponseStatus(HttpStatus.CREATED)
+    @Operation(summary = "Acheter des sondages par carte (intention de paiement Stripe)",
+            description = "Paiement unique de quantité × prix unitaire (PRIX_SONDAGE_CAD), même parcours qu'un "
+                    + "abonnement : clientSecret pour Stripe.js, puis POST /paiement/confirmer, qui relit le paiement "
+                    + "chez Stripe et crédite le solde une seule fois. 400 QUANTITE_INVALIDE hors de 1 à 1000.")
+    public IntentionPaiementResponse acheterParCarte(
+            @Parameter(hidden = true) @AuthenticationPrincipal UtilisateurConnecte moi,
+            @Valid @RequestBody AchatSondagesRequest request) {
+        return abonnementMapper.toResponse(
+                abonnementService.creerIntentionAchat(moi.entrepriseId(), abonnementMapper.toModel(request)));
+    }
+
+    @PostMapping("/achat-sondages/paiement-mobile")
+    @PreAuthorize("hasRole('ADMIN')")
+    @ResponseStatus(HttpStatus.CREATED)
+    @Operation(summary = "Acheter des sondages par paiement mobile (Moosyl, en MRU)",
+            description = "Montant = quantité × PRIX_SONDAGE_MRU. Même parcours qu'un abonnement : redirection vers "
+                    + "checkoutUrl, puis webhook Moosyl ou GET /paiement-mobile/{reference} ; le solde est crédité une "
+                    + "seule fois. 400 QUANTITE_INVALIDE, 503 PAIEMENT_MOBILE_NON_CONFIGURE, 502 MOOSYL_ERREUR.")
+    public PaiementMobileResponse acheterParMobile(
+            @Parameter(hidden = true) @AuthenticationPrincipal UtilisateurConnecte moi,
+            @Valid @RequestBody AchatSondagesMobileRequest request) {
+        return abonnementMapper.toResponse(
+                paiementMobileService.demarrerAchat(moi.entrepriseId(), abonnementMapper.toModel(request)));
+    }
+
     @GetMapping("/paiements")
     @PreAuthorize("hasRole('ADMIN')")
     @Operation(summary = "Historique des paiements de mon entreprise",
             description = "Paiements réussis seulement (les intentions abandonnées ou échouées n'y sont pas), du plus "
-                    + "récent au plus ancien : date, formule, montant, devise. Permis abonnement expiré ou en attente.")
+                    + "récent au plus ancien : date, type (ABONNEMENT avec formule, ACHAT_SONDAGES avec quantite), "
+                    + "montant, devise, fournisseur. Permis abonnement expiré ou en attente.")
     public PageResponse<PaiementResponse> paiements(
             @Parameter(hidden = true) @AuthenticationPrincipal UtilisateurConnecte moi,
             @RequestParam(defaultValue = "0") @Min(value = 0, message = "page doit être positif ou nul") int page,
@@ -107,7 +153,8 @@ public class AbonnementController {
             description = "Vérifie chez Stripe que le paiement est « succeeded » et appartient à l'entreprise, puis "
                     + "passe l'abonnement à ACTIF. Un renouvellement avant l'échéance prolonge depuis la date "
                     + "d'expiration. Idempotent : un même paiement n'est compté qu'une fois. "
-                    + "400 PAIEMENT_NON_REUSSI si Stripe n'a pas encore validé le paiement.")
+                    + "Achat de sondages (POST /achat-sondages/intention) : même route, le solde est crédité de la "
+                    + "quantité une seule fois. 400 PAIEMENT_NON_REUSSI si Stripe n'a pas encore validé le paiement.")
     public PaiementConfirmeResponse confirmer(
             @Parameter(hidden = true) @AuthenticationPrincipal UtilisateurConnecte moi,
             @Valid @RequestBody ConfirmationPaiementRequest request) {

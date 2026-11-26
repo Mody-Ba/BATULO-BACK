@@ -67,7 +67,8 @@ public class AuthTokenFilter extends OncePerRequestFilter {
     /** Le rôle devient l'autorité « ROLE_xxx » vérifiée par @PreAuthorize("hasRole('...')"). */
     private void authentifier(UtilisateurConnecteModel compte, HttpServletRequest request) {
         UtilisateurConnecte principal = new UtilisateurConnecte(compte.id(), compte.courriel(), compte.role(),
-                compte.entrepriseId(), compte.motDePasseTemporaire(), compte.statutAbonnement());
+                compte.entrepriseId(), compte.motDePasseTemporaire(), compte.statutAbonnement(),
+                compte.compteCredits());
         UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
                 principal, null, List.of(new SimpleGrantedAuthority("ROLE_" + compte.role().name())));
         authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));

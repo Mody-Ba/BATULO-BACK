@@ -1,5 +1,6 @@
 package com.batulo.mappers;
 
+import com.batulo.enums.OffreInscription;
 import com.batulo.service.model.InscriptionEffectueeModel;
 import com.batulo.service.model.InscriptionModel;
 import com.batulo.service.model.InscriptionRequest;
@@ -26,14 +27,23 @@ public class InscriptionMapper {
                 req.courriel(),
                 req.motDePasse(),
                 req.confirmationMotDePasse(),
-                req.nomEntreprise());
+                req.nomEntreprise(),
+                req.offre(),
+                req.nombreSondages());
     }
 
     public InscriptionResponse toResponse(InscriptionEffectueeModel model) {
+        String message = model.offre() == OffreInscription.ACHAT_SONDAGES
+                ? "Inscription réussie. Payez vos " + model.nombreSondages() + " sondage(s) pour commencer."
+                : model.offre() != null
+                ? "Inscription réussie. Payez votre abonnement pour commencer."
+                : "Inscription réussie. Votre compte est en attente de paiement : abonnez-vous ou achetez des sondages.";
         return new InscriptionResponse(
-                "Inscription réussie. Votre compte est en attente de paiement : choisissez une formule pour vous abonner.",
+                message,
                 authMapper.toResponse(model.utilisateur()),
                 model.abonnementId(),
-                model.statutAbonnement());
+                model.statutAbonnement(),
+                model.offre(),
+                model.nombreSondages());
     }
 }

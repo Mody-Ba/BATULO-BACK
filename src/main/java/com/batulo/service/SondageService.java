@@ -131,6 +131,8 @@ public interface SondageService {
      *
      * @throws com.batulo.exception.RegleGestionException SONDAGE_INCOMPLET (aucune question, section vide)
      *         ou DATES_INVALIDES
+     * @throws com.batulo.exception.CreditsEpuisesException 402 CREDITS_EPUISES : sans abonnement actif, la lignée
+     *         pas encore payée par crédit en exige un et le solde est à 0 (abonnement actif : jamais de débit)
      */
     SondageModel publier(Long utilisateurId, Long sondageId, DatesSondageModel dates);
 
