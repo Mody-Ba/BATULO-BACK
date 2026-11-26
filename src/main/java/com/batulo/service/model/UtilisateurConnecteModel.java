@@ -12,6 +12,11 @@ public record UtilisateurConnecteModel(
         boolean actif,
         boolean motDePasseTemporaire,
         /** Null pour le super admin. */
-        StatutAbonnement statutAbonnement
+        StatutAbonnement statutAbonnement,
+        /**
+         * L'entreprise a déjà acheté des sondages : accès complet malgré un abonnement EN_ATTENTE_PAIEMENT ou EXPIRE.
+         * Calculé seulement dans ces deux cas (false sinon).
+         */
+        boolean compteCredits
 ) {
 }

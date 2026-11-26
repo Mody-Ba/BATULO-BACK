@@ -1,5 +1,6 @@
 package com.batulo.service;
 
+import com.batulo.service.model.DemandeAchatSondagesModel;
 import com.batulo.service.model.DemandePaiementMobileModel;
 import com.batulo.service.model.PaiementMobileModel;
 import com.batulo.service.model.StatutPaiementMobileModel;
@@ -32,6 +33,14 @@ public interface PaiementMobileService {
      * @throws com.batulo.exception.MoosylIndisponibleException refus ou panne de Moosyl (502)
      */
     PaiementMobileModel demarrer(Long entrepriseId, DemandePaiementMobileModel demande);
+
+    /**
+     * Achat de sondages par paiement mobile (quantité × prix unitaire en MRU) : même parcours que {@link #demarrer} ;
+     * le solde est crédité une seule fois quand Moosyl confirme (webhook ou relecture du statut).
+     *
+     * @throws com.batulo.exception.RegleGestionException QUANTITE_INVALIDE (hors de 1 à 1000), ENTREPRISE_DESACTIVEE
+     */
+    PaiementMobileModel demarrerAchat(Long entrepriseId, DemandeAchatSondagesModel demande);
 
     /**
      * Statut d'un paiement de l'entreprise. EN_ATTENTE : relit la session chez Moosyl et active l'abonnement si elle

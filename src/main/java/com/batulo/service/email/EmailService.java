@@ -22,6 +22,10 @@ public interface EmailService {
     void envoyerConfirmationPaiement(String courriel, String prenom, Formule formule, BigDecimal montant,
                                      String devise, Instant dateExpiration, boolean renouvellement);
 
+    /** Confirmation à l'admin : achat de sondages payé, avec le nouveau solde. */
+    void envoyerConfirmationAchatSondages(String courriel, String prenom, int quantite, BigDecimal montant,
+                                          String devise, int solde);
+
     /** Rappel à l'admin : l'abonnement expire dans 7 jours ou moins. */
     void envoyerRappelExpiration(String courriel, String prenom, String entreprise, Instant dateExpiration,
                                  long joursRestants);

@@ -1,5 +1,6 @@
 package com.batulo.service.model;
 
+import com.batulo.enums.TypePaiement;
 import com.batulo.enums.Formule;
 import com.batulo.enums.StatutPaiement;
 
@@ -15,6 +16,10 @@ public record StatutPaiementMobileModel(
         String devise,
         Instant dateCreation,
         Instant datePaiement,
-        AbonnementModel abonnement
+        AbonnementModel abonnement,
+        TypePaiement type,
+        Integer quantite,
+        /** Sondages achetés de l'entreprise après ce paiement. */
+        CreditsModel credits
 ) {
 }

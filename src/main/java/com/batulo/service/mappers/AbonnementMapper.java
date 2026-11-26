@@ -27,11 +27,14 @@ public class AbonnementMapper {
                 entity.getDateExpiration(),
                 joursRestants,
                 entity.getMontant(),
-                entity.getDevise());
+                entity.getDevise(),
+                entity.getOffreChoisie(),
+                entity.getNombreSondagesChoisi(),
+                null);
     }
 
     public PaiementModel toModel(Paiement entity) {
         return new PaiementModel(entity.getId(), entity.getDatePaiement(), entity.getFormule(), entity.getMontant(),
-                entity.getDevise(), entity.getFournisseur());
+                entity.getDevise(), entity.getFournisseur(), entity.getType(), entity.getQuantite());
     }
 }

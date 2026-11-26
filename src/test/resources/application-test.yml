@@ -61,6 +61,9 @@ batulo:
     prix-mensuel-mru: 40
     prix-annuel-mru: 80
     expiration-minutes: 30
+  achat-sondages:
+    prix-cad: "0.50"
+    prix-mru: 20
   mot-de-passe:
     url-reinitialisation: http://localhost:4200/reinitialiser-mot-de-passe
 

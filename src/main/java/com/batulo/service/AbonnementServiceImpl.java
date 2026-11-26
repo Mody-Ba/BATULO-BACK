@@ -1,5 +1,10 @@
 package com.batulo.service;
 
+import java.util.HashMap;
+import java.util.ArrayList;
+import com.batulo.service.model.DemandeAchatSondagesModel;
+import com.batulo.service.model.CreditsModel;
+import com.batulo.enums.TypePaiement;
 import com.batulo.entity.Abonnement;
 import com.batulo.entity.Paiement;
 import com.batulo.enums.Formule;
@@ -48,12 +53,16 @@ public class AbonnementServiceImpl implements AbonnementService {
     static final String META_ENTREPRISE = "entrepriseId";
     static final String META_ABONNEMENT = "abonnementId";
     static final String META_FORMULE = "formule";
+    static final String META_TYPE = "type";
+    static final String META_QUANTITE = "quantite";
 
     private final AbonnementRepository abonnementRepository;
     private final PaiementRepository paiementRepository;
     private final AbonnementMapper abonnementMapper;
     private final PaiementService paiementService;
     private final ActivationPaiement activationPaiement;
+    private final CreditsSondages creditsSondages;
+    private final TarifAchatSondages tarif;
 
     @Value("${batulo.abonnement.devise}")
     private String devise;
@@ -77,26 +86,40 @@ public class AbonnementServiceImpl implements AbonnementService {
                                  PaiementRepository paiementRepository,
                                  AbonnementMapper abonnementMapper,
                                  PaiementService paiementService,
-                                 ActivationPaiement activationPaiement) {
+                                 ActivationPaiement activationPaiement,
+                                 CreditsSondages creditsSondages,
+                                 TarifAchatSondages tarif) {
         this.abonnementRepository = abonnementRepository;
         this.paiementRepository = paiementRepository;
         this.abonnementMapper = abonnementMapper;
         this.paiementService = paiementService;
         this.activationPaiement = activationPaiement;
+        this.creditsSondages = creditsSondages;
+        this.tarif = tarif;
     }
 
     @Override
     public List<FormuleModel> formules() {
-        return Arrays.stream(Formule.values())
+        List<FormuleModel> formules = new ArrayList<>(Arrays.stream(Formule.values())
                 .map(formule -> new FormuleModel(formule, libelle(formule), montant(prixCentimes(formule)),
                         deviseAffichee(), duree(formule), BigDecimal.valueOf(prixMobileMru(formule)),
-                        PaiementMobileServiceImpl.DEVISE))
-                .toList();
+                        PaiementMobileServiceImpl.DEVISE, TypePaiement.ABONNEMENT, null, null))
+                .toList());
+        // Achat à l'unité : prix d'UN sondage ; montant = quantité × prix, calculé par le serveur.
+        formules.add(new FormuleModel(null, "Achat de sondages", tarif.prixCarte(), deviseAffichee(),
+                "Sans date limite", BigDecimal.valueOf(tarif.prixMobile()), PaiementMobileServiceImpl.DEVISE,
+                TypePaiement.ACHAT_SONDAGES, TarifAchatSondages.QUANTITE_MIN, TarifAchatSondages.QUANTITE_MAX));
+        return formules;
     }
 
     @Override
     public AbonnementModel monAbonnement(Long entrepriseId) {
-        return versModele(abonnementDe(entrepriseId), Instant.now());
+        return versModele(abonnementDe(entrepriseId), Instant.now()).avecCredits(creditsSondages.de(entrepriseId));
+    }
+
+    @Override
+    public CreditsModel credits(Long entrepriseId) {
+        return creditsSondages.de(entrepriseId);
     }
 
     @Override
@@ -115,34 +138,52 @@ public class AbonnementServiceImpl implements AbonnementService {
     @Override
     @Transactional
     public IntentionPaiementModel creerIntentionPaiement(Long entrepriseId, DemandeIntentionPaiementModel demande) {
+        Formule formule = demande.formule();
+        return creerIntention(entrepriseId, TypePaiement.ABONNEMENT, formule, null, prixCentimes(formule),
+                libelle(formule), Map.of(META_FORMULE, formule.name()));
+    }
+
+    @Override
+    @Transactional
+    public IntentionPaiementModel creerIntentionAchat(Long entrepriseId, DemandeAchatSondagesModel demande) {
+        int quantite = tarif.verifierQuantite(demande.quantite());
+        return creerIntention(entrepriseId, TypePaiement.ACHAT_SONDAGES, null, quantite, tarif.centimesCarte(quantite),
+                "Achat de " + quantite + " sondage(s)", Map.of(META_QUANTITE, String.valueOf(quantite)));
+    }
+
+    /** PaymentIntent Stripe (paiement unique) et paiement EN_ATTENTE, communs aux abonnements et aux achats. */
+    private IntentionPaiementModel creerIntention(Long entrepriseId, TypePaiement type, Formule formule,
+                                                  Integer quantite, long centimes, String libelle,
+                                                  Map<String, String> metadonneesPropres) {
         Abonnement abonnement = abonnementDe(entrepriseId);
         if (!abonnement.getEntreprise().isActif()) {
             throw new RegleGestionException("ENTREPRISE_DESACTIVEE",
                     "Votre entreprise a été désactivée : le paiement est impossible. Contactez Batulo.");
         }
-        Formule formule = demande.formule();
-        long centimes = prixCentimes(formule);
         String clePublique = paiementService.clePublique();
+        Map<String, String> metadonnees = new HashMap<>(metadonneesPropres);
+        metadonnees.put(META_ENTREPRISE, String.valueOf(entrepriseId));
+        metadonnees.put(META_ABONNEMENT, String.valueOf(abonnement.getId()));
+        metadonnees.put(META_TYPE, type.name());
 
         IntentionStripeModel intention = paiementService.creerIntention(centimes, devise,
-                "Batulo – " + libelle(formule) + " – " + abonnement.getEntreprise().getNom(),
-                Map.of(META_ENTREPRISE, String.valueOf(entrepriseId),
-                        META_ABONNEMENT, String.valueOf(abonnement.getId()),
-                        META_FORMULE, formule.name()));
+                "Batulo – " + libelle + " – " + abonnement.getEntreprise().getNom(), Map.copyOf(metadonnees));
 
         Paiement paiement = new Paiement();
         paiement.setAbonnement(abonnement);
         paiement.setStripePaymentIntentId(intention.id());
+        paiement.setType(type);
         paiement.setFormule(formule);
+        paiement.setQuantite(quantite);
         paiement.setMontant(montant(centimes));
         paiement.setDevise(deviseAffichee());
         paiement.setStatut(StatutPaiement.EN_ATTENTE);
         paiementRepository.save(paiement);
 
-        log.info("Intention de paiement {} créée pour l'abonnement {} ({})",
-                intention.id(), abonnement.getId(), formule);
+        log.info("Intention de paiement {} créée pour l'abonnement {} ({})", intention.id(), abonnement.getId(),
+                type == TypePaiement.ABONNEMENT ? formule : quantite + " sondage(s)");
         return new IntentionPaiementModel(intention.id(), intention.clientSecret(), clePublique, formule,
-                paiement.getMontant(), paiement.getDevise());
+                paiement.getMontant(), paiement.getDevise(), type, quantite);
     }
 
     @Override
@@ -154,11 +195,10 @@ public class AbonnementServiceImpl implements AbonnementService {
                 .filter(p -> p.getAbonnement().getEntreprise().getId().equals(entrepriseId))
                 .orElseThrow(() -> new ResourceNotFoundException("PAIEMENT_INTROUVABLE",
                         "Aucun paiement de votre entreprise ne correspond à ce paymentIntentId."));
-        Abonnement abonnement = paiement.getAbonnement();
         Instant maintenant = Instant.now();
 
         if (paiement.getStatut() == StatutPaiement.REUSSI) {
-            return new PaiementConfirmeModel(versModele(abonnement, maintenant), true);
+            return confirme(paiement, maintenant, true);
         }
 
         // On ne fait jamais confiance au frontend : Stripe est relu pour savoir si le paiement a bien eu lieu.
@@ -171,7 +211,14 @@ public class AbonnementServiceImpl implements AbonnementService {
         }
 
         activationPaiement.activer(paiement, maintenant, "confirmation Stripe " + paymentIntentId);
-        return new PaiementConfirmeModel(versModele(abonnement, maintenant), false);
+        return confirme(paiement, maintenant, false);
+    }
+
+    private PaiementConfirmeModel confirme(Paiement paiement, Instant maintenant, boolean dejaConfirme) {
+        Long entrepriseId = paiement.getAbonnement().getEntreprise().getId();
+        CreditsModel credits = creditsSondages.de(entrepriseId);
+        return new PaiementConfirmeModel(versModele(paiement.getAbonnement(), maintenant).avecCredits(credits),
+                dejaConfirme, paiement.getType(), paiement.getQuantite(), credits);
     }
 
     /** Le PaymentIntent doit être celui créé pour cette entreprise, avec le montant et la devise attendus. */
@@ -184,7 +231,7 @@ public class AbonnementServiceImpl implements AbonnementService {
             log.warn("PaymentIntent {} incohérent avec le paiement enregistré (entreprise {}, montant {}, devise {})",
                     intention.id(), memeEntreprise, memeMontant, memeDevise);
             throw new RegleGestionException("PAIEMENT_INVALIDE",
-                    "Ce paiement Stripe ne correspond pas à l'abonnement de votre entreprise.");
+                    "Ce paiement Stripe ne correspond pas à un paiement de votre entreprise.");
         }
     }
 

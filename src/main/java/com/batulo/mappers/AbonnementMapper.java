@@ -1,5 +1,11 @@
 package com.batulo.mappers;
 
+import com.batulo.service.model.DemandeAchatSondagesModel;
+import com.batulo.service.model.CreditsResponse;
+import com.batulo.service.model.CreditsModel;
+import com.batulo.service.model.AchatSondagesRequest;
+import com.batulo.service.model.AchatSondagesMobileRequest;
+import com.batulo.enums.TypePaiement;
 import com.batulo.service.model.AbonnementModel;
 import com.batulo.service.model.AbonnementResponse;
 import com.batulo.service.model.CarteTestResponse;
@@ -45,7 +51,20 @@ public class AbonnementMapper {
 
     public FormuleResponse toResponse(FormuleModel model) {
         return new FormuleResponse(model.formule(), model.libelle(), model.prix(), model.devise(), model.duree(),
-                model.prixMobile(), model.deviseMobile());
+                model.prixMobile(), model.deviseMobile(), model.type(), model.quantiteMin(), model.quantiteMax());
+    }
+
+    public DemandeAchatSondagesModel toModel(AchatSondagesRequest req) {
+        return new DemandeAchatSondagesModel(req.quantite(), null);
+    }
+
+    public DemandeAchatSondagesModel toModel(AchatSondagesMobileRequest req) {
+        return new DemandeAchatSondagesModel(req.quantite(), req.telephone());
+    }
+
+    public CreditsResponse toResponse(CreditsModel model) {
+        return model == null ? null
+                : new CreditsResponse(model.solde(), model.totalAchete(), model.totalUtilise(), model.compteCredits());
     }
 
     public AbonnementResponse toResponse(AbonnementModel model) {
@@ -59,13 +78,17 @@ public class AbonnementMapper {
                 model.dateExpiration(),
                 model.joursRestants(),
                 model.montant(),
-                model.devise());
+                model.devise(),
+                model.offreChoisie(),
+                model.nombreSondagesChoisi(),
+                toResponse(model.credits()));
     }
 
     public PageResponse<PaiementResponse> toPaiementResponses(Page<PaiementModel> page) {
         return new PageResponse<>(
                 page.getContent().stream().map(model -> new PaiementResponse(model.id(), model.datePaiement(),
-                        model.formule(), model.montant(), model.devise(), model.fournisseur())).toList(),
+                        model.formule(), model.montant(), model.devise(), model.fournisseur(), model.type(),
+                        model.quantite())).toList(),
                 page.getNumber(),
                 page.getSize(),
                 page.getTotalElements(),
@@ -79,14 +102,23 @@ public class AbonnementMapper {
                 model.clePublique(),
                 model.formule(),
                 model.montant(),
-                model.devise());
+                model.devise(),
+                model.type(),
+                model.quantite());
     }
 
     public PaiementConfirmeResponse toResponse(PaiementConfirmeModel model) {
-        String message = model.dejaConfirme()
-                ? "Ce paiement avait déjà été confirmé : l'abonnement n'est pas prolongé une seconde fois."
-                : "Paiement confirmé : votre abonnement est à jour.";
-        return new PaiementConfirmeResponse(message, toResponse(model.abonnement()));
+        boolean achat = model.type() == TypePaiement.ACHAT_SONDAGES;
+        String message;
+        if (model.dejaConfirme()) {
+            message = achat ? "Ce paiement avait déjà été confirmé : les sondages ne sont pas crédités une seconde fois."
+                    : "Ce paiement avait déjà été confirmé : l'abonnement n'est pas prolongé une seconde fois.";
+        } else {
+            message = achat ? "Paiement confirmé : " + model.quantite() + " sondage(s) ajouté(s) à votre solde."
+                    : "Paiement confirmé : votre abonnement est à jour.";
+        }
+        return new PaiementConfirmeResponse(message, toResponse(model.abonnement()), model.type(), model.quantite(),
+                toResponse(model.credits()));
     }
 
     public DemandePaiementMobileModel toModel(PaiementMobileRequest req) {
@@ -95,12 +127,13 @@ public class AbonnementMapper {
 
     public PaiementMobileResponse toResponse(PaiementMobileModel model) {
         return new PaiementMobileResponse(model.reference(), model.checkoutUrl(), model.formule(), model.montant(),
-                model.devise(), model.expireLe());
+                model.devise(), model.expireLe(), model.type(), model.quantite());
     }
 
     public StatutPaiementMobileResponse toResponse(StatutPaiementMobileModel model) {
         return new StatutPaiementMobileResponse(model.reference(), model.statut(), model.formule(), model.montant(),
-                model.devise(), model.dateCreation(), model.datePaiement(), toResponse(model.abonnement()));
+                model.devise(), model.dateCreation(), model.datePaiement(), toResponse(model.abonnement()), model.type(),
+                model.quantite(), toResponse(model.credits()));
     }
 
     public SimulationWebhookMoosylResponse toResponse(SimulationWebhookMoosylModel model) {

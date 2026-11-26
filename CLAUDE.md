@@ -258,12 +258,46 @@ Plateforme SaaS de sondages (Spring Boot 3.5, Java 21, PostgreSQL 16, Liquibase)
   réussi il y a 24 h ou plus (DELAI_RELANCE). Limite `batulo.invitations.envois-par-heure` (500) par entreprise,
   comptée dans `invitation_envoi` (journal qui survit à la suppression d'un invité) plus les envois en file : lot
   refusé en entier, 429 LIMITE_ENVOIS (`LimiteDepasseeException`).
+- Achat de sondages à l'unité (en plus des abonnements MENSUEL et ANNUEL, inchangés et toujours illimités) : solde par
+  entreprise dans `credit_sondage` (solde, total_achete, total_utilise ; ligne créée au premier achat, CHECK solde >= 0),
+  sans date limite, les achats s'additionnent. Prix unitaires `batulo.achat-sondages.prix-cad` (PRIX_SONDAGE_CAD, devise
+  Stripe, 2 décimales max) et `prix-mru` (PRIX_SONDAGE_MRU, entiers), obligatoires (`TarifAchatSondages` : démarrage
+  refusé sinon) ; quantité 1 à 1000 (400 QUANTITE_INVALIDE) ; montant = quantité × prix, calculé par le serveur.
+  `paiement.type` (ABONNEMENT, ACHAT_SONDAGES) et `quantite` ; `formule` null pour un achat. Routes POST
+  /api/abonnements/achat-sondages/intention (Stripe : même mécanisme que l'abonnement, PaymentIntent puis
+  /paiement/confirmer relu chez Stripe) et /achat-sondages/paiement-mobile (Moosyl : webhook, GET
+  /paiement-mobile/{reference}) ; GET /api/abonnements/credits. Le crédit passe par `ActivationPaiement` (verrou du
+  paiement : une seule fois par paiement), puis `CreditsSondages.crediter` (update atomique `solde + q`) ; notification
+  PAIEMENT_RECU et courriel `envoyerConfirmationAchatSondages`. GET /formules : 3e élément type ACHAT_SONDAGES (formule
+  null, prix d'UN sondage, quantiteMin/Max), `type` ABONNEMENT sur les deux autres. Historique des paiements : `type` et
+  `quantite`.
+  Publication (`CreditsSondages.utiliserPourPublication`, dans la transaction de `publier`) : abonnement ACTIF ou
+  EXPIRE_BIENTOT -> jamais de débit ; lignée déjà payée par crédit (`sondage.credit_utilise_le` sur la version 1) -> rien ;
+  sinon (version 1, ou nouvelle version d'une lignée publiée pendant un ancien abonnement) un crédit, une seule fois par
+  lignée : marque posée par `update ... where credit_utilise_le is null`, puis `update credit_sondage set solde = solde - 1
+  where solde > 0` ; 0 ligne -> 402 CREDITS_EPUISES (toute la publication est annulée). Deux publications simultanées
+  avec un seul crédit : une seule réussit. Duplication et réutilisation : nouvelle lignée, brouillon gratuit, crédit à la
+  publication ; réponses et invitations ne consomment rien.
+  Accès : « compte de crédits » = l'entreprise a déjà acheté (total_achete > 0), relu par le filtre JWT seulement si
+  l'abonnement est EN_ATTENTE_PAIEMENT ou EXPIRE (`UtilisateurConnecte.compteCredits`) : accès complet dans ces deux cas
+  (DESACTIVE reste bloqué ; sans compte de crédits : inchangé). Collecte décidée par lignée (`RegleCollecte.ligneeAutorisee`) :
+  entreprise active et (abonnement actif ou lignée payée par crédit) ; une lignée payée par crédit collecte pour toujours,
+  même solde à 0 ; une lignée publiée pendant un abonnement se ferme à son expiration, même avec des crédits. Mêmes règles
+  pour l'envoi des invitations ; conversation admin <-> gestionnaire ouverte avec un compte de crédits.
+  GET /api/auth/moi : `credits` {solde, totalAchete, totalUtilise, compteCredits}. Inscription : `offre` (MENSUEL, ANNUEL,
+  ACHAT_SONDAGES) et `nombreSondages` facultatifs, enregistrés dans `abonnement.offre_choisie` / `nombre_sondages_choisi`
+  (aucun paiement créé). Super admin (lecture seule) : `credits` dans GET .../admins/{id}, `soldeCredits` dans la liste,
+  GET .../admins/{id}/achats-sondages, `revenus` dans le tableau de bord (paiements REUSSI par type et devise, sondages
+  vendus ; un group by).
 
 ## À traiter dans les étapes suivantes
 - Phase 4 : brouillon et reprise d'une réponse (réutiliser `EvaluateurConditions.Parcours`), pour le lien public comme
   pour le lien personnel (le brouillon d'un invité se rattachera à son invitation) ; diffusion SMS (le téléphone des
   invités est déjà saisi), WhatsApp, intégration web, campagnes. L'unicité par appareil du lien public se contourne en
   vidant le navigateur ou en changeant d'appareil (limite acceptée) ; les invitations nominatives n'ont pas ce défaut.
+- Mise en ligne : ajouter un webhook Stripe vérifié (`STRIPE_WEBHOOK_SECRET`, déjà dans la configuration mais inutilisé ;
+  `payment_intent.succeeded` -> `ActivationPaiement`) pour les abonnements et les achats de sondages : aujourd'hui un
+  paiement par carte n'est pris en compte que si le frontend appelle /paiement/confirmer.
 - Si l'application tourne un jour sur plusieurs instances : limite de requêtes partagée (Redis ou Bucket4j).
 - Phase 4, étape 3 (partie 3/3) : textes fixes des rapports et exports dans la langue demandée (« Oui », « Résumé »,
   en-têtes), mise en page de droite à gauche du rapport PDF en arabe.

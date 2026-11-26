@@ -7,9 +7,11 @@ import org.springframework.data.jpa.domain.Specification;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
 
+import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -52,4 +54,18 @@ public interface SondageRepository extends JpaRepository<Sondage, Long>, JpaSpec
     @Query("select coalesce(s.lignee.id, s.id), s.id, s.version from Sondage s "
             + "where (s.id in :ligneeIds or s.lignee.id in :ligneeIds) and s.datePublication is null")
     List<Object[]> brouillonsDesLignees(Collection<Long> ligneeIds);
+
+    /**
+     * Marque la lignée (version 1) « payée par crédit », une seule fois : deux publications simultanées de la même
+     * lignée passent l'une après l'autre et la seconde ne modifie rien (donc ne débite rien).
+     *
+     * @return 1 si la marque vient d'être posée, 0 si elle l'était déjà
+     */
+    @Modifying(flushAutomatically = true)
+    @Query("update Sondage s set s.creditUtiliseLe = :maintenant where s.id = :racineId and s.creditUtiliseLe is null")
+    int marquerCreditUtilise(Long racineId, Instant maintenant);
+
+    /** Valeur en base (requête scalaire, jamais l'entité restée dans la session). */
+    @Query("select s.creditUtiliseLe from Sondage s where s.id = :racineId")
+    Instant creditUtiliseLe(Long racineId);
 }

@@ -1,5 +1,6 @@
 package com.batulo.service;
 
+import com.batulo.service.model.PaiementModel;
 import com.batulo.enums.StatutAbonnement;
 import com.batulo.service.model.AbonnementAdminModel;
 import com.batulo.service.model.AdminDetailModel;
@@ -32,10 +33,16 @@ public interface SuperAdminService {
      */
     Page<AdminLigneModel> listerAdmins(StatutAbonnement statut, String recherche, int page, int taille);
 
-    /** Entreprises par statut d'abonnement affiché et demandes d'augmentation en attente. */
+    /**
+     * Entreprises par statut d'abonnement affiché, demandes d'augmentation en attente et revenus (paiements réussis par
+     * type et devise, sondages vendus).
+     */
     TableauDeBordSuperAdminModel tableauDeBord();
 
     AdminDetailModel detailAdmin(Long adminId);
+
+    /** Achats de sondages réussis de l'entreprise de l'admin, du plus récent au plus ancien (lecture seule). */
+    Page<PaiementModel> achatsSondages(Long adminId, int page, int taille);
 
     /** @throws com.batulo.exception.CompteExistantException courriel déjà utilisé par un autre compte */
     AdminDetailModel modifierAdmin(Long adminId, ModificationAdminModel modification);

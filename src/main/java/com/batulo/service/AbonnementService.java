@@ -2,6 +2,8 @@ package com.batulo.service;
 
 import com.batulo.service.model.AbonnementModel;
 import com.batulo.service.model.ConfirmationPaiementModel;
+import com.batulo.service.model.CreditsModel;
+import com.batulo.service.model.DemandeAchatSondagesModel;
 import com.batulo.service.model.DemandeIntentionPaiementModel;
 import com.batulo.service.model.FormuleModel;
 import com.batulo.service.model.IntentionPaiementModel;
@@ -18,7 +20,7 @@ import java.util.Optional;
  */
 public interface AbonnementService {
 
-    /** Formules proposées et leurs prix (application.yml). */
+    /** Formules proposées et leurs prix (application.yml), puis l'achat de sondages (prix d'un sondage). */
     List<FormuleModel> formules();
 
     /** @throws com.batulo.exception.ResourceNotFoundException aucun abonnement pour cette entreprise */
@@ -43,6 +45,17 @@ public interface AbonnementService {
      * @throws com.batulo.exception.RegleGestionException paiement pas (encore) réussi ou incohérent
      */
     PaiementConfirmeModel confirmerPaiement(Long entrepriseId, ConfirmationPaiementModel confirmation);
+
+    /**
+     * Achat de sondages par carte : PaymentIntent de quantité × prix unitaire et paiement EN_ATTENTE ; confirmé par
+     * {@link #confirmerPaiement}, qui crédite le solde une seule fois.
+     *
+     * @throws com.batulo.exception.RegleGestionException QUANTITE_INVALIDE (hors de 1 à 1000), entreprise désactivée
+     */
+    IntentionPaiementModel creerIntentionAchat(Long entrepriseId, DemandeAchatSondagesModel demande);
+
+    /** Solde de sondages achetés (zéros si l'entreprise n'a jamais acheté). */
+    CreditsModel credits(Long entrepriseId);
 
     /** Paiements REUSSI de l'entreprise, du plus récent au plus ancien (les intentions abandonnées n'y sont pas). */
     Page<PaiementModel> paiements(Long entrepriseId, int page, int taille);

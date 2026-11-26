@@ -89,6 +89,22 @@ public class SmtpEmailService implements EmailService {
     }
 
     @Override
+    public void envoyerConfirmationAchatSondages(String courriel, String prenom, int quantite, BigDecimal montant,
+                                                 String devise, int solde) {
+        envoyer(courriel, "Batulo – Achat de sondages confirmé", """
+                Bonjour %s,
+
+                Nous avons bien reçu votre paiement : %d sondage(s) ont été ajoutés à votre compte.
+
+                Montant : %s %s
+                Sondages disponibles : %d (sans date limite)
+
+                Un sondage est utilisé à la publication d'un nouveau sondage ; ses nouvelles versions, ses réponses et
+                ses invitations ne consomment rien. Merci de votre confiance.
+                """.formatted(prenom, quantite, montant.toPlainString(), devise, solde));
+    }
+
+    @Override
     public void envoyerRappelExpiration(String courriel, String prenom, String entreprise, Instant dateExpiration,
                                         long joursRestants) {
         envoyer(courriel, "Batulo – Votre abonnement expire bientôt", """

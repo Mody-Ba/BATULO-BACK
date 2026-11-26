@@ -122,6 +122,13 @@ public class Sondage {
     @Column(name = "reponses_nominatives", nullable = false)
     private boolean reponsesNominatives;
 
+    /**
+     * Sur la version 1 : date à laquelle la lignée a été publiée avec un crédit (achat de sondages), une seule fois.
+     * Une telle lignée collecte même sans abonnement actif. Jamais recopié dans les copies (nouvelle lignée).
+     */
+    @Column(name = "credit_utilise_le")
+    private Instant creditUtiliseLe;
+
     /** Langue dans laquelle le contenu est saisi ; modifiable en brouillon seulement. */
     @Convert(converter = LangueConverter.class)
     @Column(name = "langue_principale", nullable = false, length = 2)
@@ -282,6 +289,14 @@ public class Sondage {
     }
 
     /** Version 1 de la lignée (lui-même pour une version 1). */
+    public Instant getCreditUtiliseLe() {
+        return creditUtiliseLe;
+    }
+
+    public void setCreditUtiliseLe(Instant creditUtiliseLe) {
+        this.creditUtiliseLe = creditUtiliseLe;
+    }
+
     public Sondage getRacine() {
         return lignee == null ? this : lignee;
     }

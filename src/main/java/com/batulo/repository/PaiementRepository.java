@@ -1,5 +1,7 @@
 package com.batulo.repository;
 
+import java.util.List;
+import com.batulo.enums.TypePaiement;
 import com.batulo.entity.Paiement;
 import com.batulo.enums.StatutPaiement;
 import jakarta.persistence.LockModeType;
@@ -46,6 +48,19 @@ public interface PaiementRepository extends JpaRepository<Paiement, Long> {
     /** Statut actuel en base (requête scalaire : jamais une entité déjà chargée dans la session). */
     @Query("select p.statut from Paiement p where p.reference = :reference")
     Optional<StatutPaiement> statutParReference(String reference);
+
+    /** Achats de sondages (ou abonnements) d'une entreprise ayant un statut donné (tri porté par le Pageable). */
+    Page<Paiement> findByAbonnementEntrepriseIdAndTypeAndStatut(Long entrepriseId, TypePaiement type,
+                                                                StatutPaiement statut, Pageable pageable);
+
+    /**
+     * Revenus du tableau de bord du super admin, en une agrégation : par type et devise, montant encaissé, nombre de
+     * paiements et sondages vendus (paiements REUSSI seulement).
+     */
+    @Query("select p.type, p.devise, sum(p.montant), count(p), sum(coalesce(p.quantite, 0)) from Paiement p "
+            + "where p.statut = com.batulo.enums.StatutPaiement.REUSSI group by p.type, p.devise "
+            + "order by p.type, p.devise")
+    List<Object[]> revenus();
 
     /** Historique des paiements d'une entreprise ayant un statut donné (tri porté par le Pageable). */
     Page<Paiement> findByAbonnementEntrepriseIdAndStatut(Long entrepriseId, StatutPaiement statut, Pageable pageable);

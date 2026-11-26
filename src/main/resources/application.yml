@@ -104,6 +104,12 @@ batulo:
     prix-annuel-mru: ${MOOSYL_PRIX_ANNUEL_MRU:80}
     # Durée de validité d'une session de paiement (5 à 1440 minutes).
     expiration-minutes: 30
+  # Achat de sondages à l'unité (crédits sans date limite), en plus des abonnements. Prix unitaires obligatoires :
+  # l'application refuse de démarrer s'ils manquent. Carte : devise Stripe (batulo.abonnement.devise), 2 décimales
+  # au plus ; mobile (Moosyl) : MRU entiers. Quantité de 1 à 1000 par achat.
+  achat-sondages:
+    prix-cad: ${PRIX_SONDAGE_CAD:}
+    prix-mru: ${PRIX_SONDAGE_MRU:}
   collecte:
     # Page du formulaire répondant (frontend Angular) : le jeton du sondage y est ajouté (lien et QR code).
     url-formulaire: ${PUBLIC_FORM_URL:http://localhost:4200/s}

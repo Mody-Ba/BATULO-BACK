@@ -6,6 +6,8 @@ public record AdminDetailModel(
         AbonnementModel abonnement,
         long nombreGestionnaires,
         /** Apparence de l'entreprise (logo, couleur, nom affiché), en lecture seule pour le super admin. */
-        PersonnalisationModel personnalisation
+        PersonnalisationModel personnalisation,
+        /** Sondages achetés de l'entreprise (lecture seule). */
+        CreditsModel credits
 ) {
 }

@@ -11,7 +11,9 @@ public record AdminLigneResponse(
         Admin admin,
         @Schema(description = "Null si l'entreprise n'a pas d'abonnement")
         Abonnement abonnement,
-        long nombreGestionnaires
+        long nombreGestionnaires,
+        @Schema(description = "Sondages achetés encore disponibles (0 si l'entreprise n'a jamais acheté)")
+        int soldeCredits
 ) {
 
     public record Entreprise(Long id, String nom, boolean actif) {

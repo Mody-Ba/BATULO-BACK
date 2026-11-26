@@ -13,6 +13,8 @@ import com.batulo.service.model.ModificationAdminRequest;
 import com.batulo.service.model.MotDePasseTemporaireModel;
 import com.batulo.service.model.MotDePasseTemporaireResponse;
 import com.batulo.service.model.PageResponse;
+import com.batulo.service.model.PaiementModel;
+import com.batulo.service.model.PaiementResponse;
 import com.batulo.service.model.TableauDeBordSuperAdminModel;
 import com.batulo.service.model.TableauDeBordSuperAdminResponse;
 import org.springframework.data.domain.Page;
@@ -51,7 +53,8 @@ public class SuperAdminMapper {
                 authMapper.toResponse(model.admin()),
                 model.abonnement() == null ? null : abonnementMapper.toResponse(model.abonnement()),
                 model.nombreGestionnaires(),
-                personnalisationMapper.toResponse(model.personnalisation()));
+                personnalisationMapper.toResponse(model.personnalisation()),
+                abonnementMapper.toResponse(model.credits()));
     }
 
     public AbonnementAdminResponse toResponse(AbonnementAdminModel model) {
@@ -73,7 +76,12 @@ public class SuperAdminMapper {
                         admin.motDePasseTemporaire(), admin.motDePasseTemporaireExpireLe(), admin.dateCreation()),
                 abonnement == null ? null : new AdminLigneResponse.Abonnement(abonnement.formule(),
                         abonnement.statut(), abonnement.dateExpiration(), abonnement.joursRestants()),
-                model.nombreGestionnaires());
+                model.nombreGestionnaires(),
+                model.soldeCredits());
+    }
+
+    public PageResponse<PaiementResponse> toPaiementResponses(Page<PaiementModel> page) {
+        return abonnementMapper.toPaiementResponses(page);
     }
 
     public TableauDeBordSuperAdminResponse toResponse(TableauDeBordSuperAdminModel model) {
@@ -81,7 +89,11 @@ public class SuperAdminMapper {
         return new TableauDeBordSuperAdminResponse(
                 new TableauDeBordSuperAdminResponse.Entreprises(e.total(), e.actif(), e.expireBientot(), e.expire(),
                         e.enAttentePaiement(), e.desactive()),
-                model.demandesAugmentationEnAttente());
+                model.demandesAugmentationEnAttente(),
+                new TableauDeBordSuperAdminResponse.Revenus(model.revenus().lignes().stream()
+                        .map(l -> new TableauDeBordSuperAdminResponse.LigneRevenus(l.type(), l.devise(), l.montant(),
+                                l.nombrePaiements())).toList(),
+                        model.revenus().sondagesVendus()));
     }
 
     public MotDePasseTemporaireResponse toResponse(MotDePasseTemporaireModel model) {

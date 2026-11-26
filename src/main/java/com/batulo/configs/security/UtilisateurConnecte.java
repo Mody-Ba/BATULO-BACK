@@ -16,6 +16,8 @@ public record UtilisateurConnecte(
         Long entrepriseId,
         boolean motDePasseTemporaire,
         /** Statut effectif de l'abonnement de l'entreprise ; null pour le super admin. */
-        StatutAbonnement statutAbonnement
+        StatutAbonnement statutAbonnement,
+        /** Achat de sondages déjà fait : accès complet malgré un abonnement en attente ou expiré. */
+        boolean compteCredits
 ) {
 }

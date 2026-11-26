@@ -87,8 +87,8 @@ class SuperAdminIntegrationTest extends PostgresIntegrationTestBase {
             admin("a" + i + "@test.com", dansJours(i * 10 - 25));
         }
         assertThat(requetesPour("/api/super-admin/tableau-de-bord")).isEqualTo(avecUne);
-        // Compte connecté (filtre JWT), agrégation par statut, total des entreprises, demandes en attente.
-        assertThat(avecUne).isEqualTo(4);
+        // Compte connecté (filtre JWT), agrégation par statut, total des entreprises, demandes en attente, revenus.
+        assertThat(avecUne).isEqualTo(5);
     }
 
     // ------------------------------------------------------------------ Liste des admins

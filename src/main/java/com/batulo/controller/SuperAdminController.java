@@ -10,6 +10,7 @@ import com.batulo.service.model.CreationAdminRequest;
 import com.batulo.service.model.ModificationAdminRequest;
 import com.batulo.service.model.MotDePasseTemporaireResponse;
 import com.batulo.service.model.PageResponse;
+import com.batulo.service.model.PaiementResponse;
 import com.batulo.service.model.TableauDeBordSuperAdminResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -63,7 +64,8 @@ public class SuperAdminController {
     @PreAuthorize("hasRole('SUPER_ADMIN')")
     @Operation(summary = "Tableau de bord du super admin",
             description = "Nombre d'entreprises par statut d'abonnement affiché (recalculé à partir des dates), total "
-                    + "des entreprises et demandes d'augmentation EN_ATTENTE.")
+                    + "des entreprises, demandes d'augmentation EN_ATTENTE et revenus : paiements réussis par type "
+                    + "(ABONNEMENT, ACHAT_SONDAGES) et devise, et nombre de sondages vendus.")
     public TableauDeBordSuperAdminResponse tableauDeBord() {
         return superAdminMapper.toResponse(superAdminService.tableauDeBord());
     }
@@ -96,6 +98,20 @@ public class SuperAdminController {
                     + "404 si l'id ne désigne pas un admin, 403 pour le super admin.")
     public AdminDetailResponse detail(@PathVariable Long id) {
         return superAdminMapper.toResponse(superAdminService.detailAdmin(id));
+    }
+
+    @GetMapping("/admins/{id}/achats-sondages")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    @Operation(summary = "Historique des achats de sondages d'une entreprise (lecture seule)",
+            description = "Achats réussis de l'entreprise de l'admin, du plus récent au plus ancien : date, quantité, "
+                    + "montant, devise, fournisseur. Le solde est dans le détail de l'admin (credits). 404 si l'id ne "
+                    + "désigne pas un admin.")
+    public PageResponse<PaiementResponse> achatsSondages(
+            @PathVariable Long id,
+            @RequestParam(defaultValue = "0") @Min(value = 0, message = "page doit être positif ou nul") int page,
+            @RequestParam(defaultValue = "20") @Min(value = 1, message = "taille doit être au moins 1")
+            @Max(value = 100, message = "taille ne doit pas dépasser 100") int taille) {
+        return superAdminMapper.toPaiementResponses(superAdminService.achatsSondages(id, page, taille));
     }
 
     @PutMapping("/admins/{id}")

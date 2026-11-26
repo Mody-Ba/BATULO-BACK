@@ -1,6 +1,7 @@
 package com.batulo.entity;
 
 import com.batulo.enums.Formule;
+import com.batulo.enums.OffreInscription;
 import com.batulo.enums.StatutAbonnement;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -56,6 +57,15 @@ public class Abonnement {
 
     @Column(length = 3)
     private String devise;
+
+    /** Offre choisie à l'inscription (null : aucune, ou compte créé par le super admin). */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "offre_choisie", length = 20)
+    private OffreInscription offreChoisie;
+
+    /** Nombre de sondages choisi à l'inscription avec l'offre ACHAT_SONDAGES. */
+    @Column(name = "nombre_sondages_choisi")
+    private Integer nombreSondagesChoisi;
 
     /** Le rappel « expire dans 7 jours » a déjà été envoyé pour la période en cours. */
     @Column(name = "notif_7j_envoyee", nullable = false)
@@ -143,6 +153,22 @@ public class Abonnement {
 
     public void setDevise(String devise) {
         this.devise = devise;
+    }
+
+    public OffreInscription getOffreChoisie() {
+        return offreChoisie;
+    }
+
+    public void setOffreChoisie(OffreInscription offreChoisie) {
+        this.offreChoisie = offreChoisie;
+    }
+
+    public Integer getNombreSondagesChoisi() {
+        return nombreSondagesChoisi;
+    }
+
+    public void setNombreSondagesChoisi(Integer nombreSondagesChoisi) {
+        this.nombreSondagesChoisi = nombreSondagesChoisi;
     }
 
     public boolean isNotif7jEnvoyee() {

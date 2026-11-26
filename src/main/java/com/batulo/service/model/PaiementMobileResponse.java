@@ -1,5 +1,6 @@
 package com.batulo.service.model;
 
+import com.batulo.enums.TypePaiement;
 import com.batulo.enums.Formule;
 import io.swagger.v3.oas.annotations.media.Schema;
 
@@ -17,6 +18,10 @@ public record PaiementMobileResponse(
         @Schema(example = "MRU")
         String devise,
         @Schema(description = "Fin de validité de la session de paiement ; null si Moosyl ne la donne pas")
-        Instant expireLe
+        Instant expireLe,
+        @Schema(description = "ABONNEMENT ou ACHAT_SONDAGES (formule null)")
+        TypePaiement type,
+        @Schema(description = "Nombre de sondages achetés ; null pour un abonnement")
+        Integer quantite
 ) {
 }

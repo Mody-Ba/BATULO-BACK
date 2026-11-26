@@ -318,7 +318,10 @@ public class SondageController {
     @Operation(summary = "Publier un brouillon",
             description = "Corps facultatif. Ouverture maintenant ou planifiée (datePublication), fermeture facultative "
                     + "(dateFermeture). Le contenu est ensuite gelé. Ferme la version précédente au moment où celle-ci "
-                    + "s'ouvre. 400 SONDAGE_INCOMPLET (aucune question, section vide) ou DATES_INVALIDES.")
+                    + "s'ouvre. 400 SONDAGE_INCOMPLET (aucune question, section vide) ou DATES_INVALIDES. "
+                    + "Abonnement actif : publication illimitée. Sinon, une lignée pas encore payée utilise un "
+                    + "sondage acheté (une seule fois par lignée, toutes versions comprises) ; 402 CREDITS_EPUISES si "
+                    + "le solde est à 0.")
     public SondageResponse publier(@Parameter(hidden = true) @AuthenticationPrincipal UtilisateurConnecte moi,
                                    @PathVariable Long id, @RequestBody(required = false) DatesSondageRequest request) {
         return sondageMapper.toResponse(sondageService.publier(moi.id(), id, sondageMapper.toModel(request)));

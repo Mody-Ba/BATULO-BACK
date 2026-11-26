@@ -26,6 +26,9 @@ import java.util.regex.Pattern;
  *       statistiques d'un sondage terminé ;</li>
  *       <li>ACTIF ou EXPIRE_BIENTOT : accès complet.</li>
  *     </ul>
+ *     EN_ATTENTE_PAIEMENT ou EXPIRE avec un compte de crédits (l'entreprise a déjà acheté des sondages, quel que soit
+ *     son solde) : accès complet ; seule la publication d'un nouveau sondage exige un crédit (402 CREDITS_EPUISES,
+ *     dans le service).
  *   </li>
  * </ol>
  * Le SUPER_ADMIN n'est pas concerné par la partie abonnement. En profil dev, /api/dev/paiements/** suit les mêmes
@@ -69,15 +72,20 @@ public class AccesAbonnementInterceptor implements HandlerInterceptor {
             return true;
         }
         StatutAbonnement statut = utilisateur.statutAbonnement();
+        if (utilisateur.compteCredits()
+                && (statut == StatutAbonnement.EN_ATTENTE_PAIEMENT || statut == StatutAbonnement.EXPIRE)) {
+            return true;
+        }
         return switch (statut) {
             case DESACTIVE -> chemin.equals("/api/auth/deconnexion") || refuser(response, "ABONNEMENT_DESACTIVE",
                     "Votre entreprise a été désactivée par Batulo : aucun accès n'est possible.");
             case EN_ATTENTE_PAIEMENT -> routeAuth || routePaiement || routeMessagerie || refuser(response,
                     "ABONNEMENT_EN_ATTENTE_PAIEMENT",
-                    "Votre abonnement est en attente de paiement : payez une formule pour accéder à Batulo.");
+                    "Votre abonnement est en attente de paiement : abonnez-vous ou achetez des sondages pour accéder à Batulo.");
             case EXPIRE -> lecture(request) || routeAuth || routePaiement || routeMessagerie || routeEnvoiStatistiques
                     || refuser(response, "ABONNEMENT_EXPIRE",
-                    "Votre abonnement est expiré : accès en lecture seule. Renouvelez-le pour modifier vos données.");
+                    "Votre abonnement est expiré : accès en lecture seule. Renouvelez-le ou achetez des sondages pour "
+                            + "modifier vos données.");
             case ACTIF, EXPIRE_BIENTOT -> true;
         };
     }

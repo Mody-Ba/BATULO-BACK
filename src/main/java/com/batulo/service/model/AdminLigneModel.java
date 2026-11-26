@@ -15,7 +15,9 @@ public record AdminLigneModel(
         Entreprise entreprise,
         Admin admin,
         Abonnement abonnement,
-        long nombreGestionnaires
+        long nombreGestionnaires,
+        /** Sondages achetés encore disponibles (0 si jamais acheté). */
+        int soldeCredits
 ) {
 
     public record Entreprise(Long id, String nom, boolean actif) {

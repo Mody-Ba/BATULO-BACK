@@ -7,6 +7,8 @@ import com.batulo.service.model.ConnexionRequest;
 import com.batulo.service.model.ConnexionResponse;
 import com.batulo.service.model.IdentifiantsModel;
 import com.batulo.service.model.ProfilModel;
+import com.batulo.service.model.CreditsModel;
+import com.batulo.service.model.CreditsResponse;
 import com.batulo.service.model.ProfilResponse;
 import com.batulo.service.model.ReinitialisationMotDePasseModel;
 import com.batulo.service.model.ReinitialisationMotDePasseRequest;
@@ -49,7 +51,12 @@ public class AuthMapper {
     }
 
     public ProfilResponse toResponse(ProfilModel model) {
-        return new ProfilResponse(toResponse(model.utilisateur()), model.statutAbonnement());
+        return new ProfilResponse(toResponse(model.utilisateur()), model.statutAbonnement(),
+                model.credits() == null ? null : toResponse(model.credits()));
+    }
+
+    public CreditsResponse toResponse(CreditsModel model) {
+        return new CreditsResponse(model.solde(), model.totalAchete(), model.totalUtilise(), model.compteCredits());
     }
 
     public UtilisateurResponse toResponse(UtilisateurModel model) {
