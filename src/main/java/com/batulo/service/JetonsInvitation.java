@@ -34,7 +34,7 @@ public class JetonsInvitation {
         if (octets.length < TAILLE_MIN_SECRET_OCTETS) {
             throw new IllegalStateException("INVITATION_SECRET est absent ou trop court : il faut au moins "
                     + TAILLE_MIN_SECRET_OCTETS + " octets, dédiés aux liens d'invitation (jamais JWT_SECRET). "
-                    + "Ajoutez-le dans .env.properties (voir .env.properties.example).");
+                    + "Définissez la variable d'environnement (en local : .env.properties, voir .env.properties.example).");
         }
         this.cle = new SecretKeySpec(octets, ALGORITHME);
     }

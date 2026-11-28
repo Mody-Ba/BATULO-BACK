@@ -1,0 +1,3 @@
+# Profil prod : vérification des variables d'environnement avant la création du contexte.
+org.springframework.boot.env.EnvironmentPostProcessor=com.batulo.configs.VerificationEnvironnementProd
+org.springframework.boot.diagnostics.FailureAnalyzer=com.batulo.configs.ConfigurationProdFailureAnalyzer

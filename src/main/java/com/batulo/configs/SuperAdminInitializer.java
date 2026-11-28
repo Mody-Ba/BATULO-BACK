@@ -16,7 +16,7 @@ import java.nio.charset.StandardCharsets;
 
 /**
  * Crée le super admin (propriétaire de Batulo) au démarrage, à partir des variables SUPER_ADMIN_EMAIL et
- * SUPER_ADMIN_PASSWORD lues dans .env.properties ou l'environnement : aucune valeur dans le code ni dans
+ * SUPER_ADMIN_PASSWORD lues dans l'environnement (en local : .env.properties) : aucune valeur dans le code ni dans
  * application.yml. Ne fait rien s'il existe déjà un super admin (le compte en base n'est jamais modifié).
  * Si une variable manque, écrit un avertissement et laisse l'application démarrer.
  * Le mot de passe est chiffré avec BCrypt et n'est jamais écrit dans les logs.
@@ -57,7 +57,8 @@ public class SuperAdminInitializer implements CommandLineRunner {
         }
         if (!variablesPresentes) {
             log.warn("Aucun super admin en base et SUPER_ADMIN_EMAIL / SUPER_ADMIN_PASSWORD absentes : "
-                    + "aucun super admin créé. Renseignez-les dans .env.properties puis redémarrez.");
+                    + "aucun super admin créé. Définissez-les (variables d'environnement ; en local : .env.properties) "
+                    + "puis redémarrez.");
             return;
         }
         if (superAdminPassword.getBytes(StandardCharsets.UTF_8).length > TAILLE_MAX_MOT_DE_PASSE_OCTETS) {

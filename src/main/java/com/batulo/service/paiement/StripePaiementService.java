@@ -91,7 +91,7 @@ public class StripePaiementService implements PaiementService {
     public String clePublique() {
         if (clePublique == null || clePublique.isBlank()) {
             throw new StripeNonConfigureException("STRIPE_NON_CONFIGURE",
-                    "STRIPE_PUBLISHABLE_KEY n'est pas renseignée (voir .env.properties).");
+                    "STRIPE_PUBLISHABLE_KEY n'est pas renseignée.");
         }
         if (!clePublique.startsWith("pk_test_")) {
             throw new StripeNonConfigureException("STRIPE_MODE_TEST_REQUIS",
@@ -103,7 +103,7 @@ public class StripePaiementService implements PaiementService {
     private StripeClient client() {
         if (cleSecrete == null || cleSecrete.isBlank()) {
             throw new StripeNonConfigureException("STRIPE_NON_CONFIGURE",
-                    "STRIPE_SECRET_KEY n'est pas renseignée (voir .env.properties).");
+                    "STRIPE_SECRET_KEY n'est pas renseignée.");
         }
         if (!cleSecrete.startsWith("sk_test_") && !cleSecrete.startsWith("rk_test_")) {
             throw new StripeNonConfigureException("STRIPE_MODE_TEST_REQUIS",

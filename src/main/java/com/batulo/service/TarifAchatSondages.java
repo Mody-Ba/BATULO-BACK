@@ -39,8 +39,8 @@ public class TarifAchatSondages {
         }
         if (prixCarte == null || prixCarte.signum() <= 0 || prixCarte.stripTrailingZeros().scale() > 2) {
             throw new IllegalStateException("PRIX_SONDAGE_CAD est absent ou invalide : il faut le prix d'un sondage "
-                    + "payé par carte, positif, avec 2 décimales au plus (ex. 0.50). Ajoutez-le dans .env.properties "
-                    + "(voir .env.properties.example).");
+                    + "payé par carte, positif, avec 2 décimales au plus (ex. 0.50). Définissez la variable d'environnement "
+                    + "(en local : .env.properties, voir .env.properties.example).");
         }
         prixCarte = prixCarte.setScale(2, RoundingMode.UNNECESSARY);
         try {
@@ -50,8 +50,8 @@ public class TarifAchatSondages {
         }
         if (prixMobile <= 0) {
             throw new IllegalStateException("PRIX_SONDAGE_MRU est absent ou invalide : il faut le prix d'un sondage "
-                    + "payé par mobile (Moosyl), en MRU entiers et positif (ex. 20). Ajoutez-le dans .env.properties "
-                    + "(voir .env.properties.example).");
+                    + "payé par mobile (Moosyl), en MRU entiers et positif (ex. 20). Définissez la variable d'environnement "
+                    + "(en local : .env.properties, voir .env.properties.example).");
         }
     }
 

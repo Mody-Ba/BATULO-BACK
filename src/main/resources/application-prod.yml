@@ -1,0 +1,90 @@
+# Profil « prod » (Heroku : Java buildpack + Heroku Postgres). Lancé par le Procfile (-Dspring.profiles.active=prod).
+# Aucune valeur sensible ici : tout vient des variables d'environnement (heroku config:set), sans valeur par défaut
+# pour les obligatoires. VerificationEnvironnementProd refuse le démarrage en listant celles qui manquent.
+# .env.properties n'est jamais lu en prod (import limité aux autres profils dans application.yml).
+# Liste complète des variables : docs/deploiement-heroku.md.
+spring:
+  # Aucune connexion par formulaire ni HTTP Basic : pas d'utilisateur en mémoire (ni de mot de passe généré écrit
+  # dans les journaux).
+  autoconfigure:
+    exclude: org.springframework.boot.autoconfigure.security.servlet.UserDetailsServiceAutoConfiguration
+  datasource:
+    # Fournis par le buildpack Java de Heroku (sinon DATABASE_URL converti par VerificationEnvironnementProd).
+    url: ${JDBC_DATABASE_URL}
+    username: ${JDBC_DATABASE_USERNAME:}
+    password: ${JDBC_DATABASE_PASSWORD:}
+    hikari:
+      # Heroku Postgres essential-0 : 20 connexions au plus pour toute l'application.
+      maximum-pool-size: ${DB_POOL_MAX:10}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+  liquibase:
+    enabled: true
+  mail:
+    host: ${MAIL_HOST}
+    port: ${MAIL_PORT}
+    username: ${MAIL_USERNAME:}
+    password: ${MAIL_PASSWORD:}
+    properties:
+      mail:
+        smtp:
+          auth: ${MAIL_SMTP_AUTH:true}
+          starttls:
+            enable: ${MAIL_STARTTLS:true}
+            required: ${MAIL_STARTTLS:true}
+
+server:
+  port: ${PORT}
+  # Routeur Heroku : Tomcat lit X-Forwarded-For (adresse réelle du client, la valeur ajoutée par le routeur) et
+  # X-Forwarded-Proto (https), seulement depuis un proxy interne (adresses privées).
+  forward-headers-strategy: native
+  # Jamais de détail technique dans une réponse (message, trace, exception, erreurs de liaison).
+  error:
+    include-message: never
+    include-stacktrace: never
+    include-binding-errors: never
+    include-exception: false
+    whitelabel:
+      enabled: false
+
+# Pas de documentation publique en prod.
+springdoc:
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false
+
+batulo:
+  url-base: ${APP_BASE_URL}
+  cors:
+    origines: ${CORS_ORIGINS}
+  courriel:
+    expediteur: ${MAIL_FROM}
+  jwt:
+    secret: ${JWT_SECRET}
+  stripe:
+    cle-secrete: ${STRIPE_SECRET_KEY}
+    cle-publique: ${STRIPE_PUBLISHABLE_KEY}
+  moosyl:
+    cle-api: ${MOOSYL_API_KEY}
+    secret-webhook: ${MOOSYL_WEBHOOK_SECRET}
+    url-retour: ${MOOSYL_URL_RETOUR}
+  achat-sondages:
+    prix-cad: ${PRIX_SONDAGE_CAD}
+    prix-mru: ${PRIX_SONDAGE_MRU}
+  collecte:
+    url-formulaire: ${PUBLIC_FORM_URL}
+    # Tomcat donne déjà l'adresse du client (forward-headers-strategy) : le filtre ne lit pas X-Forwarded-For.
+    faire-confiance-proxy: false
+  invitations:
+    secret: ${INVITATION_SECRET}
+  mot-de-passe:
+    url-reinitialisation: ${RESET_PASSWORD_URL}
+  securite:
+    # Requête arrivée en http : redirigée vers https ; HSTS sur les réponses https.
+    https-obligatoire: true
+
+logging:
+  level:
+    com.batulo: INFO
