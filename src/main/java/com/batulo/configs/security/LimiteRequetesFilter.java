@@ -24,7 +24,11 @@ public class LimiteRequetesFilter extends OncePerRequestFilter {
 
     private final int limiteLecture;
     private final int limiteEnvoi;
-    /** true seulement derrière un proxy de confiance : l'adresse vient alors de X-Forwarded-For. */
+    /**
+     * true seulement derrière un proxy de confiance : l'adresse vient alors de la DERNIÈRE valeur de X-Forwarded-For.
+     * En prod (Heroku), false : Tomcat (server.forward-headers-strategy=native) remplace déjà l'adresse distante
+     * par celle du client.
+     */
     private final boolean faireConfianceProxy;
     private final ReponseErreurJson reponseErreurJson;
     private final ConcurrentHashMap<String, Fenetre> fenetres = new ConcurrentHashMap<>();
@@ -69,9 +73,15 @@ public class LimiteRequetesFilter extends OncePerRequestFilter {
 
     private String adresse(HttpServletRequest request) {
         if (faireConfianceProxy) {
+            // Le proxy AJOUTE l'adresse qu'il voit à la fin : les valeurs précédentes viennent du client et peuvent
+            // être inventées. Seule la dernière est sûre.
             String transmise = request.getHeader("X-Forwarded-For");
             if (transmise != null && !transmise.isBlank()) {
-                return transmise.split(",")[0].trim();
+                String[] adresses = transmise.split(",");
+                String derniere = adresses[adresses.length - 1].trim();
+                if (!derniere.isEmpty()) {
+                    return derniere;
+                }
             }
         }
         return request.getRemoteAddr();

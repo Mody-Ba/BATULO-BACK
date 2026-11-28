@@ -6,6 +6,8 @@ import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
+import org.springframework.security.authorization.AuthorizationDecision;
+import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
@@ -13,6 +15,7 @@ import org.springframework.security.config.annotation.web.configurers.AbstractHt
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.web.PortMapper;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.web.cors.CorsConfiguration;
@@ -37,12 +40,20 @@ public class WebSecurityConfig {
     private final AuthEntryPointJwt authEntryPointJwt;
     private final AccesRefuseHandler accesRefuseHandler;
     private final AuthTokenFilter authTokenFilter;
+    /** Swagger et OpenAPI publics (désactivés en prod : springdoc.api-docs.enabled=false). */
+    private final boolean documentationActive;
+    /** Prod : toute requête arrivée en http (X-Forwarded-Proto du proxy) est redirigée vers https, HSTS envoyé. */
+    private final boolean httpsObligatoire;
 
     public WebSecurityConfig(AuthEntryPointJwt authEntryPointJwt, AccesRefuseHandler accesRefuseHandler,
-                             AuthTokenFilter authTokenFilter) {
+                             AuthTokenFilter authTokenFilter,
+                             @Value("${springdoc.api-docs.enabled:true}") boolean documentationActive,
+                             @Value("${batulo.securite.https-obligatoire:false}") boolean httpsObligatoire) {
         this.authEntryPointJwt = authEntryPointJwt;
         this.accesRefuseHandler = accesRefuseHandler;
         this.authTokenFilter = authTokenFilter;
+        this.documentationActive = documentationActive;
+        this.httpsObligatoire = httpsObligatoire;
     }
 
     /**
@@ -92,7 +103,8 @@ public class WebSecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/api/webhooks/moosyl").permitAll()
                         // Formulaire du répondant, sans compte (RE-02) ; limite de requêtes par IP.
                         .requestMatchers("/api/public/**").permitAll()
-                        .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
+                        .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html")
+                        .access((authentification, contexte) -> new AuthorizationDecision(documentationActive))
                         // Rôles par préfixe : vérifiés ici, AVANT les règles d'abonnement de l'intercepteur, pour
                         // qu'un mauvais rôle donne toujours 403 ACCES_REFUSE. @PreAuthorize les répète sur chaque
                         // méthode des controllers (seconde barrière si une route change de préfixe).
@@ -107,6 +119,22 @@ public class WebSecurityConfig {
                         .requestMatchers("/api/entreprise/**").hasAnyRole("ADMIN", "GESTIONNAIRE")
                         .anyRequest().authenticated());
 
+        if (httpsObligatoire) {
+            // Derrière le routeur Heroku, https est toujours sur 443, quel que soit le port interne du dyno (PORT) :
+            // sans cette table, un port autre que 80 ou 8080 ferait échouer la redirection (500).
+            http.portMapper(ports -> ports.portMapper(new PortMapper() {
+                        @Override
+                        public Integer lookupHttpPort(Integer httpsPort) {
+                            return 80;
+                        }
+
+                        @Override
+                        public Integer lookupHttpsPort(Integer httpPort) {
+                            return 443;
+                        }
+                    }))
+                    .redirectToHttps(Customizer.withDefaults());
+        }
         http.addFilterBefore(authTokenFilter, UsernamePasswordAuthenticationFilter.class);
         return http.build();
     }
@@ -127,8 +155,10 @@ public class WebSecurityConfig {
         CorsConfiguration config = new CorsConfiguration();
         config.setAllowedOrigins(originesAutorisees);
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
-        // X-Jeton-Repondant : jeton d'appareil du formulaire public (réponse unique), jamais dans l'URL.
-        config.setAllowedHeaders(List.of("Authorization", "Content-Type", "Accept", "X-Jeton-Repondant"));
+        // X-Jeton-Repondant : jeton d'appareil du formulaire public (réponse unique) ; X-Jeton-Invitation : lien
+        // personnel. Jamais dans l'URL.
+        config.setAllowedHeaders(List.of("Authorization", "Content-Type", "Accept", "X-Jeton-Repondant",
+                "X-Jeton-Invitation"));
         // Le frontend lit le nom des fichiers exportés.
         config.setExposedHeaders(List.of("Content-Disposition"));
         config.setAllowCredentials(false);

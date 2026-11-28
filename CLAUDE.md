@@ -290,12 +290,35 @@ Plateforme SaaS de sondages (Spring Boot 3.5, Java 21, PostgreSQL 16, Liquibase)
   GET .../admins/{id}/achats-sondages, `revenus` dans le tableau de bord (paiements REUSSI par type et devise, sondages
   vendus ; un group by).
 
+- Déploiement (Heroku + Heroku Postgres ; frontend sur Firebase Hosting) : `docs/deploiement-heroku.md` (toutes les
+  variables, commandes, création du super admin puis retrait de son mot de passe). `Procfile` (`-Dspring.profiles.active=prod
+  -jar target/batulo.jar`, `<finalName>batulo</finalName>`), `system.properties` (Java 21). `application-prod.yml` : tout
+  vient de l'environnement, sans valeur par défaut pour les obligatoires ; `.env.properties` n'est importé que hors prod
+  (document `on-profile: "!prod"` d'application.yml). `VerificationEnvironnementProd` (EnvironmentPostProcessor,
+  `META-INF/spring.factories`, avant toute connexion) liste toutes les variables manquantes ou invalides
+  (`ConfigurationProdInvalideException`, affichée par `ConfigurationProdFailureAnalyzer`, sans recopier les secrets) :
+  obligatoires (`OBLIGATOIRES`, MAIL_USERNAME/PASSWORD sauf MAIL_SMTP_AUTH=false), secrets de 32 octets et distincts,
+  adresses https hors localhost, clés Stripe de test seulement, prix, prod et dev jamais ensemble ; base par
+  JDBC_DATABASE_URL (buildpack) ou DATABASE_URL converti (sslmode=require sauf sslmode fourni). En prod : routes
+  /api/dev absentes (`@Profile("dev")`), springdoc désactivé (et plus de permitAll sur ses adresses : 401),
+  `server.error.include-*` never, whitelabel désactivé, `ddl-auto=validate`, Liquibase actif,
+  `server.forward-headers-strategy=native` (Tomcat lit X-Forwarded-For/Proto depuis un proxy interne),
+  `batulo.securite.https-obligatoire` (http redirigé vers https sur 443 quel que soit le port interne : PortMapper fixe,
+  sinon 500 ; HSTS), `faire-confiance-proxy=false`, `UserDetailsServiceAutoConfiguration` exclue (pas de mot de passe
+  généré dans les journaux). Le filtre de
+  limite, quand il lit X-Forwarded-For (TRUST_PROXY), prend la dernière valeur (ajoutée par le proxy), jamais la
+  première. CORS accepte aussi l'en-tête `X-Jeton-Invitation`. Tests : `ProfilProdIntegrationTest` (vrai Tomcat,
+  PostgreSQL, variables en propriétés système), `VerificationEnvironnementProdTest`.
+
 ## À traiter dans les étapes suivantes
 - Phase 4 : brouillon et reprise d'une réponse (réutiliser `EvaluateurConditions.Parcours`), pour le lien public comme
   pour le lien personnel (le brouillon d'un invité se rattachera à son invitation) ; diffusion SMS (le téléphone des
   invités est déjà saisi), WhatsApp, intégration web, campagnes. L'unicité par appareil du lien public se contourne en
   vidant le navigateur ou en changeant d'appareil (limite acceptée) ; les invitations nominatives n'ont pas ce défaut.
-- Mise en ligne : ajouter un webhook Stripe vérifié (`STRIPE_WEBHOOK_SECRET`, déjà dans la configuration mais inutilisé ;
+- Stripe en production : le premier déploiement est en mode test seulement (clés sk_test_/pk_test_ exigées au
+  démarrage). Passer au mode live en même temps que le webhook ci-dessous : lever ce contrôle dans
+  `VerificationEnvironnementProd` et dans `StripePaiementService` (STRIPE_MODE_TEST_REQUIS).
+- Ajouter un webhook Stripe vérifié (`STRIPE_WEBHOOK_SECRET`, déjà dans la configuration mais inutilisé ;
   `payment_intent.succeeded` -> `ActivationPaiement`) pour les abonnements et les achats de sondages : aujourd'hui un
   paiement par carte n'est pris en compte que si le frontend appelle /paiement/confirmer.
 - Si l'application tourne un jour sur plusieurs instances : limite de requêtes partagée (Redis ou Bucket4j).

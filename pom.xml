@@ -151,6 +151,8 @@
 	</dependencies>
 
 	<build>
+		<!-- Nom stable du jar (Procfile Heroku : target/batulo.jar). -->
+		<finalName>batulo</finalName>
 		<plugins>
 			<plugin>
 				<groupId>org.springframework.boot</groupId>

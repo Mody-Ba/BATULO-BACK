@@ -49,7 +49,7 @@ public class JwtUtils {
         byte[] secret = jwtSecret == null ? new byte[0] : jwtSecret.getBytes(StandardCharsets.UTF_8);
         if (secret.length < TAILLE_MIN_SECRET_OCTETS) {
             throw new IllegalStateException("JWT_SECRET doit faire au moins " + TAILLE_MIN_SECRET_OCTETS
-                    + " octets pour signer en HS256 (voir .env.properties)");
+                    + " octets pour signer en HS256 (variable d'environnement ; en local : .env.properties)");
         }
         this.cle = Keys.hmacShaKeyFor(secret);
     }

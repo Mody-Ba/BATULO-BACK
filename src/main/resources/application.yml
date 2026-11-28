@@ -1,11 +1,10 @@
 # Configuration Batulo.
 # Les valeurs sensibles viennent des variables d'environnement ou du fichier
-# .env.properties (racine du projet, ignoré par Git). Voir .env.properties.example.
+# .env.properties (racine du projet, ignoré par Git, jamais lu en prod : voir la fin de ce fichier).
+# Voir .env.properties.example. Production (Heroku) : application-prod.yml et docs/deploiement-heroku.md.
 spring:
   application:
     name: batulo
-  config:
-    import: optional:file:.env.properties
   profiles:
     # Profil « dev » par défaut pendant le développement : il active la route /api/dev (carte de test Stripe).
     # En production : SPRING_PROFILES_ACTIVE=prod (variable d'environnement ou .env.properties).
@@ -149,3 +148,11 @@ batulo:
 logging:
   level:
     com.batulo: INFO
+
+---
+# Fichier local des secrets : lu par tous les profils sauf prod (en prod, seulement les variables d'environnement).
+spring:
+  config:
+    activate:
+      on-profile: "!prod"
+    import: optional:file:.env.properties
